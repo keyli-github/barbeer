@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/api_constants.dart';
 import '../errors/app_exception.dart';
 import '../storage/secure_storage.dart';
@@ -23,13 +24,16 @@ class ApiClient {
     _onRefreshToken = onRefreshToken;
     _onSessionExpired = onSessionExpired;
     if (_initialized) return;
-    _dio = Dio(BaseOptions(
-      baseUrl: ApiConstants.baseUrl,
-      connectTimeout: ApiConstants.connectTimeout,
-      receiveTimeout: ApiConstants.receiveTimeout,
-      sendTimeout: ApiConstants.sendTimeout,
-      contentType: 'application/json',
-    ));
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: ApiConstants.baseUrl,
+        connectTimeout: ApiConstants.connectTimeout,
+        receiveTimeout: ApiConstants.receiveTimeout,
+        sendTimeout: ApiConstants.sendTimeout,
+        contentType: 'application/json',
+        headers: _deviceHeaders,
+      ),
+    );
     _initialized = true;
   }
 
@@ -41,8 +45,24 @@ class ApiClient {
     _onSessionExpired = onSessionExpired;
   }
 
-  static const _publicPaths = ['/auth/login', '/auth/refresh', '/auth/logout', '/health'];
-  static bool _isPublic(String path) => _publicPaths.any((p) => path.contains(p));
+  static const _publicPaths = {
+    '/auth/login',
+    '/auth/refresh',
+    '/auth/logout',
+    '/health',
+  };
+
+  static Map<String, String>? get _deviceHeaders {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
+    return const {
+      'x-device-name': 'Bar Beer Android',
+      'x-device-type': 'android',
+      'user-agent': 'BarBeer/1.0 (Android)',
+    };
+  }
+
+  static bool _isPublic(String path) =>
+      _publicPaths.contains(Uri.parse(path).path);
 
   Future<Map<String, dynamic>?> _headers(String path) async {
     if (_isPublic(path)) return null;
@@ -56,32 +76,58 @@ class ApiClient {
     return Options(headers: extra);
   }
 
-  Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     final h = await _headers(path);
-    return _execute(() => _dio.get<T>(path, queryParameters: queryParameters, options: _opts(h)), path);
+    return _execute(
+      () => _dio.get<T>(
+        path,
+        queryParameters: queryParameters,
+        options: _opts(h),
+      ),
+      path,
+    );
   }
 
   Future<Response<T>> post<T>(String path, {dynamic data}) async {
     final h = await _headers(path);
-    return _execute(() => _dio.post<T>(path, data: data, options: _opts(h)), path);
+    return _execute(
+      () => _dio.post<T>(path, data: data, options: _opts(h)),
+      path,
+    );
   }
 
   Future<Response<T>> patch<T>(String path, {dynamic data}) async {
     final h = await _headers(path);
-    return _execute(() => _dio.patch<T>(path, data: data, options: _opts(h)), path);
+    return _execute(
+      () => _dio.patch<T>(path, data: data, options: _opts(h)),
+      path,
+    );
   }
 
   Future<Response<T>> put<T>(String path, {dynamic data}) async {
     final h = await _headers(path);
-    return _execute(() => _dio.put<T>(path, data: data, options: _opts(h)), path);
+    return _execute(
+      () => _dio.put<T>(path, data: data, options: _opts(h)),
+      path,
+    );
   }
 
   Future<Response<T>> delete<T>(String path, {dynamic data}) async {
     final h = await _headers(path);
-    return _execute(() => _dio.delete<T>(path, data: data, options: _opts(h)), path);
+    return _execute(
+      () => _dio.delete<T>(path, data: data, options: _opts(h)),
+      path,
+    );
   }
 
-  Future<Response<T>> _execute<T>(Future<Response<T>> Function() fn, String path, {bool isRetry = false}) async {
+  Future<Response<T>> _execute<T>(
+    Future<Response<T>> Function() fn,
+    String path, {
+    bool isRetry = false,
+  }) async {
     try {
       return await fn();
     } on DioException catch (e) {
@@ -89,7 +135,13 @@ class ApiClient {
         final newToken = await _handleRefresh();
         if (newToken != null) {
           final h = {'Authorization': 'Bearer $newToken'};
-          return _execute(() => _dio.fetch<T>(e.requestOptions..headers['Authorization'] = 'Bearer $newToken'), path, isRetry: true);
+          return _execute(
+            () => _dio.fetch<T>(
+              e.requestOptions..headers['Authorization'] = 'Bearer $newToken',
+            ),
+            path,
+            isRetry: true,
+          );
         }
       }
       throw _mapError(e);
@@ -110,22 +162,34 @@ class ApiClient {
     try {
       final newToken = await _onRefreshToken?.call();
       if (newToken == null) {
-        for (final c in _refreshQueue) c.completeError('session_expired');
-        _refreshQueue.clear();
-        _onSessionExpired?.call();
+        await _expireSession();
         return null;
       }
       for (final c in _refreshQueue) c.complete(newToken);
       _refreshQueue.clear();
       return newToken;
+    } on NetworkException {
+      _failRefreshQueue();
+      return null;
     } catch (_) {
-      for (final c in _refreshQueue) c.completeError('session_expired');
-      _refreshQueue.clear();
-      _onSessionExpired?.call();
+      await _expireSession();
       return null;
     } finally {
       _isRefreshing = false;
     }
+  }
+
+  void _failRefreshQueue() {
+    for (final c in _refreshQueue) {
+      c.completeError('session_expired');
+    }
+    _refreshQueue.clear();
+  }
+
+  Future<void> _expireSession() async {
+    _failRefreshQueue();
+    await SecureStorageService.instance.clearSession();
+    _onSessionExpired?.call();
   }
 
   AppException _mapError(DioException e) {
@@ -166,7 +230,9 @@ class ApiClient {
         return ValidationException(message: msg);
       case 429:
         return const AppException(
-            message: 'Demasiados intentos. Espera un momento.', statusCode: 429);
+          message: 'Demasiados intentos. Espera un momento.',
+          statusCode: 429,
+        );
       case 423:
         return AppException(message: msg, statusCode: 423); // cuenta bloqueada
       default:

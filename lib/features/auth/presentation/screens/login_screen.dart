@@ -17,7 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   final _formKey = GlobalKey<FormState>();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  bool _rememberMe = false, _loading = false;
+  bool _loading = false;
   String? _error;
   late AnimationController _anim;
   late Animation<double> _fade;
@@ -42,7 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       await ref.read(authProvider.notifier).login(
           username: _userCtrl.text.trim(),
           password: _passCtrl.text,
-          rememberMe: _rememberMe);
+          rememberMe: true);
     } catch (e) {
       String msg = e.toString()
           .replaceAll('AppException: ', '')
@@ -63,37 +63,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark),
-        child: SafeArea(child: GestureDetector(onTap: () => FocusScope.of(context).unfocus(),
-          child: SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: FadeTransition(opacity: _fade, child: SlideTransition(position: _slide,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                SizedBox(height: size.height * 0.08),
-                _brand(),
-                SizedBox(height: size.height * 0.05),
-                _card(),
-                const SizedBox(height: 16),
-                Text('Bar Beer 2024', style: AppTextStyles.labelSmall),
-                const SizedBox(height: 24),
-              ]))))))));
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+        ),
+        child: SafeArea(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: FadeTransition(
+                opacity: _fade,
+                child: SlideTransition(
+                  position: _slide,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(height: size.height * 0.08),
+                      _brand(),
+                      SizedBox(height: size.height * 0.05),
+                      _card(),
+                      const SizedBox(height: 16),
+                      Text('Bar Beer 2024', style: AppTextStyles.labelSmall),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _brand() => Column(children: [
-    Container(width: 80, height: 80,
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
-          shape: BoxShape.circle, boxShadow: AppShadows.button),
-      child: const Icon(Icons.local_bar_rounded, color: Colors.white, size: 40)),
+    Image.asset('assets/images/barbeer.webp', width: 100, height: 100),
     const SizedBox(height: 16),
     Text('Bar Beer', style: AppTextStyles.displayMedium.copyWith(color: AppColors.primary, fontWeight: FontWeight.w900)),
     const SizedBox(height: 6),
     const Text('Sistema de gestion', style: AppTextStyles.bodyMedium),
   ]);
 
-  Widget _card() => Container(
+  Widget _card() => Theme(
+    data: Theme.of(context).copyWith(
+      inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+        fillColor: Colors.white,
+      ),
+    ),
+    child: Container(
     padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.lg),
         boxShadow: AppShadows.cardElevated, border: Border.all(color: AppColors.borderLight, width: 0.5)),
     child: Form(key: _formKey, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Iniciar sesion', style: AppTextStyles.headlineMedium),
@@ -109,15 +131,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
           prefixIcon: Icons.lock_outline_rounded, obscureText: true,
           textInputAction: TextInputAction.done, onSubmitted: (_) => _login(),
           validator: (v) => v == null || v.isEmpty ? 'Requerido' : null),
-      const SizedBox(height: 16),
-      Row(children: [
-        SizedBox(width: 20, height: 20, child: Checkbox(value: _rememberMe, onChanged: (v) => setState(() => _rememberMe = v ?? false))),
-        const SizedBox(width: 10),
-        const Text('Mantener sesion iniciada', style: AppTextStyles.bodySmall),
-      ]),
-      const SizedBox(height: 24),
+       const SizedBox(height: 24),
       PrimaryButton(label: 'Ingresar', onPressed: _loading ? null : _login, isLoading: _loading, icon: Icons.login_rounded),
-    ])));
+    ]))));
 
   Widget _errBox(String msg) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

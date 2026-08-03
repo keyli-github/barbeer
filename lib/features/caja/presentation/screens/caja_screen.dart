@@ -1,181 +1,1530 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_text_field.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/caja_repository.dart';
+import '../providers/caja_provider.dart';
 
-class CajaMovimiento {
-  final String id, tipo, concepto, metodoPago;
-  final double monto;
-  final DateTime fecha;
-  const CajaMovimiento({required this.id, required this.tipo, required this.concepto,
-      required this.metodoPago, required this.monto, required this.fecha});
-}
-
-class CajaState {
-  final List<CajaMovimiento> movimientos;
-  final double saldoInicial;
-  final bool cajaAbierta;
-  const CajaState({this.movimientos = const [], this.saldoInicial = 500.0, this.cajaAbierta = true});
-  double get ingresos => movimientos.where((m) => m.tipo == 'INGRESO').fold(0, (s, m) => s + m.monto);
-  double get egresos => movimientos.where((m) => m.tipo == 'EGRESO').fold(0, (s, m) => s + m.monto);
-  double get saldoActual => saldoInicial + ingresos - egresos;
-}
-
-class CajaNotifier extends StateNotifier<CajaState> {
-  CajaNotifier() : super(CajaState(movimientos: _mock));
-  static final _mock = [
-    CajaMovimiento(id:'1',tipo:'INGRESO',concepto:'Apertura de caja',metodoPago:'Efectivo',monto:500,fecha:DateTime.now().subtract(const Duration(hours:6))),
-    CajaMovimiento(id:'2',tipo:'INGRESO',concepto:'Venta POS',metodoPago:'Efectivo',monto:125,fecha:DateTime.now().subtract(const Duration(hours:4))),
-    CajaMovimiento(id:'3',tipo:'INGRESO',concepto:'Venta POS',metodoPago:'Tarjeta',monto:85,fecha:DateTime.now().subtract(const Duration(hours:3))),
-    CajaMovimiento(id:'4',tipo:'EGRESO',concepto:'Pago proveedor',metodoPago:'Efectivo',monto:200,fecha:DateTime.now().subtract(const Duration(hours:2))),
-    CajaMovimiento(id:'5',tipo:'INGRESO',concepto:'Venta POS',metodoPago:'Efectivo',monto:220,fecha:DateTime.now().subtract(const Duration(hours:1))),
-    CajaMovimiento(id:'6',tipo:'EGRESO',concepto:'Propinas staff',metodoPago:'Efectivo',monto:50,fecha:DateTime.now().subtract(const Duration(minutes:30))),
-  ];
-
-  void addEgreso(String concepto, double monto) {
-    state = CajaState(movimientos: [...state.movimientos,
-      CajaMovimiento(id: DateTime.now().toString(), tipo: 'EGRESO', concepto: concepto, metodoPago: 'Efectivo', monto: monto, fecha: DateTime.now())],
-      saldoInicial: state.saldoInicial, cajaAbierta: state.cajaAbierta);
-  }
-  void cerrarCaja() => state = CajaState(movimientos: state.movimientos, saldoInicial: state.saldoInicial, cajaAbierta: false);
-}
-
-final cajaProvider = StateNotifierProvider<CajaNotifier, CajaState>((ref) => CajaNotifier());
-
-class CajaScreen extends ConsumerWidget {
+class CajaScreen extends ConsumerStatefulWidget {
   const CajaScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CajaScreen> createState() => _CajaScreenState();
+}
+
+class _CajaScreenState extends ConsumerState<CajaScreen> {
+  bool _historial = false;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(cajaProvider);
-    return Scaffold(backgroundColor: AppColors.backgroundAlt,
-      body: SafeArea(bottom: false, child: CustomScrollView(slivers: [
-        SliverAppBar(floating: true, snap: true, backgroundColor: AppColors.background, elevation: 0, scrolledUnderElevation: 0,
-          leading: Builder(builder: (ctx) => IconButton(icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary), onPressed: () => Scaffold.of(ctx).openDrawer())),
-          title: Row(children: [
-            const Text('Caja', style: AppTextStyles.appBarTitle),
-            const SizedBox(width: 10),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: state.cajaAbierta ? AppColors.successLight : AppColors.errorLight, borderRadius: BorderRadius.circular(100)),
-              child: Text(state.cajaAbierta ? 'Abierta' : 'Cerrada',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: state.cajaAbierta ? AppColors.success : AppColors.error))),
-          ]),
-          actions: [
-            if (state.cajaAbierta) ...[
-              TextButton(onPressed: () => _showEgreso(context, ref), child: const Text('+ Egreso')),
-              TextButton(onPressed: () => _confirmCerrar(context, ref),
-                  child: const Text('Cerrar caja', style: TextStyle(color: AppColors.error))),
-            ],
-          ]),
-        SliverPadding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          sliver: SliverList(delegate: SliverChildListDelegate([
-            Row(children: [
-              Expanded(child: _KpiCard(label: 'Saldo inicial', value: state.saldoInicial, icon: Icons.account_balance_wallet_rounded, color: AppColors.textSecondary)),
-              const SizedBox(width: 10),
-              Expanded(child: _KpiCard(label: 'Ingresos', value: state.ingresos, icon: Icons.trending_up_rounded, color: AppColors.success)),
-            ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: _KpiCard(label: 'Egresos', value: state.egresos, icon: Icons.trending_down_rounded, color: AppColors.error)),
-              const SizedBox(width: 10),
-              Expanded(child: _KpiCard(label: 'Saldo actual', value: state.saldoActual, icon: Icons.account_balance_rounded, color: AppColors.primary)),
-            ]),
-            const SizedBox(height: 20),
-            _DesglosePago(movimientos: state.movimientos),
-            const SizedBox(height: 20),
-            Row(children: [const Text('Movimientos', style: AppTextStyles.titleLarge), const Spacer(),
-              Text('${state.movimientos.length} registros', style: AppTextStyles.bodySmall)]),
-            const SizedBox(height: 10),
-            for (final m in state.movimientos.reversed)
-              Padding(padding: const EdgeInsets.only(bottom: 6), child: AppCard(
-                child: Row(children: [
-                  Container(width: 36, height: 36,
-                    decoration: BoxDecoration(color: m.tipo == 'INGRESO' ? AppColors.successLight : AppColors.errorLight, borderRadius: BorderRadius.circular(8)),
-                    child: Icon(m.tipo == 'INGRESO' ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                        color: m.tipo == 'INGRESO' ? AppColors.success : AppColors.error, size: 18)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(m.concepto, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500)),
-                    Text('${m.metodoPago} · ${m.fecha.hour.toString().padLeft(2,'0')}:${m.fecha.minute.toString().padLeft(2,'0')}', style: AppTextStyles.labelSmall),
-                  ])),
-                  Text('${m.tipo == 'INGRESO' ? '+' : '-'} S/ ${m.monto.toStringAsFixed(2)}',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14,
-                          color: m.tipo == 'INGRESO' ? AppColors.success : AppColors.error)),
-                ]))),
-          ]))),
-      ])));
+    final auth = ref.watch(authProvider);
+    final actual = state.actual;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundAlt,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _Header(
+              historial: _historial,
+              state: state,
+              isSuperAdmin: auth.user?.isSuperAdmin ?? false,
+              onTab: (value) => setState(() => _historial = value),
+              onSede: (value) {
+                if (value != null) {
+                  ref.read(cajaProvider.notifier).seleccionarSede(value);
+                }
+              },
+            ),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                child: state.isLoading
+                    ? const _CajaSkeleton(key: ValueKey('loading'))
+                    : state.error != null &&
+                            actual == null &&
+                            state.historial.isEmpty
+                        ? AppErrorState(
+                            key: const ValueKey('error'),
+                            message: state.error!,
+                            onRetry: ref.read(cajaProvider.notifier).load,
+                          )
+                        : _historial
+                            ? _Historial(
+                                key: const ValueKey('history'),
+                                state: state,
+                                onFilter: ref
+                                    .read(cajaProvider.notifier)
+                                    .filtrarHistorial,
+                                onPage: ref
+                                    .read(cajaProvider.notifier)
+                                    .cambiarPaginaHistorial,
+                                onDetail: (id) => _showDetail(context, id),
+                              )
+                            : _Actual(
+                                key: const ValueKey('current'),
+                                state: state,
+                                canOpen:
+                                    auth.hasPermission('caja:aperturar'),
+                                canMove:
+                                    auth.hasPermission('caja:movimientos'),
+                                canPrecuadre:
+                                    auth.hasPermission('caja:precuadre'),
+                                canClose: auth.hasPermission('caja:cerrar'),
+                                onOpen: () => _showOpening(context),
+                                onMove: () => _showMovement(context),
+                                onPrecuadre: () => _showArqueo(
+                                  context,
+                                  cierre: false,
+                                ),
+                                onClose: () => _showArqueo(
+                                  context,
+                                  cierre: true,
+                                ),
+                                onMovementFilter: (tipo) {
+                                  if (actual != null) {
+                                    ref
+                                        .read(cajaProvider.notifier)
+                                        .filtrarMovimientos(actual.id, tipo);
+                                  }
+                                },
+                                onMovementPage: (page) {
+                                  if (actual != null) {
+                                    ref
+                                        .read(cajaProvider.notifier)
+                                        .loadMovimientos(
+                                          actual.id,
+                                          pagina: page,
+                                        );
+                                  }
+                                },
+                              ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void _showEgreso(BuildContext context, WidgetRef ref) {
-    final conceptoCtrl = TextEditingController();
-    final montoCtrl = TextEditingController();
-    showModalBottomSheet(context: context, backgroundColor: Colors.transparent, isScrollControlled: true,
-      builder: (_) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
-        child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-          const Text('Registrar egreso', style: AppTextStyles.headlineMedium),
-          const SizedBox(height: 20),
-          TextField(controller: conceptoCtrl, decoration: const InputDecoration(labelText: 'Concepto', prefixIcon: Icon(Icons.description_rounded))),
-          const SizedBox(height: 12),
-          TextField(controller: montoCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Monto (S/)', prefixIcon: Icon(Icons.attach_money_rounded))),
-          const SizedBox(height: 20),
-          SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
-            onPressed: () { final m = double.tryParse(montoCtrl.text) ?? 0;
-              if (conceptoCtrl.text.isNotEmpty && m > 0) { ref.read(cajaProvider.notifier).addEgreso(conceptoCtrl.text, m); Navigator.of(context).pop(); } },
-            child: const Text('Registrar egreso'))),
-        ]))));
+  Future<void> _showDetail(BuildContext context, String id) async {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _DetailSheet(
+        future: ref.read(cajaProvider.notifier).detalle(id),
+      ),
+    );
   }
 
-  Future<void> _confirmCerrar(BuildContext context, WidgetRef ref) async {
-    final ok = await ConfirmDialog.show(context: context, title: 'Cerrar caja', description: 'Se cerrara la caja del dia.', confirmLabel: 'Cerrar caja', isDanger: true);
-    if (ok) ref.read(cajaProvider.notifier).cerrarCaja();
+  Future<void> _showOpening(BuildContext context) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _OpeningSheet(),
+    );
+    if (saved == true && mounted) _success('Caja abierta correctamente');
   }
-}
 
-class _KpiCard extends StatelessWidget {
-  final String label; final double value; final IconData icon; final Color color;
-  const _KpiCard({required this.label, required this.value, required this.icon, required this.color});
-  @override Widget build(BuildContext context) => AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Row(children: [Icon(icon, color: color, size: 20), const Spacer(),
-      Text(label, style: AppTextStyles.labelSmall)]),
-    const SizedBox(height: 8),
-    Text('S/ ${value.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color)),
-  ]));
-}
+  Future<void> _showMovement(BuildContext context) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _MovementSheet(),
+    );
+    if (saved == true && mounted) _success('Movimiento registrado');
+  }
 
-class _DesglosePago extends StatelessWidget {
-  final List<CajaMovimiento> movimientos;
-  const _DesglosePago({required this.movimientos});
-  @override Widget build(BuildContext context) {
-    final methods = <String, double>{};
-    for (final m in movimientos.where((m) => m.tipo == 'INGRESO')) {
-      methods[m.metodoPago] = (methods[m.metodoPago] ?? 0) + m.monto;
+  Future<void> _showArqueo(
+    BuildContext context, {
+    required bool cierre,
+  }) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ArqueoSheet(cierre: cierre),
+    );
+    if (saved == true && mounted) {
+      _success(cierre ? 'Caja cerrada correctamente' : 'Precuadre registrado');
     }
-    final total = methods.values.fold(0.0, (a, b) => a + b);
-    return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Desglose por metodo', style: AppTextStyles.titleMedium),
-      const SizedBox(height: 12),
-      for (final e in methods.entries) ...[
-        Row(children: [
-          SizedBox(width: 100, child: Text(e.key, style: AppTextStyles.bodySmall)),
-          const SizedBox(width: 8),
-          Expanded(child: Stack(children: [
-            Container(height: 8, decoration: BoxDecoration(color: AppColors.backgroundAlt, borderRadius: BorderRadius.circular(4))),
-            FractionallySizedBox(widthFactor: total > 0 ? e.value / total : 0,
-              child: Container(height: 8, decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(4)))),
-          ])),
-          const SizedBox(width: 8),
-          Text('S/ ${e.value.toStringAsFixed(0)}', style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.w600)),
-        ]),
-        const SizedBox(height: 8),
-      ],
-    ]));
   }
+
+  void _success(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  final bool historial;
+  final CajaState state;
+  final bool isSuperAdmin;
+  final ValueChanged<bool> onTab;
+  final ValueChanged<String?> onSede;
+
+  const _Header({
+    required this.historial,
+    required this.state,
+    required this.isSuperAdmin,
+    required this.onTab,
+    required this.onSede,
+  });
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.background,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySurface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: AppColors.primary,
+                      size: 21,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Caja', style: AppTextStyles.headlineLarge),
+                        Text(
+                          'Control operativo del turno',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSuperAdmin && state.sedes.isNotEmpty)
+                    SizedBox(
+                      width: 150,
+                      child: DropdownButtonFormField<String>(
+                        value: state.sedeId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Sede',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                        ),
+                        items: state.sedes
+                            .map(
+                              (sede) => DropdownMenuItem(
+                                value: sede['id'] as String,
+                                child: Text(
+                                  sede['nombre'] as String? ?? '',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: onSede,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundAlt,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+                child: Row(
+                  children: [
+                    _Tab(
+                      label: 'Turno actual',
+                      selected: !historial,
+                      onTap: () => onTab(false),
+                    ),
+                    _Tab(
+                      label: 'Historial',
+                      selected: historial,
+                      onTap: () => onTab(true),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _Tab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _Tab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.surface : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: selected ? AppShadows.card : null,
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelLarge.copyWith(
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _Actual extends StatelessWidget {
+  final CajaState state;
+  final bool canOpen;
+  final bool canMove;
+  final bool canPrecuadre;
+  final bool canClose;
+  final VoidCallback onOpen;
+  final VoidCallback onMove;
+  final VoidCallback onPrecuadre;
+  final VoidCallback onClose;
+  final ValueChanged<String?> onMovementFilter;
+  final ValueChanged<int> onMovementPage;
+
+  const _Actual({
+    super.key,
+    required this.state,
+    required this.canOpen,
+    required this.canMove,
+    required this.canPrecuadre,
+    required this.canClose,
+    required this.onOpen,
+    required this.onMove,
+    required this.onPrecuadre,
+    required this.onClose,
+    required this.onMovementFilter,
+    required this.onMovementPage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final session = state.actual;
+    if (session == null) {
+      return AppEmptyState(
+        icon: Icons.lock_clock_outlined,
+        title: 'No hay una caja abierta',
+        description: canOpen
+            ? 'Registra el conteo de efectivo para iniciar el turno.'
+            : 'Un usuario autorizado debe abrir la caja de esta sede.',
+        actionLabel: canOpen ? 'Abrir caja' : null,
+        onAction: canOpen ? onOpen : null,
+      );
+    }
+    final summary = session.resumen ??
+        CajaResumen(
+          totalEntradas: 0,
+          totalSalidas: 0,
+          saldoEsperado: session.montoApertura,
+        );
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () async {},
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+        children: [
+          Row(
+            children: [
+              _StatusPill(label: session.estado, color: AppColors.success),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${session.sede} · ${_dateTime(session.abiertaAt)}',
+                  style: AppTextStyles.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = (constraints.maxWidth - 10) / 2;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _Metric(
+                    width: width,
+                    label: 'Apertura',
+                    value: session.montoApertura,
+                    icon: Icons.play_circle_outline_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                  _Metric(
+                    width: width,
+                    label: 'Entradas',
+                    value: summary.totalEntradas,
+                    icon: Icons.south_west_rounded,
+                    color: AppColors.success,
+                  ),
+                  _Metric(
+                    width: width,
+                    label: 'Salidas',
+                    value: summary.totalSalidas,
+                    icon: Icons.north_east_rounded,
+                    color: AppColors.error,
+                  ),
+                  _Metric(
+                    width: width,
+                    label: 'Saldo esperado',
+                    value: summary.saldoEsperado,
+                    icon: Icons.account_balance_rounded,
+                    color: AppColors.primary,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (canMove)
+                FilledButton.icon(
+                  onPressed: state.isActing ? null : onMove,
+                  icon: const Icon(Icons.swap_vert_rounded, size: 18),
+                  label: const Text('Movimiento'),
+                ),
+              if (canPrecuadre)
+                OutlinedButton.icon(
+                  onPressed: state.isActing ? null : onPrecuadre,
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('Precuadre'),
+                ),
+              if (canClose)
+                OutlinedButton.icon(
+                  onPressed: state.isActing ? null : onClose,
+                  icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                  label: const Text('Cerrar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                  ),
+                ),
+            ],
+          ),
+          if (session.precuadreAt != null) ...[
+            const SizedBox(height: 12),
+            _PrecuadreBanner(session: session),
+          ],
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Movimientos', style: AppTextStyles.titleLarge),
+              ),
+              Text(
+                '${state.movimientosTotal} registros',
+                style: AppTextStyles.labelSmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _FilterRow(
+            selected: state.tipoFiltro,
+            values: const [null, 'ENTRADA', 'SALIDA'],
+            labels: const ['Todos', 'Entradas', 'Salidas'],
+            onChanged: onMovementFilter,
+          ),
+          const SizedBox(height: 10),
+          if (state.movimientos.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: AppEmptyState(
+                icon: Icons.receipt_long_outlined,
+                title: 'Sin movimientos',
+                description: 'El turno aun no registra entradas ni salidas.',
+              ),
+            )
+          else
+            for (final movement in state.movimientos)
+              _MovementTile(movement: movement),
+          _Pager(
+            page: state.movimientosPagina,
+            pages: state.movimientosPaginas,
+            total: state.movimientosTotal,
+            onPage: onMovementPage,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Historial extends StatelessWidget {
+  final CajaState state;
+  final ValueChanged<String?> onFilter;
+  final ValueChanged<int> onPage;
+  final ValueChanged<String> onDetail;
+
+  const _Historial({
+    super.key,
+    required this.state,
+    required this.onFilter,
+    required this.onPage,
+    required this.onDetail,
+  });
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+        children: [
+          _FilterRow(
+            selected: state.estadoFiltro,
+            values: const [null, 'ABIERTA', 'CERRADA'],
+            labels: const ['Todas', 'Abiertas', 'Cerradas'],
+            onChanged: onFilter,
+          ),
+          const SizedBox(height: 12),
+          if (state.historial.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: AppEmptyState(
+                icon: Icons.history_rounded,
+                title: 'Sin sesiones de caja',
+                description: 'No hay resultados para el filtro seleccionado.',
+              ),
+            )
+          else
+            for (final session in state.historial)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: AppCard(
+                  onTap: () => onDetail(session.id),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: session.estado == 'ABIERTA'
+                              ? AppColors.successLight
+                              : AppColors.backgroundAlt,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Icon(
+                          session.estado == 'ABIERTA'
+                              ? Icons.lock_open_rounded
+                              : Icons.lock_rounded,
+                          color: session.estado == 'ABIERTA'
+                              ? AppColors.success
+                              : AppColors.textSecondary,
+                          size: 19,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(session.sede, style: AppTextStyles.titleMedium),
+                            Text(
+                              '${_dateTime(session.abiertaAt)} · ${session.usuarioApertura}',
+                              style: AppTextStyles.labelSmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _StatusPill(
+                            label: session.estado,
+                            color: session.estado == 'ABIERTA'
+                                ? AppColors.success
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            _money(
+                              session.resumen?.saldoEsperado ??
+                                  session.montoApertura,
+                            ),
+                            style: AppTextStyles.labelLarge.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          _Pager(
+            page: state.historialPagina,
+            pages: state.historialPaginas,
+            total: state.historialTotal,
+            onPage: onPage,
+          ),
+        ],
+      );
+}
+
+class _OpeningSheet extends ConsumerStatefulWidget {
+  const _OpeningSheet();
+
+  @override
+  ConsumerState<_OpeningSheet> createState() => _OpeningSheetState();
+}
+
+class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
+  late final Map<double, TextEditingController> _controllers = {
+    for (final value in cajaDenominaciones) value: TextEditingController(),
+  };
+  bool _loading = false;
+
+  double get _total => _controllers.entries.fold(
+        0,
+        (sum, entry) =>
+            sum + entry.key * (int.tryParse(entry.value.text) ?? 0),
+      );
+
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _SheetFrame(
+        title: 'Apertura de caja',
+        subtitle: 'Conteo obligatorio de las 10 denominaciones PEN',
+        child: Column(
+          children: [
+            GridView.count(
+              crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              children: [
+                for (final value in cajaDenominaciones)
+                  TextFormField(
+                    controller: _controllers[value],
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'S/ ${_denomination(value)}',
+                      hintText: '0',
+                      prefixIcon: const Icon(
+                        Icons.payments_outlined,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _TotalBand(label: 'Total de apertura', value: _total),
+            const SizedBox(height: 18),
+            PrimaryButton(
+              label: 'Abrir caja',
+              icon: Icons.lock_open_rounded,
+              isLoading: _loading,
+              onPressed: _submit,
+            ),
+          ],
+        ),
+      );
+
+  Future<void> _submit() async {
+    setState(() => _loading = true);
+    try {
+      await ref.read(cajaProvider.notifier).abrir({
+        for (final entry in _controllers.entries)
+          entry.key: int.tryParse(entry.value.text) ?? 0,
+      });
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) _sheetError(context, error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
+
+class _MovementOption {
+  final String label;
+  final String tipo;
+  final String origen;
+  final String medio;
+  final bool voucher;
+
+  const _MovementOption(
+    this.label,
+    this.tipo,
+    this.origen,
+    this.medio, {
+    this.voucher = false,
+  });
+}
+
+const _movementOptions = [
+  _MovementOption('Entrada manual en efectivo', 'ENTRADA', 'MANUAL', 'EFECTIVO'),
+  _MovementOption('Venta en efectivo', 'ENTRADA', 'VENTA', 'EFECTIVO'),
+  _MovementOption('Salida en efectivo', 'SALIDA', 'MANUAL', 'EFECTIVO'),
+  _MovementOption('Salida con tarjeta', 'SALIDA', 'MANUAL', 'TARJETA'),
+  _MovementOption('Otra salida', 'SALIDA', 'MANUAL', 'OTRO'),
+  _MovementOption(
+    'Pago por Yape',
+    'SALIDA',
+    'PAGO_NO_EFECTIVO',
+    'YAPE',
+    voucher: true,
+  ),
+  _MovementOption(
+    'Pago por transferencia',
+    'SALIDA',
+    'PAGO_NO_EFECTIVO',
+    'TRANSFERENCIA',
+    voucher: true,
+  ),
+];
+
+class _MovementSheet extends ConsumerStatefulWidget {
+  const _MovementSheet();
+
+  @override
+  ConsumerState<_MovementSheet> createState() => _MovementSheetState();
+}
+
+class _MovementSheetState extends ConsumerState<_MovementSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _conceptController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _referenceController = TextEditingController();
+  final _voucherController = TextEditingController();
+  _MovementOption _option = _movementOptions.first;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _conceptController.dispose();
+    _amountController.dispose();
+    _referenceController.dispose();
+    _voucherController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _SheetFrame(
+        title: 'Registrar movimiento',
+        subtitle: 'Los tipos y medios se ajustan a las reglas de caja',
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              DropdownButtonFormField<_MovementOption>(
+                value: _option,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Operacion'),
+                items: _movementOptions
+                    .map(
+                      (option) => DropdownMenuItem(
+                        value: option,
+                        child: Text(option.label),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _option = value);
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _ReadOnlyChip(label: _option.tipo)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _ReadOnlyChip(label: _option.origen)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _ReadOnlyChip(label: _option.medio)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Concepto',
+                hint: 'Motivo del movimiento',
+                controller: _conceptController,
+                maxLength: 160,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'El concepto es obligatorio'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Monto (S/)',
+                hint: '0.00',
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  final amount = double.tryParse(value ?? '');
+                  return amount == null || amount <= 0 ? 'Monto invalido' : null;
+                },
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Referencia (opcional)',
+                hint: 'Documento o correlativo',
+                controller: _referenceController,
+                maxLength: 100,
+              ),
+              if (_option.voucher) ...[
+                const SizedBox(height: 12),
+                AppTextField(
+                  label: 'Voucher o comprobante',
+                  hint: 'URL o identificador del voucher',
+                  controller: _voucherController,
+                  maxLength: 500,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Yape y transferencia requieren voucher'
+                      : null,
+                ),
+              ],
+              const SizedBox(height: 20),
+              PrimaryButton(
+                label: 'Registrar movimiento',
+                isLoading: _loading,
+                onPressed: _submit,
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(cajaProvider.notifier).registrarMovimiento({
+        'tipo': _option.tipo,
+        'origen': _option.origen,
+        'medioPago': _option.medio,
+        'concepto': _conceptController.text.trim(),
+        'monto': double.parse(_amountController.text),
+        if (_referenceController.text.trim().isNotEmpty)
+          'referencia': _referenceController.text.trim(),
+        if (_option.voucher) 'comprobante': _voucherController.text.trim(),
+      });
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) _sheetError(context, error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
+
+class _ArqueoSheet extends ConsumerStatefulWidget {
+  final bool cierre;
+
+  const _ArqueoSheet({required this.cierre});
+
+  @override
+  ConsumerState<_ArqueoSheet> createState() => _ArqueoSheetState();
+}
+
+class _ArqueoSheetState extends ConsumerState<_ArqueoSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _notesController = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final expected = ref.watch(cajaProvider).actual?.resumen?.saldoEsperado ?? 0;
+    final declared = double.tryParse(_amountController.text) ?? 0;
+    return _SheetFrame(
+      title: widget.cierre ? 'Cerrar caja' : 'Registrar precuadre',
+      subtitle: widget.cierre
+          ? 'El cierre es definitivo para este turno'
+          : 'Compara el efectivo contado con el saldo esperado',
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            _TotalBand(label: 'Saldo esperado', value: expected),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Monto declarado (S/)',
+              hint: '0.00',
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) => setState(() {}),
+              validator: (value) {
+                final amount = double.tryParse(value ?? '');
+                return amount == null || amount < 0 ? 'Monto invalido' : null;
+              },
+            ),
+            const SizedBox(height: 10),
+            _Difference(value: declared - expected),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Observaciones (opcional)',
+              hint: 'Detalle del arqueo',
+              controller: _notesController,
+              maxLength: 500,
+              maxLines: 3,
+            ),
+            const SizedBox(height: 20),
+            AppButton(
+              label: widget.cierre ? 'Confirmar cierre' : 'Guardar precuadre',
+              isFullWidth: true,
+              isLoading: _loading,
+              variant: widget.cierre
+                  ? AppButtonVariant.danger
+                  : AppButtonVariant.primary,
+              onPressed: _submit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      final amount = double.parse(_amountController.text);
+      if (widget.cierre) {
+        await ref
+            .read(cajaProvider.notifier)
+            .cerrar(amount, _notesController.text);
+      } else {
+        await ref
+            .read(cajaProvider.notifier)
+            .precuadre(amount, _notesController.text);
+      }
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) _sheetError(context, error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
+
+class _DetailSheet extends StatelessWidget {
+  final Future<CajaSesion> future;
+
+  const _DetailSheet({required this.future});
+
+  @override
+  Widget build(BuildContext context) => _SheetFrame(
+        title: 'Detalle de caja',
+        subtitle: 'Resumen y arqueos registrados por el servidor',
+        child: FutureBuilder<CajaSesion>(
+          future: future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const _InlineSkeleton();
+            }
+            if (snapshot.hasError) {
+              return AppErrorState(message: snapshot.error.toString());
+            }
+            final session = snapshot.data!;
+            final values = <String, String>{
+              'Sede': session.sede,
+              'Estado': session.estado,
+              'Apertura': _money(session.montoApertura),
+              'Abierta por': session.usuarioApertura,
+              'Fecha de apertura': _dateTime(session.abiertaAt),
+              if (session.resumen != null)
+                'Saldo esperado': _money(session.resumen!.saldoEsperado),
+              if (session.montoDeclaradoPrecuadre != null)
+                'Precuadre declarado':
+                    _money(session.montoDeclaradoPrecuadre!),
+              if (session.diferenciaPrecuadre != null)
+                'Diferencia precuadre': _money(session.diferenciaPrecuadre!),
+              if (session.montoDeclaradoCierre != null)
+                'Cierre declarado': _money(session.montoDeclaradoCierre!),
+              if (session.diferenciaCierre != null)
+                'Diferencia cierre': _money(session.diferenciaCierre!),
+              if (session.cerradaAt != null)
+                'Fecha de cierre': _dateTime(session.cerradaAt!),
+              if (session.observacionesCierre?.isNotEmpty ?? false)
+                'Observaciones': session.observacionesCierre!,
+            };
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final entry in values.entries) ...[
+                  _DetailRow(label: entry.key, value: entry.value),
+                  const Divider(height: 18),
+                ],
+                const SizedBox(height: 8),
+                const Text(
+                  'Conteo de apertura',
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: session.denominaciones
+                      .map(
+                        (item) => _ReadOnlyChip(
+                          label:
+                              'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+}
+
+class _SheetFrame extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _SheetFrame({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 38,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: AppTextStyles.headlineMedium),
+                        const SizedBox(height: 3),
+                        Text(subtitle, style: AppTextStyles.labelSmall),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: child,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _Metric extends StatelessWidget {
+  final double width;
+  final String label;
+  final double value;
+  final IconData icon;
+  final Color color;
+
+  const _Metric({
+    required this.width,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 18),
+                  const SizedBox(width: 7),
+                  Expanded(child: Text(label, style: AppTextStyles.labelSmall)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _money(value),
+                style: AppTextStyles.titleLarge.copyWith(color: color),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _MovementTile extends StatelessWidget {
+  final CajaMovimiento movement;
+
+  const _MovementTile({required this.movement});
+
+  @override
+  Widget build(BuildContext context) {
+    final incoming = movement.tipo == 'ENTRADA';
+    final color = incoming ? AppColors.success : AppColors.error;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: AppCard(
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                incoming ? Icons.south_west_rounded : Icons.north_east_rounded,
+                color: color,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movement.concepto,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${movement.medioPago} · ${movement.origen} · ${_dateTime(movement.createdAt)}',
+                    style: AppTextStyles.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${incoming ? '+' : '-'} ${_money(movement.monto)}',
+              style: AppTextStyles.labelLarge.copyWith(color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  final String? selected;
+  final List<String?> values;
+  final List<String> labels;
+  final ValueChanged<String?> onChanged;
+
+  const _FilterRow({
+    required this.selected,
+    required this.values,
+    required this.labels,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(values.length, (index) {
+            final active = selected == values[index];
+            return Padding(
+              padding: const EdgeInsets.only(right: 7),
+              child: ChoiceChip(
+                selected: active,
+                label: Text(labels[index]),
+                onSelected: (_) => onChanged(values[index]),
+                showCheckmark: false,
+                visualDensity: VisualDensity.compact,
+                selectedColor: AppColors.primarySurface,
+                side: BorderSide(
+                  color: active ? AppColors.primaryBorder : AppColors.border,
+                ),
+                labelStyle: AppTextStyles.labelSmall.copyWith(
+                  color: active ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            );
+          }),
+        ),
+      );
+}
+
+class _Pager extends StatelessWidget {
+  final int page;
+  final int pages;
+  final int total;
+  final ValueChanged<int> onPage;
+
+  const _Pager({
+    required this.page,
+    required this.pages,
+    required this.total,
+    required this.onPage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (pages <= 1) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        children: [
+          Text('$total registros', style: AppTextStyles.labelSmall),
+          const Spacer(),
+          IconButton.outlined(
+            visualDensity: VisualDensity.compact,
+            onPressed: page > 1 ? () => onPage(page - 1) : null,
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text('$page / $pages', style: AppTextStyles.labelLarge),
+          ),
+          IconButton.outlined(
+            visualDensity: VisualDensity.compact,
+            onPressed: page < pages ? () => onPage(page + 1) : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrecuadreBanner extends StatelessWidget {
+  final CajaSesion session;
+
+  const _PrecuadreBanner({required this.session});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.warningLight,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.warning.withOpacity(0.28)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.fact_check_outlined, color: AppColors.warning),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Precuadre ${_money(session.montoDeclaradoPrecuadre ?? 0)} · diferencia ${_money(session.diferenciaPrecuadre ?? 0)}',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _TotalBand extends StatelessWidget {
+  final String label;
+  final double value;
+
+  const _TotalBand({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.primarySurface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.primaryBorder),
+        ),
+        child: Row(
+          children: [
+            Text(label, style: AppTextStyles.bodyMedium),
+            const Spacer(),
+            Text(
+              _money(value),
+              style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
+            ),
+          ],
+        ),
+      );
+}
+
+class _Difference extends StatelessWidget {
+  final double value;
+
+  const _Difference({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = value == 0
+        ? AppColors.success
+        : value < 0
+            ? AppColors.error
+            : AppColors.warning;
+    return Row(
+      children: [
+        const Text('Diferencia estimada', style: AppTextStyles.bodySmall),
+        const Spacer(),
+        Text(
+          _money(value),
+          style: AppTextStyles.labelLarge.copyWith(color: color),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReadOnlyChip extends StatelessWidget {
+  final String label;
+
+  const _ReadOnlyChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundAlt,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Text(
+          label.replaceAll('_', ' '),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.labelSmall.copyWith(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+}
+
+class _StatusPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.labelSmall.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(label, style: AppTextStyles.labelSmall)),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+}
+
+class _CajaSkeleton extends StatelessWidget {
+  const _CajaSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [
+          Row(
+            children: [
+              Expanded(child: _SkeletonBox(height: 96)),
+              SizedBox(width: 10),
+              Expanded(child: _SkeletonBox(height: 96)),
+            ],
+          ),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _SkeletonBox(height: 96)),
+              SizedBox(width: 10),
+              Expanded(child: _SkeletonBox(height: 96)),
+            ],
+          ),
+          SizedBox(height: 24),
+          _SkeletonBox(height: 64),
+          SizedBox(height: 8),
+          _SkeletonBox(height: 64),
+          SizedBox(height: 8),
+          _SkeletonBox(height: 64),
+        ],
+      );
+}
+
+class _InlineSkeleton extends StatelessWidget {
+  const _InlineSkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+        children: [
+          _SkeletonBox(height: 48),
+          SizedBox(height: 10),
+          _SkeletonBox(height: 48),
+          SizedBox(height: 10),
+          _SkeletonBox(height: 48),
+        ],
+      );
+}
+
+class _SkeletonBox extends StatelessWidget {
+  final double height;
+
+  const _SkeletonBox({required this.height});
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.35, end: 0.8),
+        duration: const Duration(milliseconds: 800),
+        builder: (_, opacity, __) => Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: AppColors.border.withOpacity(opacity),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+        ),
+      );
+}
+
+void _sheetError(BuildContext context, Object error) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(error.toString()),
+      backgroundColor: AppColors.error,
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
+
+String _money(double value) => 'S/ ${value.toStringAsFixed(2)}';
+
+String _denomination(double value) =>
+    value >= 1 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+
+String _dateTime(DateTime value) {
+  final local = value.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }

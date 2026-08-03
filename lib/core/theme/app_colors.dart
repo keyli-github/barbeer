@@ -10,7 +10,7 @@ class AppColors {
   static const Color accent = Color(0xFFF59E0B);
   static const Color accentLight = Color(0xFFFEF3C7);
   static const Color background = Color(0xFFFFFFFF);
-  static const Color backgroundAlt = Color(0xFFF7F9FC);
+  static const Color backgroundAlt = Color(0xFFF6F8FB);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = Color(0xFF475569);
@@ -35,8 +35,15 @@ class AppColors {
   static const Color roleBartender = Color(0xFF0EA5E9);
 
   static const List<Color> avatarColors = [
-    Color(0xFF3B82F6), Color(0xFF8B5CF6), Color(0xFF10B981), Color(0xFFEF4444),
-    Color(0xFFF97316), Color(0xFF0EA5E9), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF6366F1),
+    Color(0xFF3B82F6),
+    Color(0xFF8B5CF6),
+    Color(0xFF10B981),
+    Color(0xFFEF4444),
+    Color(0xFFF97316),
+    Color(0xFF0EA5E9),
+    Color(0xFFEC4899),
+    Color(0xFF14B8A6),
+    Color(0xFF6366F1),
   ];
 
   static Color avatarColor(String seed) =>
@@ -44,35 +51,63 @@ class AppColors {
 
   static Color roleColor(String role) {
     switch (role.toUpperCase()) {
-      case 'SUPERADMIN': return roleSuperadmin;
-      case 'ADMIN': return roleAdmin;
-      case 'CAJERO': return roleCajero;
-      case 'MOZO': return roleMozo;
-      case 'COCINA': return roleCocina;
-      case 'BARTENDER': return roleBartender;
-      default: return primary;
+      case 'SUPERADMIN':
+        return roleSuperadmin;
+      case 'ADMIN':
+        return roleAdmin;
+      case 'CAJERO':
+        return roleCajero;
+      case 'MOZO':
+        return roleMozo;
+      case 'COCINA':
+        return roleCocina;
+      case 'BARTENDER':
+        return roleBartender;
+      default:
+        return primary;
     }
   }
 }
 
 class AppShadows {
   AppShadows._();
-  static List<BoxShadow> card = [
-    BoxShadow(color: Color(0xFF2563EB).withOpacity(0.04), blurRadius: 20, offset: Offset(0, 4)),
-    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: Offset(0, 2), spreadRadius: -2),
+  static final List<BoxShadow> card = [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.035),
+      blurRadius: 14,
+      offset: const Offset(0, 4),
+      spreadRadius: -3,
+    ),
   ];
-  static List<BoxShadow> cardElevated = [
-    BoxShadow(color: Color(0xFF2563EB).withOpacity(0.08), blurRadius: 32, offset: Offset(0, 8), spreadRadius: -4),
-    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16, offset: Offset(0, 4), spreadRadius: -2),
+  static final List<BoxShadow> cardElevated = [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.07),
+      blurRadius: 22,
+      offset: const Offset(0, 8),
+      spreadRadius: -5,
+    ),
   ];
-  static List<BoxShadow> sheet = [
-    BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 40, offset: Offset(0, -8)),
+  static final List<BoxShadow> sheet = [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.10),
+      blurRadius: 32,
+      offset: const Offset(0, -6),
+    ),
   ];
-  static List<BoxShadow> nav = [
-    BoxShadow(color: Color(0xFF2563EB).withOpacity(0.10), blurRadius: 28, offset: Offset(0, -4), spreadRadius: -2),
-    BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 16, offset: Offset(0, 4)),
+  static final List<BoxShadow> nav = [
+    BoxShadow(
+      color: Colors.black.withOpacity(0.06),
+      blurRadius: 20,
+      offset: const Offset(0, -4),
+      spreadRadius: -4,
+    ),
   ];
-  static List<BoxShadow> button = [
-    BoxShadow(color: Color(0xFF2563EB).withOpacity(0.35), blurRadius: 16, offset: Offset(0, 6), spreadRadius: -2),
+  static final List<BoxShadow> button = [
+    BoxShadow(
+      color: primary.withOpacity(0.22),
+      blurRadius: 14,
+      offset: const Offset(0, 5),
+      spreadRadius: -3,
+    ),
   ];
 }

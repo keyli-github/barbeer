@@ -25,14 +25,23 @@ final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
+  // El GoRouter se crea UNA SOLA VEZ. El estado de auth se lee en el
+  // callback de redirect (no al crear el provider) para evitar que el
+  // router se reconstruya con cada cambio de estado, lo que provocaba
+  // que la app volviera a /splash y llamara bootstrap() de nuevo.
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: RoutePaths.splash,
     redirect: (ctx, state) {
+      final auth = ref.read(authProvider);        // lee el estado ACTUAL
       final path = state.matchedLocation;
       final status = auth.status;
-      if (status == AuthStatus.initial) return null;
+
+      // Durante la carga inicial y mientras se procesa el login,
+      // no forzar ninguna redirección para evitar parpadeos.
+      if (status == AuthStatus.initial || status == AuthStatus.loading) {
+        return null;
+      }
       if (status == AuthStatus.mustChangePassword) {
         return path == RoutePaths.changePassword ? null : RoutePaths.changePassword;
       }
@@ -40,7 +49,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return path == RoutePaths.login ? null : RoutePaths.login;
       }
       if (status == AuthStatus.authenticated) {
-        if (path == RoutePaths.login || path == RoutePaths.splash) return RoutePaths.dashboard;
+        if (path == RoutePaths.login || path == RoutePaths.splash) {
+          return RoutePaths.dashboard;
+        }
         if (!auth.canAccess(path)) return RoutePaths.noAutorizado;
       }
       return null;

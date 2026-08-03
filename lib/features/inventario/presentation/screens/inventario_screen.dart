@@ -1,211 +1,471 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_bottom_sheet.dart';
-import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/inventario_repository.dart';
 
-class InventarioItem {
-  final String id, code, name, category, location;
-  final int stock, minStock, maxStock;
-  final double costPrice;
-  String get status => stock <= minStock ? 'CRITICO' : stock <= minStock * 1.5 ? 'ALERTA' : 'OK';
-  const InventarioItem({required this.id, required this.code, required this.name, required this.category,
-      required this.location, required this.stock, required this.minStock, required this.maxStock, required this.costPrice});
-  InventarioItem copyWith({int? stock}) => InventarioItem(id:id,code:code,name:name,category:category,location:location,
-      stock:stock??this.stock,minStock:minStock,maxStock:maxStock,costPrice:costPrice);
+// ─── Providers ────────────────────────────────────────────────────────────────
+
+final _invRepoProvider = Provider<InventarioRepository>(
+  (ref) => InventarioRepository(ApiClient.instance),
+);
+
+class _InvState {
+  final List<InventarioItem> items;
+  final InventarioResumen? resumen;
+  final bool loading;
+  final String? error;
+  final int page, totalPages, total;
+  final String search, estadoFilter;
+
+  const _InvState({
+    this.items = const [],
+    this.resumen,
+    this.loading = true,
+    this.error,
+    this.page = 1,
+    this.totalPages = 1,
+    this.total = 0,
+    this.search = '',
+    this.estadoFilter = '',
+  });
+
+  _InvState copyWith({
+    List<InventarioItem>? items,
+    InventarioResumen? resumen,
+    bool? loading,
+    String? error,
+    bool clearError = false,
+    int? page,
+    int? totalPages,
+    int? total,
+    String? search,
+    String? estadoFilter,
+  }) =>
+      _InvState(
+        items: items ?? this.items,
+        resumen: resumen ?? this.resumen,
+        loading: loading ?? this.loading,
+        error: clearError ? null : (error ?? this.error),
+        page: page ?? this.page,
+        totalPages: totalPages ?? this.totalPages,
+        total: total ?? this.total,
+        search: search ?? this.search,
+        estadoFilter: estadoFilter ?? this.estadoFilter,
+      );
 }
 
-class InventarioState {
-  final List<InventarioItem> items; final String search, category;
-  const InventarioState({this.items = const [], this.search = '', this.category = 'Todos'});
-  InventarioState copyWith({List<InventarioItem>? items, String? search, String? category}) =>
-      InventarioState(items: items ?? this.items, search: search ?? this.search, category: category ?? this.category);
-  List<InventarioItem> get filtered => items.where((i) {
-    final ms = search.isEmpty || i.name.toLowerCase().contains(search.toLowerCase()) || i.code.toLowerCase().contains(search.toLowerCase());
-    final mc = category == 'Todos' || i.category == category;
-    return ms && mc;
-  }).toList();
-}
+class _InvNotifier extends StateNotifier<_InvState> {
+  final InventarioRepository _repo;
 
-class InventarioNotifier extends StateNotifier<InventarioState> {
-  InventarioNotifier() : super(InventarioState(items: _mock));
-  static final _mock = [
-    const InventarioItem(id:'1',code:'CKT001',name:'Pisco',category:'Destilados',location:'Bar A',stock:5,minStock:10,maxStock:50,costPrice:45),
-    const InventarioItem(id:'2',code:'CRV001',name:'Cerveza Cusquena 12und',category:'Cervezas',location:'Refrigerador',stock:24,minStock:12,maxStock:72,costPrice:60),
-    const InventarioItem(id:'3',code:'DST001',name:'Johnnie Walker Red 750ml',category:'Destilados',location:'Bar B',stock:3,minStock:5,maxStock:20,costPrice:18),
-    const InventarioItem(id:'4',code:'VNO001',name:'Malbec Trivento 750ml',category:'Vinos',location:'Cava',stock:8,minStock:6,maxStock:24,costPrice:25),
-    const InventarioItem(id:'5',code:'SNK001',name:'Papas Fritas Kg',category:'Snacks',location:'Cocina',stock:4,minStock:3,maxStock:15,costPrice:8),
-    const InventarioItem(id:'6',code:'BCK001',name:'Hielo Bolsa 5kg',category:'Insumos',location:'Freezer',stock:12,minStock:8,maxStock:30,costPrice:5),
-    const InventarioItem(id:'7',code:'BCK002',name:'Limon Kg',category:'Insumos',location:'Cocina',stock:2,minStock:4,maxStock:15,costPrice:4),
-    const InventarioItem(id:'8',code:'CKT002',name:'Ron Havana Club 750ml',category:'Destilados',location:'Bar A',stock:7,minStock:5,maxStock:20,costPrice:35),
-  ];
+  _InvNotifier(this._repo) : super(const _InvState()) {
+    load();
+  }
 
-  void adjustStock(String id, String tipo, int qty) {
-    final idx = state.items.indexWhere((i) => i.id == id);
-    if (idx >= 0) {
-      final list = [...state.items];
-      final current = list[idx].stock;
-      final newStock = tipo == 'ENTRADA' ? current + qty : (current - qty).clamp(0, 999);
-      list[idx] = list[idx].copyWith(stock: newStock);
-      state = state.copyWith(items: list);
+  Future<void> load({bool resetPage = false}) async {
+    final p = resetPage ? 1 : state.page;
+    state = state.copyWith(loading: true, clearError: true, page: p);
+    try {
+      final results = await Future.wait([
+        _repo.list(
+          pagina: p,
+          limite: 20,
+          q: state.search.isEmpty ? null : state.search,
+          estado: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+        ),
+        _repo.resumen(),
+      ]);
+      final page = results[0] as InventarioPage;
+      final resumen = results[1] as InventarioResumen;
+      state = state.copyWith(
+        items: page.data,
+        resumen: resumen,
+        total: page.total,
+        totalPages: page.totalPaginas,
+        page: page.pagina,
+        loading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(loading: false, error: e.toString());
     }
   }
 
-  void setSearch(String s) => state = state.copyWith(search: s);
-  void setCategory(String c) => state = state.copyWith(category: c);
+  void setSearch(String s) { state = state.copyWith(search: s); load(resetPage: true); }
+  void setEstado(String v) { state = state.copyWith(estadoFilter: v); load(resetPage: true); }
+  void setPage(int p) { state = state.copyWith(page: p); load(); }
+
+  Future<void> ajustar(InventarioItem item, String tipo, double cantidad, String? ref) async {
+    await _repo.ajustar(item.id, tipo: tipo, cantidad: cantidad, referencia: ref);
+    await load();
+  }
 }
 
-final inventarioProvider = StateNotifierProvider<InventarioNotifier, InventarioState>((ref) => InventarioNotifier());
+final _invProvider = StateNotifierProvider<_InvNotifier, _InvState>(
+  (ref) => _InvNotifier(ref.watch(_invRepoProvider)),
+);
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 class InventarioScreen extends ConsumerWidget {
   const InventarioScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(inventarioProvider);
-    final filtered = state.filtered;
-    final critical = state.items.where((i) => i.status == 'CRITICO').length;
-    final alert = state.items.where((i) => i.status == 'ALERTA').length;
-    final totalValue = state.items.fold(0.0, (s, i) => s + i.stock * i.costPrice);
+    final auth = ref.watch(authProvider);
+    final state = ref.watch(_invProvider);
+    final notifier = ref.read(_invProvider.notifier);
+    final canEdit = auth.hasPermission('inventario:editar');
 
-    final categories = ['Todos', ...state.items.map((i) => i.category).toSet().toList()..sort()];
-
-    return Scaffold(backgroundColor: AppColors.backgroundAlt,
-      body: SafeArea(bottom: false, child: Column(children: [
-        Container(color: AppColors.background, child: Column(children: [
-          Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 8), child: Row(children: [
-            const Icon(Icons.inventory_2_rounded, color: AppColors.primary, size: 24),
-            const SizedBox(width: 10),
-            const Expanded(child: Text('Inventario', style: AppTextStyles.headlineLarge)),
-          ])),
-          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: AppSearchBar(hint: 'Buscar por nombre o codigo...', onChanged: (q) => ref.read(inventarioProvider.notifier).setSearch(q))),
-          SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(children: categories.map((c) => _CatTab(label: c, selected: state.category == c,
-                onTap: () => ref.read(inventarioProvider.notifier).setCategory(c))).toList())),
-        ])),
-
-        Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: Row(children: [
-          Expanded(child: _StatChip(label: 'Total', value: '${state.items.length}', color: AppColors.primary)),
-          const SizedBox(width: 8),
-          Expanded(child: _StatChip(label: 'Critico', value: '$critical', color: AppColors.error)),
-          const SizedBox(width: 8),
-          Expanded(child: _StatChip(label: 'Alerta', value: '$alert', color: AppColors.warning)),
-          const SizedBox(width: 8),
-          Expanded(child: _StatChip(label: 'Valor', value: 'S/${totalValue.toStringAsFixed(0)}', color: AppColors.success)),
-        ])),
-        const SizedBox(height: 8),
-
-        Expanded(child: filtered.isEmpty
-          ? const AppEmptyState(icon: Icons.inventory_2_outlined, title: 'Sin productos en inventario')
-          : ListView(children: [
-              for (final item in filtered)
-                Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                  child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(item.name, style: AppTextStyles.titleMedium),
-                        Text('${item.code} · ${item.category} · ${item.location}', style: AppTextStyles.labelSmall),
-                      ])),
-                      _StatusBadge(status: item.status),
-                      const SizedBox(width: 8),
-                      IconButton(icon: const Icon(Icons.tune_rounded, size: 18, color: AppColors.primary),
-                          onPressed: () => _showAdjust(context, ref, item)),
-                    ]),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Text('Stock: ', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary)),
-                      Text('${item.stock}', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700, color: _statusColor(item.status))),
-                      Text(' / Min: ${item.minStock} / Max: ${item.maxStock}', style: AppTextStyles.bodySmall),
-                      const Spacer(),
-                      Text('S/ ${item.costPrice.toStringAsFixed(2)}/u', style: AppTextStyles.bodySmall),
-                    ]),
-                    const SizedBox(height: 6),
-                    LinearProgressIndicator(value: item.maxStock > 0 ? item.stock / item.maxStock : 0,
-                        color: _statusColor(item.status), backgroundColor: AppColors.backgroundAlt,
-                        minHeight: 6, borderRadius: BorderRadius.circular(3)),
-                  ]))),
-              const SizedBox(height: 80),
-            ])),
-      ])));
+    return Scaffold(
+      backgroundColor: AppColors.backgroundAlt,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _Header(
+              total: state.total,
+              onSearch: notifier.setSearch,
+              estadoFilter: state.estadoFilter,
+              onEstado: notifier.setEstado,
+            ),
+            if (state.resumen != null && !state.loading) _KpiRow(resumen: state.resumen!),
+            const SizedBox(height: 4),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: state.loading
+                    ? const AppLoading(key: ValueKey('l'))
+                    : state.error != null
+                        ? AppErrorState(key: const ValueKey('e'), message: state.error!, onRetry: () => notifier.load())
+                        : state.items.isEmpty
+                            ? const AppEmptyState(key: ValueKey('empty'), icon: Icons.inventory_2_outlined, title: 'Sin productos en inventario')
+                            : ListView.builder(
+                                key: const ValueKey('list'),
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                                itemCount: state.items.length + 1,
+                                itemBuilder: (_, i) {
+                                  if (i == state.items.length) {
+                                    return AppPagination(page: state.page, totalPages: state.totalPages, total: state.total, onPageChange: notifier.setPage);
+                                  }
+                                  return _InventarioTile(
+                                    item: state.items[i],
+                                    canEdit: canEdit,
+                                    onAdjust: () => _showAdjust(context, ref, state.items[i]),
+                                  );
+                                },
+                              ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-
-  Color _statusColor(String s) => s == 'CRITICO' ? AppColors.error : s == 'ALERTA' ? AppColors.warning : AppColors.success;
 
   void _showAdjust(BuildContext context, WidgetRef ref, InventarioItem item) {
-    String tipo = 'ENTRADA';
-    final qtyCtrl = TextEditingController(text: '1');
-    showModalBottomSheet(context: context, backgroundColor: Colors.transparent, isScrollControlled: true,
-      builder: (_) => StatefulBuilder(builder: (ctx, setS) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
-        child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [Text('Ajuste: ${item.name}', style: AppTextStyles.headlineMedium), const Spacer(),
-            IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.of(ctx).pop())]),
-          const SizedBox(height: 16),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _AdjustSheet(
+        item: item,
+        onSaved: () => ref.read(_invProvider.notifier).load(),
+        repo: ref.read(_invRepoProvider),
+      ),
+    );
+  }
+}
+
+class _Header extends StatefulWidget {
+  final int total;
+  final ValueChanged<String> onSearch, onEstado;
+  final String estadoFilter;
+  const _Header({required this.total, required this.onSearch, required this.estadoFilter, required this.onEstado});
+
+  @override
+  State<_Header> createState() => _HeaderState();
+}
+
+class _HeaderState extends State<_Header> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.background,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.inventory_2_rounded, color: AppColors.primary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Inventario', style: AppTextStyles.headlineLarge),
+                  Text('${widget.total} productos', style: AppTextStyles.labelSmall),
+                ])),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _ctrl,
+              onChanged: widget.onSearch,
+              style: AppTextStyles.bodyMedium,
+              decoration: const InputDecoration(
+                hintText: 'Buscar por nombre o código...',
+                prefixIcon: Icon(Icons.search_rounded, color: AppColors.textTertiary, size: 18),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(
+              children: [
+                for (final e in [('', 'Todos'), ('OK', 'OK'), ('ALERTA', 'Alerta'), ('CRITICO', 'Crítico')])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => widget.onEstado(e.$1),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: widget.estadoFilter == e.$1 ? AppColors.primarySurface : AppColors.backgroundAlt,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          border: Border.all(color: widget.estadoFilter == e.$1 ? AppColors.primaryBorder : AppColors.border),
+                        ),
+                        child: Text(e.$2, style: TextStyle(fontSize: 12,
+                          fontWeight: widget.estadoFilter == e.$1 ? FontWeight.w700 : FontWeight.w500,
+                          color: widget.estadoFilter == e.$1 ? AppColors.primary : AppColors.textSecondary)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KpiRow extends StatelessWidget {
+  final InventarioResumen resumen;
+  const _KpiRow({required this.resumen});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    child: Row(
+      children: [
+        _Chip('Críticos', '${resumen.critico}', AppColors.error),
+        const SizedBox(width: 8),
+        _Chip('En Alerta', '${resumen.alerta}', AppColors.warning),
+        const SizedBox(width: 8),
+        _Chip('OK', '${resumen.ok}', AppColors.success),
+      ],
+    ),
+  );
+}
+
+class _Chip extends StatelessWidget {
+  final String label, value;
+  final Color color;
+  const _Chip(this.label, this.value, this.color);
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(color: color.withOpacity(0.09), borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
+        Text(label, style: AppTextStyles.labelSmall),
+      ]),
+    ),
+  );
+}
+
+class _InventarioTile extends StatelessWidget {
+  final InventarioItem item;
+  final bool canEdit;
+  final VoidCallback onAdjust;
+  const _InventarioTile({required this.item, required this.canEdit, required this.onAdjust});
+
+  Color get _statusColor => item.estado == 'CRITICO' ? AppColors.error
+      : item.estado == 'ALERTA' ? AppColors.warning : AppColors.success;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = item.max > 0 ? (item.stock / item.max).clamp(0.0, 1.0) : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.borderLight),
+          boxShadow: AppShadows.card,
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Expanded(child: GestureDetector(onTap: () => setS(() => tipo = 'ENTRADA'),
-              child: _TipoBtn(label: 'Entrada', icon: Icons.add_rounded, selected: tipo == 'ENTRADA', color: AppColors.success))),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.producto, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text('${item.codigo} · ${item.categoria}', style: AppTextStyles.labelSmall),
+            ])),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _statusColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(item.estado, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _statusColor)),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Stock: ${item.stock.toStringAsFixed(item.stock % 1 == 0 ? 0 : 1)} ${item.unidad}',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _statusColor)),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct.toDouble(),
+                  minHeight: 5,
+                  backgroundColor: AppColors.backgroundAlt,
+                  valueColor: AlwaysStoppedAnimation(_statusColor),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text('Min ${item.min.toStringAsFixed(0)} · Max ${item.max.toStringAsFixed(0)} · ${item.ubicacion}',
+                style: AppTextStyles.labelSmall),
+            ])),
             const SizedBox(width: 12),
-            Expanded(child: GestureDetector(onTap: () => setS(() => tipo = 'SALIDA'),
-              child: _TipoBtn(label: 'Salida', icon: Icons.remove_rounded, selected: tipo == 'SALIDA', color: AppColors.error))),
+            if (canEdit)
+              TextButton(
+                onPressed: onAdjust,
+                child: const Text('Ajustar'),
+              ),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class _AdjustSheet extends StatefulWidget {
+  final InventarioItem item;
+  final VoidCallback onSaved;
+  final InventarioRepository repo;
+  const _AdjustSheet({required this.item, required this.onSaved, required this.repo});
+
+  @override
+  State<_AdjustSheet> createState() => _AdjustSheetState();
+}
+
+class _AdjustSheetState extends State<_AdjustSheet> {
+  String _tipo = 'ENTRADA';
+  final _cantCtrl = TextEditingController();
+  final _refCtrl = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() { _cantCtrl.dispose(); _refCtrl.dispose(); super.dispose(); }
+
+  Future<void> _confirm() async {
+    final cant = double.tryParse(_cantCtrl.text);
+    if (cant == null || (_tipo != 'AJUSTE' && cant <= 0) || (_tipo == 'AJUSTE' && cant < 0)) {
+      setState(() => _error = 'Cantidad inválida.');
+      return;
+    }
+    setState(() { _saving = true; _error = null; });
+    try {
+      await widget.repo.ajustar(widget.item.id, tipo: _tipo, cantidad: cant, referencia: _refCtrl.text.trim().isEmpty ? null : _refCtrl.text.trim());
+      if (mounted) { Navigator.of(context).pop(); widget.onSaved(); }
+    } catch (e) {
+      setState(() { _saving = false; _error = e.toString(); });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(top: 12), decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+        Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 0), child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Ajuste de stock', style: AppTextStyles.headlineMedium),
+            Text('${widget.item.producto} · Stock: ${widget.item.stock}', style: AppTextStyles.bodySmall),
+          ])),
+          IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.of(context).pop()),
+        ])),
+        const Divider(),
+        Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 20), child: Column(children: [
+          Row(children: [
+            for (final t in [('ENTRADA', 'Entrada'), ('SALIDA', 'Salida'), ('AJUSTE', 'Conteo')])
+              Expanded(child: Padding(padding: EdgeInsets.only(right: t.$1 == 'AJUSTE' ? 0 : 8),
+                child: GestureDetector(onTap: () => setState(() { _tipo = t.$1; _error = null; }),
+                  child: AnimatedContainer(duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _tipo == t.$1 ? AppColors.primarySurface : AppColors.backgroundAlt,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _tipo == t.$1 ? AppColors.primaryBorder : AppColors.border),
+                    ),
+                    child: Text(t.$2, textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, fontWeight: _tipo == t.$1 ? FontWeight.w700 : FontWeight.w500,
+                        color: _tipo == t.$1 ? AppColors.primary : AppColors.textSecondary)),
+                  )),
+              )),
           ]),
           const SizedBox(height: 16),
-          TextField(controller: qtyCtrl, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Cantidad', prefixIcon: Icon(Icons.numbers_rounded))),
-          const SizedBox(height: 20),
-          SizedBox(width: double.infinity, height: 52, child: ElevatedButton(
-            onPressed: () { final q = int.tryParse(qtyCtrl.text) ?? 0;
-              if (q > 0) { ref.read(inventarioProvider.notifier).adjustStock(item.id, tipo, q); Navigator.of(ctx).pop(); } },
-            child: const Text('Aplicar ajuste'))),
-        ])))));
+          TextField(
+            controller: _cantCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              hintText: '0',
+              hintStyle: const TextStyle(fontSize: 28, color: AppColors.textHint),
+              labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _refCtrl,
+            decoration: const InputDecoration(labelText: 'Referencia (opcional)', contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12)),
+          ),
+          if (_error != null) ...[const SizedBox(height: 8), Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13))],
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, height: 50,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _confirm,
+              child: _saving ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)) : const Text('Confirmar ajuste'),
+            )),
+        ])),
+      ]),
+    );
   }
-}
-
-class _TipoBtn extends StatelessWidget {
-  final String label; final IconData icon; final bool selected; final Color color;
-  const _TipoBtn({required this.label, required this.icon, required this.selected, required this.color});
-  @override Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    decoration: BoxDecoration(color: selected ? color.withOpacity(0.12) : AppColors.backgroundAlt,
-        borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: selected ? color : AppColors.border)),
-    child: Column(children: [Icon(icon, color: selected ? color : AppColors.textSecondary, size: 22),
-      const SizedBox(height: 4), Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? color : AppColors.textSecondary))]));
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String status; const _StatusBadge({required this.status});
-  @override Widget build(BuildContext context) {
-    Color c = status == 'CRITICO' ? AppColors.error : status == 'ALERTA' ? AppColors.warning : AppColors.success;
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(100)),
-      child: Text(status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c)));
-  }
-}
-
-class _CatTab extends StatelessWidget {
-  final String label; final bool selected; final VoidCallback onTap;
-  const _CatTab({required this.label, required this.selected, required this.onTap});
-  @override Widget build(BuildContext context) => GestureDetector(onTap: onTap,
-    child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(color: selected ? AppColors.primarySurface : AppColors.backgroundAlt,
-          borderRadius: BorderRadius.circular(AppRadius.full), border: Border.all(color: selected ? AppColors.primaryBorder : AppColors.border)),
-      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: selected ? AppColors.primary : AppColors.textSecondary))));
-}
-
-class _StatChip extends StatelessWidget {
-  final String label, value; final Color color;
-  const _StatChip({required this.label, required this.value, required this.color});
-  @override Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(AppRadius.sm)),
-    child: Column(children: [
-      Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-      Text(label, style: AppTextStyles.labelSmall),
-    ]));
 }

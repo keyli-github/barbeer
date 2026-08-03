@@ -7,7 +7,10 @@ class ApiConstants {
   //   1. Conecta el teléfono por USB con depuración activada
   //   2. Ejecuta en la terminal del PC:  adb reverse tcp:3001 tcp:3001
   //   3. Usa esta URL:
-  static const String baseUrl = 'http://127.0.0.1:3001/api';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:3001/api',
+  );
   //
   // OPCIÓN B — WiFi (ambos en la misma red):
   //   Cambia por la IP local de tu PC (ejecuta ipconfig en Windows):
@@ -33,7 +36,8 @@ class ApiConstants {
   // Users
   static const String users = '/usuarios';
   static String user(String id) => '/usuarios/$id';
-  static String resetUserPassword(String id) => '/usuarios/$id/resetear-password';
+  static String resetUserPassword(String id) =>
+      '/usuarios/$id/resetear-password';
 
   // Roles
   static const String roles = '/roles';
