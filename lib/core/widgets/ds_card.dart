@@ -37,10 +37,7 @@ class DSCard extends StatelessWidget {
     );
 
     if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: content,
-      );
+      return GestureDetector(onTap: onTap, child: content);
     }
     return content;
   }
@@ -97,7 +94,9 @@ class DSStatCard extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  positive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                  positive
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
                   size: 11,
                   color: positive ? AppColors.success : AppColors.error,
                 ),

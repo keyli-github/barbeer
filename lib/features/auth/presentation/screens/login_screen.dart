@@ -120,164 +120,155 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _buildBrand() => Column(
-        children: [
-          // Logo con sombra suave
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
-              boxShadow: AppShadows.card,
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: Image.asset(
-              'assets/images/barbeerLogo.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          SizedBox(height: AppSpacing.lg),
-          // Título
-          Text(
-            'Bar Beer',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          SizedBox(height: AppSpacing.xxs),
-          // Subtítulo
-          Text(
-            'Sistema de gestión',
-            style: TextStyle(
-              fontSize: 15,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      );
-
-  Widget _buildLoginForm() => Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(AppSpacing.xl),
+    children: [
+      // Logo con sombra suave
+      Container(
+        width: 96,
+        height: 96,
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
           boxShadow: AppShadows.card,
           border: Border.all(color: AppColors.border, width: 1),
         ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Iniciar sesión',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: AppSpacing.xxs),
-              Text(
-                'Ingresa tus credenciales para continuar',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              SizedBox(height: AppSpacing.xl),
-              // Error message si existe
-              if (_error != null) ...[
-                _buildErrorBox(_error!),
-                SizedBox(height: AppSpacing.md),
-              ],
-              // Campo usuario
-              AppTextField(
-                label: 'Usuario',
-                hint: 'Nombre de usuario',
-                controller: _userCtrl,
-                prefixIcon: Icons.person_outline_rounded,
-                textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Requerido' : null,
-              ),
-              SizedBox(height: AppSpacing.md),
-              // Campo contraseña
-              AppTextField(
-                label: 'Contraseña',
-                hint: 'Ingresa tu contraseña',
-                controller: _passCtrl,
-                prefixIcon: Icons.lock_outline_rounded,
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _login(),
-                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
-              ),
-              SizedBox(height: AppSpacing.xl),
-              // Botón de login
-              PrimaryButton(
-                text: 'Ingresar',
-                onPressed: _loading ? null : _login,
-                isLoading: _loading,
-                icon: Icons.login_rounded,
-              ),
-            ],
-          ),
+        padding: EdgeInsets.all(AppSpacing.md),
+        child: Image.asset(
+          'assets/images/barbeerLogo.png',
+          fit: BoxFit.contain,
         ),
-      );
+      ),
+      SizedBox(height: AppSpacing.lg),
+      // Título
+      Text(
+        'Bar Beer',
+        style: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textPrimary,
+          letterSpacing: -0.5,
+        ),
+      ),
+      SizedBox(height: AppSpacing.xxs),
+      // Subtítulo
+      Text(
+        'Sistema de gestión',
+        style: TextStyle(
+          fontSize: 15,
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    ],
+  );
 
-  Widget _buildErrorBox(String msg) => Container(
-        padding: EdgeInsets.all(AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: AppColors.errorLight,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
-          border: Border.all(color: AppColors.errorBorder, width: 1),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.error,
-              size: AppSpacing.iconSM,
-            ),
-            SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                msg,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _buildFooter() => Column(
+  Widget _buildLoginForm() => Container(
+    width: double.infinity,
+    padding: EdgeInsets.all(AppSpacing.xl),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+      boxShadow: AppShadows.card,
+      border: Border.all(color: AppColors.border, width: 1),
+    ),
+    child: Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Bar Beer © 2024',
+            'Iniciar sesión',
             style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textTertiary,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
           ),
           SizedBox(height: AppSpacing.xxs),
           Text(
-            'Sistema de gestión empresarial',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textTertiary,
-            ),
+            'Ingresa tus credenciales para continuar',
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          ),
+          SizedBox(height: AppSpacing.xl),
+          // Error message si existe
+          if (_error != null) ...[
+            _buildErrorBox(_error!),
+            SizedBox(height: AppSpacing.md),
+          ],
+          // Campo usuario
+          AppTextField(
+            label: 'Usuario',
+            hint: 'Nombre de usuario',
+            controller: _userCtrl,
+            prefixIcon: Icons.person_outline_rounded,
+            textInputAction: TextInputAction.next,
+            validator: (v) =>
+                v == null || v.trim().isEmpty ? 'Requerido' : null,
+          ),
+          SizedBox(height: AppSpacing.md),
+          // Campo contraseña
+          AppTextField(
+            label: 'Contraseña',
+            hint: 'Ingresa tu contraseña',
+            controller: _passCtrl,
+            prefixIcon: Icons.lock_outline_rounded,
+            obscureText: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _login(),
+            validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+          ),
+          SizedBox(height: AppSpacing.xl),
+          // Botón de login
+          PrimaryButton(
+            text: 'Ingresar',
+            onPressed: _loading ? null : _login,
+            isLoading: _loading,
+            icon: Icons.login_rounded,
           ),
         ],
-      );
+      ),
+    ),
+  );
+
+  Widget _buildErrorBox(String msg) => Container(
+    padding: EdgeInsets.all(AppSpacing.sm),
+    decoration: BoxDecoration(
+      color: AppColors.errorLight,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+      border: Border.all(color: AppColors.errorBorder, width: 1),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          Icons.error_outline_rounded,
+          color: AppColors.error,
+          size: AppSpacing.iconSM,
+        ),
+        SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            msg,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildFooter() => Column(
+    children: [
+      Text(
+        'Bar Beer © 2024',
+        style: TextStyle(fontSize: 13, color: AppColors.textTertiary),
+      ),
+      SizedBox(height: AppSpacing.xxs),
+      Text(
+        'Sistema de gestión empresarial',
+        style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+      ),
+    ],
+  );
 }

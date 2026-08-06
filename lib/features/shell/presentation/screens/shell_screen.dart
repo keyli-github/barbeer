@@ -42,30 +42,109 @@ class _DSec {
 // ─── Estructura del drawer ────────────────────────────────────────────────────
 
 const _drawerSections = [
-  _DSec(title: 'PRINCIPAL', items: [
-    _DItem(path: '/dashboard',  label: 'Inicio',    icon: Icons.home_rounded),
-  ]),
-  _DSec(title: 'VENTAS Y CAJA', items: [
-    _DItem(path: '/ventas',    label: 'Ventas',      icon: Icons.shopping_cart_rounded),
-    _DItem(path: '/caja',      label: 'Caja',        icon: Icons.account_balance_wallet_rounded, perm: 'caja:leer'),
-  ]),
-  _DSec(title: 'INVENTARIO', items: [
-    _DItem(path: '/productos',  label: 'Productos',  icon: Icons.liquor_rounded,       perm: 'productos:crear'),
-    _DItem(path: '/inventario', label: 'Inventario', icon: Icons.inventory_2_rounded,  perm: 'inventario:leer'),
-    _DItem(path: '/kardex',     label: 'Kardex',     icon: Icons.swap_vert_rounded,    perm: 'kardex:leer'),
-    _DItem(path: '/compras',    label: 'Compras',    icon: Icons.local_shipping_rounded, perm: 'compras:leer'),
-  ]),
-  _DSec(title: 'PERSONAL', items: [
-    _DItem(path: '/asistencia', label: 'Asistencia', icon: Icons.badge_rounded, perm: 'asistencia:leer'),
-  ]),
-  _DSec(title: 'ADMINISTRACIÓN', items: [
-    _DItem(path: '/etiquetas',  label: 'Billeteras', icon: Icons.payment_rounded,               perm: 'etiquetas:crear'),
-    _DItem(path: '/usuarios',   label: 'Usuarios',   icon: Icons.people_rounded,                perm: 'usuarios:leer'),
-    _DItem(path: '/sucursales', label: 'Sucursales', icon: Icons.store_rounded,                 perm: 'establecimientos:leer'),
-    _DItem(path: '/roles',      label: 'Roles',      icon: Icons.admin_panel_settings_rounded,  perm: 'roles:leer'),
-    _DItem(path: '/permisos',   label: 'Permisos',   icon: Icons.security_rounded,              perm: 'permisos:leer'),
-    _DItem(path: '/auditoria',  label: 'Auditoría',  icon: Icons.history_rounded,               perm: 'audit:leer'),
-  ]),
+  _DSec(
+    title: 'PRINCIPAL',
+    items: [
+      _DItem(path: '/dashboard', label: 'Inicio', icon: Icons.home_rounded),
+    ],
+  ),
+  _DSec(
+    title: 'VENTAS Y CAJA',
+    items: [
+      _DItem(
+        path: '/ventas',
+        label: 'Ventas',
+        icon: Icons.shopping_cart_rounded,
+      ),
+      _DItem(
+        path: '/caja',
+        label: 'Caja',
+        icon: Icons.account_balance_wallet_rounded,
+        perm: 'caja:leer',
+      ),
+    ],
+  ),
+  _DSec(
+    title: 'INVENTARIO',
+    items: [
+      _DItem(
+        path: '/productos',
+        label: 'Productos',
+        icon: Icons.liquor_rounded,
+        perm: 'productos:crear',
+      ),
+      _DItem(
+        path: '/inventario',
+        label: 'Inventario',
+        icon: Icons.inventory_2_rounded,
+        perm: 'inventario:leer',
+      ),
+      _DItem(
+        path: '/kardex',
+        label: 'Kardex',
+        icon: Icons.swap_vert_rounded,
+        perm: 'kardex:leer',
+      ),
+      _DItem(
+        path: '/compras',
+        label: 'Compras',
+        icon: Icons.local_shipping_rounded,
+        perm: 'compras:leer',
+      ),
+    ],
+  ),
+  _DSec(
+    title: 'PERSONAL',
+    items: [
+      _DItem(
+        path: '/asistencia',
+        label: 'Asistencia',
+        icon: Icons.badge_rounded,
+        perm: 'asistencia:leer',
+      ),
+    ],
+  ),
+  _DSec(
+    title: 'ADMINISTRACIÓN',
+    items: [
+      _DItem(
+        path: '/etiquetas',
+        label: 'Billeteras',
+        icon: Icons.payment_rounded,
+        perm: 'etiquetas:crear',
+      ),
+      _DItem(
+        path: '/usuarios',
+        label: 'Usuarios',
+        icon: Icons.people_rounded,
+        perm: 'usuarios:leer',
+      ),
+      _DItem(
+        path: '/sucursales',
+        label: 'Sucursales',
+        icon: Icons.store_rounded,
+        perm: 'establecimientos:leer',
+      ),
+      _DItem(
+        path: '/roles',
+        label: 'Roles',
+        icon: Icons.admin_panel_settings_rounded,
+        perm: 'roles:leer',
+      ),
+      _DItem(
+        path: '/permisos',
+        label: 'Permisos',
+        icon: Icons.security_rounded,
+        perm: 'permisos:leer',
+      ),
+      _DItem(
+        path: '/auditoria',
+        label: 'Auditoría',
+        icon: Icons.history_rounded,
+        perm: 'audit:leer',
+      ),
+    ],
+  ),
 ];
 
 // ─── Bottom nav base (siempre visible) ───────────────────────────────────────
@@ -99,7 +178,7 @@ class ShellScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth   = ref.watch(authProvider);
+    final auth = ref.watch(authProvider);
     final navItems = _buildNav(auth);
     final showDrawer = _countDrawerItems(auth) > 4;
 
@@ -138,29 +217,40 @@ class ShellScreen extends ConsumerWidget {
     final items = <_NavItem>[..._baseNav];
 
     // Cajero → Caja en nav
-    if (auth.hasPermission('caja:leer') && !auth.hasPermission('inventario:leer')) {
-      items.add(const _NavItem(
-        path: '/caja', label: 'Caja',
-        icon: Icons.account_balance_wallet_outlined,
-        activeIcon: Icons.account_balance_wallet_rounded,
-      ));
+    if (auth.hasPermission('caja:leer') &&
+        !auth.hasPermission('inventario:leer')) {
+      items.add(
+        const _NavItem(
+          path: '/caja',
+          label: 'Caja',
+          icon: Icons.account_balance_wallet_outlined,
+          activeIcon: Icons.account_balance_wallet_rounded,
+        ),
+      );
     }
 
     // Admin/Superadmin → Inventario en nav
     if (auth.hasPermission('inventario:leer')) {
-      items.insert(2, const _NavItem(
-        path: '/inventario', label: 'Stock',
-        icon: Icons.inventory_2_outlined,
-        activeIcon: Icons.inventory_2_rounded,
-      ));
+      items.insert(
+        2,
+        const _NavItem(
+          path: '/inventario',
+          label: 'Stock',
+          icon: Icons.inventory_2_outlined,
+          activeIcon: Icons.inventory_2_rounded,
+        ),
+      );
     }
 
     // Perfil al final
-    items.add(const _NavItem(
-      path: '/perfil', label: 'Perfil',
-      icon: Icons.person_outline_rounded,
-      activeIcon: Icons.person_rounded,
-    ));
+    items.add(
+      const _NavItem(
+        path: '/perfil',
+        label: 'Perfil',
+        icon: Icons.person_outline_rounded,
+        activeIcon: Icons.person_rounded,
+      ),
+    );
 
     // Más... si hay drawer
     // (el drawer ya actúa como el "Más" de las referencias)
@@ -216,11 +306,18 @@ class _BottomNavBar extends StatelessWidget {
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: items.map((item) => _NavBarItem(
-                item: item,
-                active: current.startsWith(item.path),
-                onTap: () { HapticFeedback.selectionClick(); go(item.path); },
-              )).toList(),
+              children: items
+                  .map(
+                    (item) => _NavBarItem(
+                      item: item,
+                      active: current.startsWith(item.path),
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        go(item.path);
+                      },
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ),
@@ -305,7 +402,7 @@ class _AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final u  = auth.user;
+    final u = auth.user;
     final un = u?.username ?? '';
     final rol = u?.rol ?? '';
 
@@ -334,13 +431,17 @@ class _AppDrawer extends StatelessWidget {
                         width: 32,
                         height: 32,
                         errorBuilder: (_, __, ___) => Container(
-                          width: 32, height: 32,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             color: AppColors.brandSurface,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.local_bar_rounded,
-                              color: AppColors.brand, size: 18),
+                          child: const Icon(
+                            Icons.local_bar_rounded,
+                            color: AppColors.brand,
+                            size: 18,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -446,17 +547,24 @@ class _AppDrawer extends StatelessWidget {
                 logout();
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Row(
                   children: [
                     Container(
-                      width: 36, height: 36,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: AppColors.errorLight,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.logout_rounded,
-                          color: AppColors.error, size: 18),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        color: AppColors.error,
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Text(
@@ -485,10 +593,11 @@ class _DrawerAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color   = AppColors.avatarColor(username);
+    final color = AppColors.avatarColor(username);
     final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
     return Container(
-      width: 44, height: 44,
+      width: 44,
+      height: 44,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         shape: BoxShape.circle,

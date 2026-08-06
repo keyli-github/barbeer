@@ -1,5 +1,5 @@
 /// BarBeer — Exportación centralizada de todos los widgets del Design System
-/// 
+///
 /// Uso: import 'package:barbeer/core/widgets/widgets.dart';
 
 // ── Design System nuevo (DS prefix) ──────────────────────────────────────────

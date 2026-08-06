@@ -38,9 +38,7 @@ class ConfirmationDialog {
                   child: Icon(
                     icon,
                     size: 28,
-                    color: isDestructive
-                        ? AppColors.error
-                        : AppColors.primary,
+                    color: isDestructive ? AppColors.error : AppColors.primary,
                   ),
                 ),
                 SizedBox(height: AppSpacing.lg),
@@ -225,11 +223,7 @@ class _AnimatedMessageDialogState extends State<_AnimatedMessageDialog>
                     color: widget.backgroundColor,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    widget.icon,
-                    size: 40,
-                    color: widget.color,
-                  ),
+                  child: Icon(widget.icon, size: 40, color: widget.color),
                 ),
                 SizedBox(height: AppSpacing.lg),
                 Text(
@@ -268,8 +262,7 @@ class AppBottomSheet {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height *
-              (heightFactor ?? 0.9),
+          maxHeight: MediaQuery.of(context).size.height * (heightFactor ?? 0.9),
         ),
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -324,8 +317,7 @@ class AppBottomSheet {
                 ),
               ),
             // Divisor
-            if (title != null)
-              Divider(height: 1, color: AppColors.divider),
+            if (title != null) Divider(height: 1, color: AppColors.divider),
             // Contenido
             Flexible(child: child),
           ],

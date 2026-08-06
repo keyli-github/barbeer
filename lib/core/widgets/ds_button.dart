@@ -4,7 +4,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
 enum DSButtonVariant { primary, secondary, outline, ghost, danger }
-enum DSButtonSize    { sm, md, lg }
+
+enum DSButtonSize { sm, md, lg }
 
 /// Botón unificado BarBeer — todos los tamaños y variantes
 class DSButton extends StatelessWidget {
@@ -21,46 +22,62 @@ class DSButton extends StatelessWidget {
     super.key,
     required this.label,
     this.onPressed,
-    this.variant  = DSButtonVariant.primary,
-    this.size     = DSButtonSize.md,
+    this.variant = DSButtonVariant.primary,
+    this.size = DSButtonSize.md,
     this.icon,
     this.iconTrailing = false,
-    this.loading  = false,
+    this.loading = false,
     this.fullWidth = false,
   });
 
   // Conveniences
   const DSButton.primary({
-    super.key, required this.label, this.onPressed,
-    this.icon, this.iconTrailing = false,
-    this.loading = false, this.fullWidth = false,
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+    this.iconTrailing = false,
+    this.loading = false,
+    this.fullWidth = false,
     this.size = DSButtonSize.md,
   }) : variant = DSButtonVariant.primary;
 
   const DSButton.secondary({
-    super.key, required this.label, this.onPressed,
-    this.icon, this.iconTrailing = false,
-    this.loading = false, this.fullWidth = false,
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+    this.iconTrailing = false,
+    this.loading = false,
+    this.fullWidth = false,
     this.size = DSButtonSize.md,
   }) : variant = DSButtonVariant.secondary;
 
   const DSButton.outline({
-    super.key, required this.label, this.onPressed,
-    this.icon, this.iconTrailing = false,
-    this.loading = false, this.fullWidth = false,
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+    this.iconTrailing = false,
+    this.loading = false,
+    this.fullWidth = false,
     this.size = DSButtonSize.md,
   }) : variant = DSButtonVariant.outline;
 
   const DSButton.danger({
-    super.key, required this.label, this.onPressed,
-    this.icon, this.iconTrailing = false,
-    this.loading = false, this.fullWidth = false,
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+    this.iconTrailing = false,
+    this.loading = false,
+    this.fullWidth = false,
     this.size = DSButtonSize.md,
   }) : variant = DSButtonVariant.danger;
 
   @override
   Widget build(BuildContext context) {
-    final h  = _height();
+    final h = _height();
     final fs = _fontSize();
     final px = _padX();
 
@@ -74,7 +91,8 @@ class DSButton extends StatelessWidget {
       children: [
         if (loading) ...[
           SizedBox(
-            width: 16, height: 16,
+            width: 16,
+            height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
               valueColor: AlwaysStoppedAnimation(fg),
@@ -109,7 +127,10 @@ class DSButton extends StatelessWidget {
         child: InkWell(
           onTap: (onPressed == null || loading)
               ? null
-              : () { HapticFeedback.lightImpact(); onPressed!(); },
+              : () {
+                  HapticFeedback.lightImpact();
+                  onPressed!();
+                },
           borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
@@ -131,44 +152,62 @@ class DSButton extends StatelessWidget {
 
   double _height() {
     switch (size) {
-      case DSButtonSize.sm: return 36;
-      case DSButtonSize.lg: return 52;
-      default:              return 44;
+      case DSButtonSize.sm:
+        return 36;
+      case DSButtonSize.lg:
+        return 52;
+      default:
+        return 44;
     }
   }
 
   double _fontSize() {
     switch (size) {
-      case DSButtonSize.sm: return 13;
-      case DSButtonSize.lg: return 16;
-      default:              return 15;
+      case DSButtonSize.sm:
+        return 13;
+      case DSButtonSize.lg:
+        return 16;
+      default:
+        return 15;
     }
   }
 
   double _padX() {
     switch (size) {
-      case DSButtonSize.sm: return 14;
-      case DSButtonSize.lg: return 24;
-      default:              return 20;
+      case DSButtonSize.sm:
+        return 14;
+      case DSButtonSize.lg:
+        return 24;
+      default:
+        return 20;
     }
   }
 
   Color _bg() {
     switch (variant) {
-      case DSButtonVariant.primary:   return AppColors.primary;
-      case DSButtonVariant.secondary: return AppColors.primarySurface;
-      case DSButtonVariant.danger:    return AppColors.error;
-      default:                        return Colors.transparent;
+      case DSButtonVariant.primary:
+        return AppColors.primary;
+      case DSButtonVariant.secondary:
+        return AppColors.primarySurface;
+      case DSButtonVariant.danger:
+        return AppColors.error;
+      default:
+        return Colors.transparent;
     }
   }
 
   Color _fg() {
     switch (variant) {
-      case DSButtonVariant.primary:   return Colors.white;
-      case DSButtonVariant.secondary: return AppColors.primary;
-      case DSButtonVariant.danger:    return Colors.white;
-      case DSButtonVariant.ghost:     return AppColors.textSecondary;
-      default:                        return AppColors.primary;
+      case DSButtonVariant.primary:
+        return Colors.white;
+      case DSButtonVariant.secondary:
+        return AppColors.primary;
+      case DSButtonVariant.danger:
+        return Colors.white;
+      case DSButtonVariant.ghost:
+        return AppColors.textSecondary;
+      default:
+        return AppColors.primary;
     }
   }
 
@@ -213,7 +252,10 @@ class DSIconButton extends StatelessWidget {
 
     return GestureDetector(
       onTap: onPressed != null
-          ? () { HapticFeedback.lightImpact(); onPressed!(); }
+          ? () {
+              HapticFeedback.lightImpact();
+              onPressed!();
+            }
           : null,
       child: tooltip != null ? Tooltip(message: tooltip!, child: btn) : btn,
     );

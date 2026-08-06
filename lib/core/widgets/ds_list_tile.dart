@@ -32,7 +32,8 @@ class DSListTile extends StatelessWidget {
       onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
       child: Padding(
-        padding: padding ??
+        padding:
+            padding ??
             const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.sm,
@@ -80,18 +81,27 @@ class DSStatusBadge extends StatelessWidget {
   });
 
   // Constructores predefinidos
-  factory DSStatusBadge.active()    => const DSStatusBadge(label: 'ACTIVA',    color: AppColors.success);
-  factory DSStatusBadge.pending()   => const DSStatusBadge(label: 'PENDIENTE', color: AppColors.warning);
-  factory DSStatusBadge.cancelled() => const DSStatusBadge(label: 'ANULADA',   color: AppColors.error);
-  factory DSStatusBadge.inactive()  => const DSStatusBadge(label: 'INACTIVO',  color: AppColors.textTertiary);
+  factory DSStatusBadge.active() =>
+      const DSStatusBadge(label: 'ACTIVA', color: AppColors.success);
+  factory DSStatusBadge.pending() =>
+      const DSStatusBadge(label: 'PENDIENTE', color: AppColors.warning);
+  factory DSStatusBadge.cancelled() =>
+      const DSStatusBadge(label: 'ANULADA', color: AppColors.error);
+  factory DSStatusBadge.inactive() =>
+      const DSStatusBadge(label: 'INACTIVO', color: AppColors.textTertiary);
 
   factory DSStatusBadge.fromString(String status) {
     switch (status.toUpperCase()) {
-      case 'ACTIVA':    return DSStatusBadge.active();
-      case 'PENDIENTE': return DSStatusBadge.pending();
-      case 'ANULADA':   return DSStatusBadge.cancelled();
-      case 'INACTIVO':  return DSStatusBadge.inactive();
-      default: return DSStatusBadge(label: status, color: AppColors.textTertiary);
+      case 'ACTIVA':
+        return DSStatusBadge.active();
+      case 'PENDIENTE':
+        return DSStatusBadge.pending();
+      case 'ANULADA':
+        return DSStatusBadge.cancelled();
+      case 'INACTIVO':
+        return DSStatusBadge.inactive();
+      default:
+        return DSStatusBadge(label: status, color: AppColors.textTertiary);
     }
   }
 
@@ -175,7 +185,10 @@ class DSSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.xs,
       ),
       child: Row(
         children: [

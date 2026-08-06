@@ -128,11 +128,7 @@ class DSUserAvatar extends StatelessWidget {
   final String username;
   final double size;
 
-  const DSUserAvatar({
-    super.key,
-    required this.username,
-    this.size = 44,
-  });
+  const DSUserAvatar({super.key, required this.username, this.size = 44});
 
   @override
   Widget build(BuildContext context) {

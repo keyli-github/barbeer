@@ -125,10 +125,7 @@ class SecondaryButton extends StatelessWidget {
                   ],
                   Text(
                     text,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -193,10 +190,7 @@ class DestructiveButton extends StatelessWidget {
                   ],
                   Text(
                     text,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -240,10 +234,7 @@ class TextButtonCustom extends StatelessWidget {
           ],
           Text(
             text,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ],
       ),

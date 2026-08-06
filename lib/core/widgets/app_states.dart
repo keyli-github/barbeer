@@ -36,11 +36,7 @@ class AppEmptyState extends StatelessWidget {
                 color: AppColors.backgroundAlt,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
               ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: AppColors.textTertiary,
-              ),
+              child: Icon(icon, size: 40, color: AppColors.textTertiary),
             ),
             SizedBox(height: AppSpacing.lg),
             Text(
@@ -84,10 +80,7 @@ class AppEmptyState extends StatelessWidget {
                 ),
                 child: Text(
                   actionText!,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -130,11 +123,7 @@ class AppErrorState extends StatelessWidget {
                 color: AppColors.errorLight,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
               ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: AppColors.error,
-              ),
+              child: Icon(icon, size: 40, color: AppColors.error),
             ),
             SizedBox(height: AppSpacing.lg),
             Text(
@@ -165,10 +154,7 @@ class AppErrorState extends StatelessWidget {
                 icon: Icon(Icons.refresh_rounded, size: 20),
                 label: Text(
                   actionText!,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -195,11 +181,7 @@ class AppLoadingIndicator extends StatelessWidget {
   final String? message;
   final double size;
 
-  const AppLoadingIndicator({
-    super.key,
-    this.message,
-    this.size = 40,
-  });
+  const AppLoadingIndicator({super.key, this.message, this.size = 40});
 
   @override
   Widget build(BuildContext context) {
@@ -219,10 +201,7 @@ class AppLoadingIndicator extends StatelessWidget {
             SizedBox(height: AppSpacing.lg),
             Text(
               message!,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -236,10 +215,7 @@ class AppLoadingIndicator extends StatelessWidget {
 class AppNoConnectionState extends StatelessWidget {
   final VoidCallback? onRetry;
 
-  const AppNoConnectionState({
-    super.key,
-    this.onRetry,
-  });
+  const AppNoConnectionState({super.key, this.onRetry});
 
   @override
   Widget build(BuildContext context) {

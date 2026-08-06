@@ -199,7 +199,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       );
       if (!mounted) return;
       // Feedback de éxito centrado
-      DSSuccessOverlay.show(context,
+      DSSuccessOverlay.show(
+        context,
         title: 'Venta registrada',
         description: 'La venta se registró correctamente.',
       );
@@ -300,7 +301,11 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         Container(
           color: AppColors.background,
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.xs,
+          ),
           child: DSSearchField(
             controller: _searchCtrl,
             placeholder: 'Buscar producto por nombre o código...',
@@ -312,17 +317,25 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         Container(
           color: AppColors.brandSurface,
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-          child: Row(children: [
-            Icon(Icons.info_outline_rounded,
-              size: 14, color: AppColors.brand),
-            const SizedBox(width: 6),
-            const Expanded(
-              child: Text(
-                'El método de pago se clasifica después en Caja / Conciliación.',
-                style: TextStyle(fontSize: 11, color: AppColors.brandDark)),
-            ),
-          ]),
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 14,
+                color: AppColors.brand,
+              ),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'El método de pago se clasifica después en Caja / Conciliación.',
+                  style: TextStyle(fontSize: 11, color: AppColors.brandDark),
+                ),
+              ),
+            ],
+          ),
         ),
 
         // ── Catálogo ───────────────────────────────────────────────────
@@ -330,43 +343,46 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           child: _loadingProducts
               ? const DSSkeletonList(count: 6)
               : _errorProducts != null
-                  ? DSErrorState(message: _errorProducts, onRetry: _loadProducts)
-                  : _filteredProducts.isEmpty
-                      ? DSEmptyState(
-                          icon: Icons.liquor_outlined,
-                          title: _searchCtrl.text.isNotEmpty
-                              ? 'Sin resultados' : 'Sin productos',
-                          message: _searchCtrl.text.isNotEmpty
-                              ? 'Sin productos para "${_searchCtrl.text}"'
-                              : 'No hay productos disponibles para vender.',
-                          actionLabel: 'Recargar',
-                          onAction: _loadProducts,
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.md, AppSpacing.sm,
-                            AppSpacing.md, 100),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.78,
-                            crossAxisSpacing: AppSpacing.sm,
-                            mainAxisSpacing: AppSpacing.sm,
-                          ),
-                          itemCount: _filteredProducts.length,
-                          itemBuilder: (_, i) {
-                            final p = _filteredProducts[i];
-                            final qty = _cartQty(p.id);
-                            return _ProductoCard(
-                              producto: p,
-                              qty: qty,
-                              frozen: _frozen,
-                              onAdd: () => _addToCart(p),
-                              onIncrease: () => _changeQuantity(p.id, 1),
-                              onDecrease: () => _changeQuantity(p.id, -1),
-                            );
-                          },
-                        ),
+              ? DSErrorState(message: _errorProducts, onRetry: _loadProducts)
+              : _filteredProducts.isEmpty
+              ? DSEmptyState(
+                  icon: Icons.liquor_outlined,
+                  title: _searchCtrl.text.isNotEmpty
+                      ? 'Sin resultados'
+                      : 'Sin productos',
+                  message: _searchCtrl.text.isNotEmpty
+                      ? 'Sin productos para "${_searchCtrl.text}"'
+                      : 'No hay productos disponibles para vender.',
+                  actionLabel: 'Recargar',
+                  onAction: _loadProducts,
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    100,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.78,
+                    crossAxisSpacing: AppSpacing.sm,
+                    mainAxisSpacing: AppSpacing.sm,
+                  ),
+                  itemCount: _filteredProducts.length,
+                  itemBuilder: (_, i) {
+                    final p = _filteredProducts[i];
+                    final qty = _cartQty(p.id);
+                    return _ProductoCard(
+                      producto: p,
+                      qty: qty,
+                      frozen: _frozen,
+                      onAdd: () => _addToCart(p),
+                      onIncrease: () => _changeQuantity(p.id, 1),
+                      onDecrease: () => _changeQuantity(p.id, -1),
+                    );
+                  },
+                ),
         ),
 
         // ── Barra de carrito ───────────────────────────────────────────
@@ -410,8 +426,11 @@ class _ProductoCard extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
         border: Border.all(
-          color: qty > 0 ? AppColors.primary.withValues(alpha: 0.3) : AppColors.border,
-          width: qty > 0 ? 1.5 : 0.75),
+          color: qty > 0
+              ? AppColors.primary.withValues(alpha: 0.3)
+              : AppColors.border,
+          width: qty > 0 ? 1.5 : 0.75,
+        ),
         boxShadow: AppShadows.card,
       ),
       child: Column(
@@ -422,7 +441,8 @@ class _ProductoCard extends StatelessWidget {
             flex: 5,
             child: ClipRRect(
               borderRadius: BorderRadius.vertical(
-                top: Radius.circular(AppSpacing.radiusLG)),
+                top: Radius.circular(AppSpacing.radiusLG),
+              ),
               child: DSProductImage(
                 imageUrl: producto.imageUrl as String?,
                 productName: producto.nombre as String,
@@ -439,26 +459,49 @@ class _ProductoCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(producto.nombre as String,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary),
-                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(
+                    producto.nombre as String,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const Spacer(),
-                  Row(children: [
-                    Text(FormatUtils.currency(producto.precioVenta as double),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800,
-                        color: AppColors.primary)),
-                    const Spacer(),
-                    if (stock != null && stockBajo)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.warningLight,
-                          borderRadius: BorderRadius.circular(4)),
-                        child: Text('$stock', style: const TextStyle(
-                          fontSize: 9, fontWeight: FontWeight.w700,
-                          color: AppColors.warning))),
-                  ]),
+                  Row(
+                    children: [
+                      Text(
+                        FormatUtils.currency(producto.precioVenta as double),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (stock != null && stockBajo)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.warningLight,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$stock',
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: AppSpacing.xxs),
                   // Controles de cantidad
                   if (qty == 0 || agotado)
@@ -472,28 +515,45 @@ class _ProductoCard extends StatelessWidget {
                               ? AppColors.surfaceAlt
                               : AppColors.primarySurface,
                           foregroundColor: agotado
-                              ? AppColors.textTertiary : AppColors.primary,
+                              ? AppColors.textTertiary
+                              : AppColors.primary,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                        child: Text(agotado ? 'Sin stock' : '+ Agregar',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          agotado ? 'Sin stock' : '+ Agregar',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     )
                   else
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _QtyBtn(icon: Icons.remove_rounded,
-                          onTap: frozen ? null : onDecrease),
-                        Text('$qty', style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w800,
-                          color: AppColors.primary)),
-                        _QtyBtn(icon: Icons.add_rounded,
+                        _QtyBtn(
+                          icon: Icons.remove_rounded,
+                          onTap: frozen ? null : onDecrease,
+                        ),
+                        Text(
+                          '$qty',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        _QtyBtn(
+                          icon: Icons.add_rounded,
                           onTap: (frozen || (stock != null && qty >= stock))
-                              ? null : onIncrease,
-                          color: AppColors.primary),
+                              ? null
+                              : onIncrease,
+                          color: AppColors.primary,
+                        ),
                       ],
                     ),
                 ],
@@ -513,16 +573,26 @@ class _QtyBtn extends StatelessWidget {
   const _QtyBtn({required this.icon, this.onTap, this.color});
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: () { if (onTap != null) { HapticFeedback.selectionClick(); onTap!(); } },
+    onTap: () {
+      if (onTap != null) {
+        HapticFeedback.selectionClick();
+        onTap!();
+      }
+    },
     child: Container(
-      width: 28, height: 28,
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
         color: (color ?? AppColors.textTertiary).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8)),
-      child: Icon(icon, size: 16,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        icon,
+        size: 16,
         color: onTap != null
             ? (color ?? AppColors.textSecondary)
-            : AppColors.textDisabled),
+            : AppColors.textDisabled,
+      ),
     ),
   );
 }
@@ -547,13 +617,22 @@ class _CartBar extends StatelessWidget {
     top: false,
     child: Container(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
         color: AppColors.background,
-        border: const Border(top: BorderSide(color: AppColors.border, width: 0.75)),
+        border: const Border(
+          top: BorderSide(color: AppColors.border, width: 0.75),
+        ),
       ),
       child: GestureDetector(
-        onTap: () { HapticFeedback.mediumImpact(); onTap(); },
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          onTap();
+        },
         child: Container(
           height: 52,
           decoration: BoxDecoration(
@@ -563,32 +642,54 @@ class _CartBar extends StatelessWidget {
               BoxShadow(
                 color: (frozen ? AppColors.warning : AppColors.primary)
                     .withValues(alpha: 0.3),
-                blurRadius: 12, offset: const Offset(0, 4)),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
-          child: Row(children: [
-            const SizedBox(width: AppSpacing.md),
-            Container(
-              width: 28, height: 28,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8)),
-              child: Center(
-                child: Text('$count',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800,
-                    color: Colors.white)),
+          child: Row(
+            children: [
+              const SizedBox(width: AppSpacing.md),
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Text(
+                    '$count',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(child: Text(
-              frozen ? 'Revisar carrito (error)' : 'Ver carrito',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                color: Colors.white))),
-            Text(FormatUtils.currency(total),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                color: Colors.white)),
-            const SizedBox(width: AppSpacing.md),
-          ]),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  frozen ? 'Revisar carrito (error)' : 'Ver carrito',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Text(
+                FormatUtils.currency(total),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+            ],
+          ),
         ),
       ),
     ),

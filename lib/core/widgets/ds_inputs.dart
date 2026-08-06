@@ -30,10 +30,7 @@ class DSSearchField extends StatelessWidget {
       child: TextField(
         controller: controller,
         onChanged: onChanged,
-        style: const TextStyle(
-          fontSize: 15,
-          color: AppColors.textPrimary,
-        ),
+        style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
         decoration: InputDecoration(
           hintText: placeholder,
           hintStyle: const TextStyle(
@@ -143,11 +140,7 @@ class DSFilterBar extends StatelessWidget {
   final List<Widget> children;
   final EdgeInsetsGeometry? padding;
 
-  const DSFilterBar({
-    super.key,
-    required this.children,
-    this.padding,
-  });
+  const DSFilterBar({super.key, required this.children, this.padding});
 
   @override
   Widget build(BuildContext context) {
@@ -155,11 +148,9 @@ class DSFilterBar extends StatelessWidget {
       height: 36,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: padding ??
-            const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        children: children
-            .expand((w) => [w, const SizedBox(width: 8)])
-            .toList()
+        padding:
+            padding ?? const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        children: children.expand((w) => [w, const SizedBox(width: 8)]).toList()
           ..removeLast(),
       ),
     );
@@ -231,10 +222,7 @@ class DSFormField extends StatelessWidget {
           onTap: onTap,
           onChanged: onChanged,
           autofocus: autofocus,
-          style: const TextStyle(
-            fontSize: 16,
-            color: AppColors.textPrimary,
-          ),
+          style: const TextStyle(fontSize: 16, color: AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(
@@ -257,7 +245,10 @@ class DSFormField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: const BorderSide(
+                color: AppColors.primary,
+                width: 1.5,
+              ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMD),

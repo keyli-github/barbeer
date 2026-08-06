@@ -211,8 +211,7 @@ class ProductosScreen extends ConsumerWidget {
                       key: ValueKey('empty'),
                       icon: Icons.inventory_2_outlined,
                       title: 'Sin productos',
-                      message:
-                          'No hay productos con los filtros actuales.',
+                      message: 'No hay productos con los filtros actuales.',
                     )
                   : GridView.builder(
                       key: ValueKey('grid'),
@@ -240,10 +239,8 @@ class ProductosScreen extends ConsumerWidget {
                           product: state.items[i],
                           canEdit: canEdit,
                           canDelete: canDelete,
-                          onEdit: () =>
-                              _showForm(context, ref, state.items[i]),
-                          onToggle: () =>
-                              notifier.toggleActivo(state.items[i]),
+                          onEdit: () => _showForm(context, ref, state.items[i]),
+                          onToggle: () => notifier.toggleActivo(state.items[i]),
                           onDelete: () async {
                             final ok = await ConfirmationDialog.show(
                               context: context,
@@ -345,15 +342,21 @@ class _FiltersSectionState extends State<_FiltersSection> {
               filled: true,
               fillColor: AppColors.backgroundAlt,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusMD,
+                ),
                 borderSide: BorderSide(color: AppColors.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusMD,
+                ),
                 borderSide: BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+                borderRadius: BorderRadius.circular(
+                  spacing.AppSpacing.radiusMD,
+                ),
                 borderSide: BorderSide(color: AppColors.primary, width: 1.5),
               ),
             ),
@@ -381,7 +384,9 @@ class _FiltersSectionState extends State<_FiltersSection> {
                         color: widget.estadoFilter == e.$1
                             ? AppColors.primarySurface
                             : AppColors.backgroundAlt,
-                        borderRadius:                                 BorderRadius.circular(spacing.AppSpacing.radiusRound),
+                        borderRadius: BorderRadius.circular(
+                          spacing.AppSpacing.radiusRound,
+                        ),
                         border: Border.all(
                           color: widget.estadoFilter == e.$1
                               ? AppColors.primaryBorder
@@ -525,33 +530,30 @@ class _KpiChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.09),
-            borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusSM),
+    child: Container(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusSM),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
-          child: Column(
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ],
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 // ─── Product Card (Grid) ──────────────────────────────────────────────────────
@@ -575,8 +577,8 @@ class _ProductCard extends StatelessWidget {
     final marginColor = product.margin >= 40
         ? AppColors.success
         : product.margin >= 20
-            ? AppColors.warning
-            : AppColors.error;
+        ? AppColors.warning
+        : AppColors.error;
 
     return GestureDetector(
       onTap: onEdit,
@@ -650,8 +652,9 @@ class _ProductCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: marginColor.withOpacity(0.12),
-                            borderRadius:
-                                BorderRadius.circular(spacing.AppSpacing.radiusXS),
+                            borderRadius: BorderRadius.circular(
+                              spacing.AppSpacing.radiusXS,
+                            ),
                           ),
                           child: Text(
                             '${product.margin.toStringAsFixed(0)}%',

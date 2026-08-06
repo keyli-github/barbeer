@@ -3,7 +3,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
 /// AppHeader unificado para toda la aplicación BarBeer
-/// 
+///
 /// Pantallas principales: logo BarBeer + subtítulo de rol + hamburger (si hay drawer)
 /// Subpantallas: flecha atrás + título + acciones
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -65,10 +65,12 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
                 // ── Acciones ─────────────────────────────────────────────
                 if (actions != null)
-                  ...actions!.map((a) => Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: a,
-                  )),
+                  ...actions!.map(
+                    (a) => Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: a,
+                    ),
+                  ),
               ],
             ),
           ),

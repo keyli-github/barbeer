@@ -89,8 +89,16 @@ class _DSSkeletonState extends State<DSSkeleton>
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
             colors: [
-              Color.lerp(AppColors.borderLight, AppColors.surfaceAlt, _anim.value)!,
-              Color.lerp(AppColors.surfaceAlt, AppColors.borderLight, _anim.value)!,
+              Color.lerp(
+                AppColors.borderLight,
+                AppColors.surfaceAlt,
+                _anim.value,
+              )!,
+              Color.lerp(
+                AppColors.surfaceAlt,
+                AppColors.borderLight,
+                _anim.value,
+              )!,
             ],
           ),
         ),
@@ -278,9 +286,7 @@ class DSErrorState extends StatelessWidget {
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Reintentar'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                ),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
               ),
             ],
           ],

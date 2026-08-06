@@ -122,7 +122,11 @@ class SucursalesScreen extends ConsumerWidget {
                 padding: EdgeInsets.all(AppSpacing.md),
                 child: Row(
                   children: [
-                    Icon(Icons.store_rounded, color: AppColors.primary, size: 24),
+                    Icon(
+                      Icons.store_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
                     SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(

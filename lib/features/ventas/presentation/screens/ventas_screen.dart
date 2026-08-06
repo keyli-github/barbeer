@@ -54,10 +54,7 @@ class VentasScreen extends ConsumerWidget {
           bottom: false,
           child: Column(
             children: [
-              AppHeader(
-                title: 'Ventas',
-                subtitle: 'Historial de ventas',
-              ),
+              AppHeader(title: 'Ventas', subtitle: 'Historial de ventas'),
               const Expanded(child: HistorialVentasView()),
             ],
           ),
@@ -100,10 +97,7 @@ class _VendedoraViewState extends State<_VendedoraView>
         bottom: false,
         child: Column(
           children: [
-            AppHeader(
-              title: 'Ventas',
-              subtitle: 'Nueva venta y mis ventas',
-            ),
+            AppHeader(title: 'Ventas', subtitle: 'Nueva venta y mis ventas'),
             Container(
               color: AppColors.surface,
               child: TabBar(
@@ -165,10 +159,7 @@ class _AdminViewState extends State<_AdminView>
         bottom: false,
         child: Column(
           children: [
-            AppHeader(
-              title: 'Ventas',
-              subtitle: 'Gestión completa',
-            ),
+            AppHeader(title: 'Ventas', subtitle: 'Gestión completa'),
             Container(
               color: AppColors.surface,
               child: TabBar(
@@ -199,4 +190,3 @@ class _AdminViewState extends State<_AdminView>
     );
   }
 }
-

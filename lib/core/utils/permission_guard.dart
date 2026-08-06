@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 class PermissionGuard extends StatelessWidget {
   /// Lista de permisos requeridos (cualquiera de ellos permite el acceso)
   final List<String> permissions;
-  
+
   /// Widget a mostrar si el usuario tiene permiso
   final Widget child;
-  
+
   /// Widget a mostrar si NO tiene permiso (null = no mostrar nada)
   final Widget? fallback;
-  
+
   /// Función para verificar si el usuario tiene un permiso específico
   final bool Function(String permission) checkPermission;
 
@@ -27,16 +27,16 @@ class PermissionGuard extends StatelessWidget {
   Widget build(BuildContext context) {
     // Si tiene al menos uno de los permisos requeridos, mostrar el widget
     final hasPermission = permissions.any((p) => checkPermission(p));
-    
+
     if (hasPermission) {
       return child;
     }
-    
+
     // Si no tiene permiso y hay fallback, mostrarlo
     if (fallback != null) {
       return fallback!;
     }
-    
+
     // Si no tiene permiso y no hay fallback, no mostrar nada
     return const SizedBox.shrink();
   }
@@ -57,7 +57,7 @@ extension PermissionGuardExtension on Widget {
       child: this,
     );
   }
-  
+
   /// Versión simplificada para un solo permiso
   Widget guardWithPermission(
     String permission,
