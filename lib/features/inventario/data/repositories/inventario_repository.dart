@@ -54,11 +54,7 @@ class InventarioRepository {
   Future<List<ProductoOption>> productos() async {
     final response = await _api.get<Map<String, dynamic>>(
       '/productos',
-      queryParameters: {
-        'pagina': 1,
-        'limite': 100,
-        'activo': 'true',
-      },
+      queryParameters: {'pagina': 1, 'limite': 100, 'activo': 'true'},
     );
     return (response.data?['data'] as List? ?? const [])
         .whereType<Map>()

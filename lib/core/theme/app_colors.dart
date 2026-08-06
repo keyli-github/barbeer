@@ -30,9 +30,7 @@ class AppColors {
   static const Color roleSuperadmin = Color(0xFF7C3AED);
   static const Color roleAdmin = Color(0xFF16A34A);
   static const Color roleCajero = Color(0xFF2563EB);
-  static const Color roleMozo = Color(0xFFF97316);
-  static const Color roleCocina = Color(0xFFEF4444);
-  static const Color roleBartender = Color(0xFF0EA5E9);
+  static const Color roleVendedora = Color(0xFFF59E0B);
 
   static const List<Color> avatarColors = [
     Color(0xFF3B82F6),
@@ -57,12 +55,8 @@ class AppColors {
         return roleAdmin;
       case 'CAJERO':
         return roleCajero;
-      case 'MOZO':
-        return roleMozo;
-      case 'COCINA':
-        return roleCocina;
-      case 'BARTENDER':
-        return roleBartender;
+      case 'VENDEDORA':
+        return roleVendedora;
       default:
         return primary;
     }
@@ -73,7 +67,7 @@ class AppShadows {
   AppShadows._();
   static final List<BoxShadow> card = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.035),
+      color: Colors.black.withValues(alpha: 0.035),
       blurRadius: 14,
       offset: const Offset(0, 4),
       spreadRadius: -3,
@@ -104,7 +98,7 @@ class AppShadows {
   ];
   static final List<BoxShadow> button = [
     BoxShadow(
-      color: primary.withOpacity(0.22),
+      color: AppColors.primary.withOpacity(0.22),
       blurRadius: 14,
       offset: const Offset(0, 5),
       spreadRadius: -3,

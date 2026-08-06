@@ -63,26 +63,26 @@ class CajaState {
     int? movimientosPagina,
     int? movimientosPaginas,
     int? movimientosTotal,
-  }) =>
-      CajaState(
-        isLoading: isLoading ?? this.isLoading,
-        isActing: isActing ?? this.isActing,
-        error: clearError ? null : (error ?? this.error),
-        actual: clearActual ? null : (actual ?? this.actual),
-        historial: historial ?? this.historial,
-        movimientos: movimientos ?? this.movimientos,
-        sedes: sedes ?? this.sedes,
-        sedeId: sedeId ?? this.sedeId,
-        estadoFiltro:
-            clearEstadoFiltro ? null : (estadoFiltro ?? this.estadoFiltro),
-        tipoFiltro: clearTipoFiltro ? null : (tipoFiltro ?? this.tipoFiltro),
-        historialPagina: historialPagina ?? this.historialPagina,
-        historialPaginas: historialPaginas ?? this.historialPaginas,
-        historialTotal: historialTotal ?? this.historialTotal,
-        movimientosPagina: movimientosPagina ?? this.movimientosPagina,
-        movimientosPaginas: movimientosPaginas ?? this.movimientosPaginas,
-        movimientosTotal: movimientosTotal ?? this.movimientosTotal,
-      );
+  }) => CajaState(
+    isLoading: isLoading ?? this.isLoading,
+    isActing: isActing ?? this.isActing,
+    error: clearError ? null : (error ?? this.error),
+    actual: clearActual ? null : (actual ?? this.actual),
+    historial: historial ?? this.historial,
+    movimientos: movimientos ?? this.movimientos,
+    sedes: sedes ?? this.sedes,
+    sedeId: sedeId ?? this.sedeId,
+    estadoFiltro: clearEstadoFiltro
+        ? null
+        : (estadoFiltro ?? this.estadoFiltro),
+    tipoFiltro: clearTipoFiltro ? null : (tipoFiltro ?? this.tipoFiltro),
+    historialPagina: historialPagina ?? this.historialPagina,
+    historialPaginas: historialPaginas ?? this.historialPaginas,
+    historialTotal: historialTotal ?? this.historialTotal,
+    movimientosPagina: movimientosPagina ?? this.movimientosPagina,
+    movimientosPaginas: movimientosPaginas ?? this.movimientosPaginas,
+    movimientosTotal: movimientosTotal ?? this.movimientosTotal,
+  );
 }
 
 class CajaNotifier extends StateNotifier<CajaState> {
@@ -167,31 +167,28 @@ class CajaNotifier extends StateNotifier<CajaState> {
   }
 
   Future<void> filtrarMovimientos(String sesionId, String? tipo) async {
-    state = state.copyWith(
-      tipoFiltro: tipo,
-      clearTipoFiltro: tipo == null,
-    );
+    state = state.copyWith(tipoFiltro: tipo, clearTipoFiltro: tipo == null);
     await loadMovimientos(sesionId);
   }
 
   Future<CajaSesion> detalle(String id) => _repository.detalle(id);
 
   Future<void> abrir(Map<double, int> cantidades) => _action(() async {
-        await _repository.abrir(cantidades, sedeId: state.sedeId);
-      });
+    await _repository.abrir(cantidades, sedeId: state.sedeId);
+  });
 
+  /// @deprecated Bloqueado por regla de negocio en V2 (retorna 403/422).
+  /// Conservado como referencia legacy — no se llama desde la UI V2.
   Future<void> registrarMovimiento(Map<String, dynamic> data) async {
     final id = state.actual?.id;
     if (id == null) return;
     await _action(() => _repository.registrarMovimiento(id, data));
   }
 
-  Future<void> precuadre(double monto, String? observaciones) async {
+  Future<void> precuadre(double monto) async {
     final id = state.actual?.id;
     if (id == null) return;
-    await _action(
-      () => _repository.precuadre(id, monto, observaciones: observaciones),
-    );
+    await _action(() => _repository.precuadre(id, monto));
   }
 
   Future<void> cerrar(double monto, String? observaciones) async {
@@ -199,6 +196,24 @@ class CajaNotifier extends StateNotifier<CajaState> {
     if (id == null) return;
     await _action(
       () => _repository.cerrar(id, monto, observaciones: observaciones),
+    );
+  }
+
+  /// Cierre forzado con ventas pendientes (ADMIN/SUPERADMIN).
+  Future<void> cerrarForzado(
+    double monto, {
+    required String motivoForzado,
+    String? observaciones,
+  }) async {
+    final id = state.actual?.id;
+    if (id == null) return;
+    await _action(
+      () => _repository.cerrarForzado(
+        id,
+        monto,
+        motivoForzado: motivoForzado,
+        observaciones: observaciones,
+      ),
     );
   }
 

@@ -61,12 +61,11 @@ class KardexResumen {
   });
 
   factory KardexResumen.fromJson(Map<String, dynamic> json) => KardexResumen(
-        totalMovimientos:
-            (json['totalMovimientos'] as num?)?.toInt() ?? 0,
-        entradas: (json['entradas'] as num?)?.toInt() ?? 0,
-        salidas: (json['salidas'] as num?)?.toInt() ?? 0,
-        valorTotal: (json['valorTotal'] as num?)?.toDouble() ?? 0,
-      );
+    totalMovimientos: (json['totalMovimientos'] as num?)?.toInt() ?? 0,
+    entradas: (json['entradas'] as num?)?.toInt() ?? 0,
+    salidas: (json['salidas'] as num?)?.toInt() ?? 0,
+    valorTotal: (json['valorTotal'] as num?)?.toDouble() ?? 0,
+  );
 }
 
 class KardexPage {
@@ -85,16 +84,17 @@ class KardexPage {
   });
 
   factory KardexPage.fromJson(Map<String, dynamic> json) => KardexPage(
-        data: (json['data'] as List? ?? const [])
-            .whereType<Map>()
-            .map((item) =>
-                KardexMovimiento.fromJson(Map<String, dynamic>.from(item)))
-            .toList(),
-        total: (json['total'] as num?)?.toInt() ?? 0,
-        pagina: (json['pagina'] as num?)?.toInt() ?? 1,
-        limite: (json['limite'] as num?)?.toInt() ?? 25,
-        totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 0,
-      );
+    data: (json['data'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => KardexMovimiento.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList(),
+    total: (json['total'] as num?)?.toInt() ?? 0,
+    pagina: (json['pagina'] as num?)?.toInt() ?? 1,
+    limite: (json['limite'] as num?)?.toInt() ?? 25,
+    totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class KardexOption {

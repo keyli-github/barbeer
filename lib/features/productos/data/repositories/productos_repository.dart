@@ -28,8 +28,7 @@ class ProductosRepository {
   }
 
   Future<ProductosResumen> summary() async {
-    final response =
-        await _api.get<Map<String, dynamic>>('/productos/resumen');
+    final response = await _api.get<Map<String, dynamic>>('/productos/resumen');
     return ProductosResumen.fromJson(response.data ?? const {});
   }
 

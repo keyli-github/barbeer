@@ -69,25 +69,24 @@ class KardexState {
     int? limite,
     int? total,
     int? totalPaginas,
-  }) =>
-      KardexState(
-        movimientos: movimientos ?? this.movimientos,
-        resumen: resumen ?? this.resumen,
-        sedes: sedes ?? this.sedes,
-        productos: productos ?? this.productos,
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : error ?? this.error,
-        search: search ?? this.search,
-        tipo: clearTipo ? null : tipo ?? this.tipo,
-        productoId: clearProducto ? null : productoId ?? this.productoId,
-        sedeId: clearSede ? null : sedeId ?? this.sedeId,
-        desde: clearDates ? null : desde ?? this.desde,
-        hasta: clearDates ? null : hasta ?? this.hasta,
-        pagina: pagina ?? this.pagina,
-        limite: limite ?? this.limite,
-        total: total ?? this.total,
-        totalPaginas: totalPaginas ?? this.totalPaginas,
-      );
+  }) => KardexState(
+    movimientos: movimientos ?? this.movimientos,
+    resumen: resumen ?? this.resumen,
+    sedes: sedes ?? this.sedes,
+    productos: productos ?? this.productos,
+    isLoading: isLoading ?? this.isLoading,
+    error: clearError ? null : error ?? this.error,
+    search: search ?? this.search,
+    tipo: clearTipo ? null : tipo ?? this.tipo,
+    productoId: clearProducto ? null : productoId ?? this.productoId,
+    sedeId: clearSede ? null : sedeId ?? this.sedeId,
+    desde: clearDates ? null : desde ?? this.desde,
+    hasta: clearDates ? null : hasta ?? this.hasta,
+    pagina: pagina ?? this.pagina,
+    limite: limite ?? this.limite,
+    total: total ?? this.total,
+    totalPaginas: totalPaginas ?? this.totalPaginas,
+  );
 }
 
 class KardexNotifier extends StateNotifier<KardexState> {
@@ -101,9 +100,9 @@ class KardexNotifier extends StateNotifier<KardexState> {
     this._repository, {
     required bool isSuperAdmin,
     required bool canReadProducts,
-  })  : _isSuperAdmin = isSuperAdmin,
-        _canReadProducts = canReadProducts,
-        super(const KardexState()) {
+  }) : _isSuperAdmin = isSuperAdmin,
+       _canReadProducts = canReadProducts,
+       super(const KardexState()) {
     load();
     loadOptions();
   }
@@ -111,8 +110,8 @@ class KardexNotifier extends StateNotifier<KardexState> {
   String? _date(DateTime? value) => value == null
       ? null
       : '${value.year.toString().padLeft(4, '0')}-'
-          '${value.month.toString().padLeft(2, '0')}-'
-          '${value.day.toString().padLeft(2, '0')}';
+            '${value.month.toString().padLeft(2, '0')}-'
+            '${value.day.toString().padLeft(2, '0')}';
 
   Future<void> load({int? pagina}) async {
     final request = ++_request;
@@ -182,7 +181,10 @@ class KardexNotifier extends StateNotifier<KardexState> {
   void search(String value) {
     _searchTimer?.cancel();
     state = state.copyWith(search: value);
-    _searchTimer = Timer(const Duration(milliseconds: 350), () => load(pagina: 1));
+    _searchTimer = Timer(
+      const Duration(milliseconds: 350),
+      () => load(pagina: 1),
+    );
   }
 
   void filterTipo(String? value) {
@@ -217,7 +219,9 @@ class KardexNotifier extends StateNotifier<KardexState> {
   }
 }
 
-final kardexProvider = StateNotifierProvider<KardexNotifier, KardexState>((ref) {
+final kardexProvider = StateNotifierProvider<KardexNotifier, KardexState>((
+  ref,
+) {
   final auth = ref.watch(authProvider);
   return KardexNotifier(
     ref.watch(kardexRepositoryProvider),

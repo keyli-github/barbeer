@@ -65,19 +65,31 @@ class CategoriasRepository {
   }
 
   Future<Categoria> create(String nombre, {String? descripcion}) async {
-    final r = await _api.post('/categorias', data: {
-      'nombre': nombre,
-      if (descripcion?.trim().isNotEmpty ?? false) 'descripcion': descripcion!.trim(),
-    });
+    final r = await _api.post(
+      '/categorias',
+      data: {
+        'nombre': nombre,
+        if (descripcion?.trim().isNotEmpty ?? false)
+          'descripcion': descripcion!.trim(),
+      },
+    );
     return Categoria.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
-  Future<Categoria> update(String id, {String? nombre, String? descripcion, bool? activo}) async {
-    final r = await _api.patch('/categorias/$id', data: {
-      if (nombre != null) 'nombre': nombre,
-      if (descripcion != null) 'descripcion': descripcion,
-      if (activo != null) 'activo': activo,
-    });
+  Future<Categoria> update(
+    String id, {
+    String? nombre,
+    String? descripcion,
+    bool? activo,
+  }) async {
+    final r = await _api.patch(
+      '/categorias/$id',
+      data: {
+        if (nombre != null) 'nombre': nombre,
+        if (descripcion != null) 'descripcion': descripcion,
+        if (activo != null) 'activo': activo,
+      },
+    );
     return Categoria.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 

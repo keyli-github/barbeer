@@ -13,16 +13,14 @@ class KardexRepository {
     String? desde,
     String? hasta,
     String? sedeId,
-  }) =>
-      {
-        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
-        if (tipo != null && tipo.isNotEmpty) 'tipo': tipo,
-        if (productoId != null && productoId.isNotEmpty)
-          'productoId': productoId,
-        if (desde != null && desde.isNotEmpty) 'desde': desde,
-        if (hasta != null && hasta.isNotEmpty) 'hasta': hasta,
-        if (sedeId != null && sedeId.isNotEmpty) 'sedeId': sedeId,
-      };
+  }) => {
+    if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+    if (tipo != null && tipo.isNotEmpty) 'tipo': tipo,
+    if (productoId != null && productoId.isNotEmpty) 'productoId': productoId,
+    if (desde != null && desde.isNotEmpty) 'desde': desde,
+    if (hasta != null && hasta.isNotEmpty) 'hasta': hasta,
+    if (sedeId != null && sedeId.isNotEmpty) 'sedeId': sedeId,
+  };
 
   Future<KardexPage> list({
     int pagina = 1,

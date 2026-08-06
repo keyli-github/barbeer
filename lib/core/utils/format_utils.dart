@@ -7,7 +7,8 @@ class FormatUtils {
       '$symbol ${NumberFormat('#,##0.00').format(amount)}';
 
   static String date(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
-  static String dateTime(DateTime d) => DateFormat('dd/MM/yyyy HH:mm').format(d);
+  static String dateTime(DateTime d) =>
+      DateFormat('dd/MM/yyyy HH:mm').format(d);
 
   static String timeAgo(DateTime date) {
     final diff = DateTime.now().difference(date);
@@ -28,22 +29,29 @@ class FormatUtils {
 
   static String roleName(String role) {
     switch (role.toUpperCase()) {
-      case 'SUPERADMIN': return 'Super Admin';
-      case 'ADMIN': return 'Administrador';
-      case 'CAJERO': return 'Cajero';
-      case 'MOZO': return 'Mozo';
-      case 'COCINA': return 'Cocina';
-      case 'BARTENDER': return 'Bartender';
-      default: return role;
+      case 'SUPERADMIN':
+        return 'Super Admin';
+      case 'ADMIN':
+        return 'Administrador';
+      case 'CAJERO':
+        return 'Cajero';
+      case 'VENDEDORA':
+        return 'Vendedora';
+      default:
+        return role;
     }
   }
 
   static String deviceIcon(String? type) {
     switch (type) {
-      case 'android': return 'Android';
-      case 'ios': return 'iOS';
-      case 'web': return 'Web';
-      default: return type ?? 'Dispositivo';
+      case 'android':
+        return 'Android';
+      case 'ios':
+        return 'iOS';
+      case 'web':
+        return 'Web';
+      default:
+        return type ?? 'Dispositivo';
     }
   }
 }

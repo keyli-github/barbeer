@@ -52,11 +52,18 @@ class AuthState {
   bool hasPermission(String p) => user?.hasPermission(p) ?? false;
   bool canAccess(String path) {
     const m = {
+      '/productos': 'productos:crear',
+      '/inventario': 'inventario:leer',
+      '/kardex': 'kardex:leer',
+      '/compras': 'compras:leer',
+      '/asistencia': 'asistencia:leer',
       '/usuarios': 'usuarios:leer',
       '/roles': 'roles:leer',
       '/permisos': 'permisos:leer',
       '/sucursales': 'establecimientos:leer',
       '/auditoria': 'audit:leer',
+      '/etiquetas': 'etiquetas:crear',
+      '/caja': 'caja:leer',
     };
     final req = m[path];
     return req == null || hasPermission(req);

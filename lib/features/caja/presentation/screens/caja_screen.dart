@@ -7,10 +7,11 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
-import '../../../../core/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
+import '../widgets/caja_arqueo_sheets.dart';
+import '../widgets/caja_resumen_v2.dart';
 
 class CajaScreen extends ConsumerStatefulWidget {
   const CajaScreen({super.key});
@@ -28,9 +29,9 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     final auth = ref.watch(authProvider);
     final actual = state.actual;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
-      body: SafeArea(
+    return Material(
+      color: AppColors.backgroundAlt,
+      child: SafeArea(
         bottom: false,
         child: Column(
           children: [
@@ -51,63 +52,53 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                 child: state.isLoading
                     ? const _CajaSkeleton(key: ValueKey('loading'))
                     : state.error != null &&
-                            actual == null &&
-                            state.historial.isEmpty
-                        ? AppErrorState(
-                            key: const ValueKey('error'),
-                            message: state.error!,
-                            onRetry: ref.read(cajaProvider.notifier).load,
-                          )
-                        : _historial
-                            ? _Historial(
-                                key: const ValueKey('history'),
-                                state: state,
-                                onFilter: ref
-                                    .read(cajaProvider.notifier)
-                                    .filtrarHistorial,
-                                onPage: ref
-                                    .read(cajaProvider.notifier)
-                                    .cambiarPaginaHistorial,
-                                onDetail: (id) => _showDetail(context, id),
-                              )
-                            : _Actual(
-                                key: const ValueKey('current'),
-                                state: state,
-                                canOpen:
-                                    auth.hasPermission('caja:aperturar'),
-                                canMove:
-                                    auth.hasPermission('caja:movimientos'),
-                                canPrecuadre:
-                                    auth.hasPermission('caja:precuadre'),
-                                canClose: auth.hasPermission('caja:cerrar'),
-                                onOpen: () => _showOpening(context),
-                                onMove: () => _showMovement(context),
-                                onPrecuadre: () => _showArqueo(
-                                  context,
-                                  cierre: false,
-                                ),
-                                onClose: () => _showArqueo(
-                                  context,
-                                  cierre: true,
-                                ),
-                                onMovementFilter: (tipo) {
-                                  if (actual != null) {
-                                    ref
-                                        .read(cajaProvider.notifier)
-                                        .filtrarMovimientos(actual.id, tipo);
-                                  }
-                                },
-                                onMovementPage: (page) {
-                                  if (actual != null) {
-                                    ref
-                                        .read(cajaProvider.notifier)
-                                        .loadMovimientos(
-                                          actual.id,
-                                          pagina: page,
-                                        );
-                                  }
-                                },
-                              ),
+                          actual == null &&
+                          state.historial.isEmpty
+                    ? AppErrorState(
+                        key: const ValueKey('error'),
+                        message: state.error!,
+                        onRetry: ref.read(cajaProvider.notifier).load,
+                      )
+                    : _historial
+                    ? _Historial(
+                        key: const ValueKey('history'),
+                        state: state,
+                        onFilter: ref
+                            .read(cajaProvider.notifier)
+                            .filtrarHistorial,
+                        onPage: ref
+                            .read(cajaProvider.notifier)
+                            .cambiarPaginaHistorial,
+                        onDetail: (id) => _showDetail(context, id),
+                      )
+                    : _Actual(
+                        key: const ValueKey('current'),
+                        state: state,
+                        canOpen: auth.hasPermission('caja:aperturar'),
+                        canPrecuadre: auth.hasPermission('caja:precuadre'),
+                        canClose: auth.hasPermission('caja:cerrar'),
+                        canForzar: auth.hasPermission('caja:forzar-cierre'),
+                        onOpen: () => _showOpening(context),
+                        onPrecuadre: () => _showPrecuadre(context),
+                        onClose: () => _showCierre(
+                          context,
+                          canForzar: auth.hasPermission('caja:forzar-cierre'),
+                        ),
+                        onMovementFilter: (tipo) {
+                          if (actual != null) {
+                            ref
+                                .read(cajaProvider.notifier)
+                                .filtrarMovimientos(actual.id, tipo);
+                          }
+                        },
+                        onMovementPage: (page) {
+                          if (actual != null) {
+                            ref
+                                .read(cajaProvider.notifier)
+                                .loadMovimientos(actual.id, pagina: page);
+                          }
+                        },
+                      ),
               ),
             ),
           ],
@@ -121,9 +112,8 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => _DetailSheet(
-        future: ref.read(cajaProvider.notifier).detalle(id),
-      ),
+      builder: (sheetContext) =>
+          _DetailSheet(future: ref.read(cajaProvider.notifier).detalle(id)),
     );
   }
 
@@ -137,30 +127,26 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     if (saved == true && mounted) _success('Caja abierta correctamente');
   }
 
-  Future<void> _showMovement(BuildContext context) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _MovementSheet(),
+  Future<void> _showPrecuadre(BuildContext context) async {
+    showPrecuadreSheet(
+      context,
+      onSuccess: () => _success('Precuadre registrado'),
     );
-    if (saved == true && mounted) _success('Movimiento registrado');
   }
 
-  Future<void> _showArqueo(
+  Future<void> _showCierre(
     BuildContext context, {
-    required bool cierre,
+    required bool canForzar,
   }) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ArqueoSheet(cierre: cierre),
+    showCierreSheet(
+      context,
+      canForzar: canForzar,
+      onSuccess: () => _success('Caja cerrada correctamente'),
     );
-    if (saved == true && mounted) {
-      _success(cierre ? 'Caja cerrada correctamente' : 'Precuadre registrado');
-    }
   }
+
+  /// @deprecated Movimientos manuales prohibidos en V2.
+  // Future<void> _showMovement(BuildContext context) async { ... }
 
   void _success(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -186,94 +172,102 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: AppColors.background,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
+    color: AppColors.background,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySurface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: AppColors.primary,
-                      size: 21,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Caja', style: AppTextStyles.headlineLarge),
-                        Text(
-                          'Control operativo del turno',
-                          style: AppTextStyles.labelSmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isSuperAdmin && state.sedes.isNotEmpty)
-                    SizedBox(
-                      width: 150,
-                      child: DropdownButtonFormField<String>(
-                        value: state.sedeId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Sede',
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                        ),
-                        items: state.sedes
-                            .map(
-                              (sede) => DropdownMenuItem(
-                                value: sede['id'] as String,
-                                child: Text(
-                                  sede['nombre'] as String? ?? '',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: onSede,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundAlt,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
+              Builder(
+                builder: (ctx) => IconButton(
+                  tooltip: 'Abrir menú',
+                  icon: const Icon(Icons.menu_rounded),
+                  color: AppColors.textPrimary,
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
                 ),
-                child: Row(
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: AppColors.primary,
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Tab(
-                      label: 'Turno actual',
-                      selected: !historial,
-                      onTap: () => onTab(false),
-                    ),
-                    _Tab(
-                      label: 'Historial',
-                      selected: historial,
-                      onTap: () => onTab(true),
+                    Text('Caja', style: AppTextStyles.headlineLarge),
+                    Text(
+                      'Control operativo del turno',
+                      style: AppTextStyles.labelSmall,
                     ),
                   ],
                 ),
               ),
+              if (isSuperAdmin && state.sedes.isNotEmpty)
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: state.sedeId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Sede',
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                    items: state.sedes
+                        .map(
+                          (sede) => DropdownMenuItem(
+                            value: sede['id'] as String,
+                            child: Text(
+                              sede['nombre'] as String? ?? '',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onSede,
+                  ),
+                ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundAlt,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Row(
+              children: [
+                _Tab(
+                  label: 'Turno actual',
+                  selected: !historial,
+                  onTap: () => onTab(false),
+                ),
+                _Tab(
+                  label: 'Historial',
+                  selected: historial,
+                  onTap: () => onTab(true),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Tab extends StatelessWidget {
@@ -289,37 +283,36 @@ class _Tab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-        child: InkWell(
+    child: InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(vertical: 9),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.surface : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: selected ? AppShadows.card : null,
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.labelLarge.copyWith(
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
+          boxShadow: selected ? AppShadows.card : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.labelLarge.copyWith(
+            color: selected ? AppColors.primary : AppColors.textSecondary,
           ),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class _Actual extends StatelessWidget {
   final CajaState state;
   final bool canOpen;
-  final bool canMove;
   final bool canPrecuadre;
   final bool canClose;
+  final bool canForzar;
   final VoidCallback onOpen;
-  final VoidCallback onMove;
   final VoidCallback onPrecuadre;
   final VoidCallback onClose;
   final ValueChanged<String?> onMovementFilter;
@@ -329,11 +322,10 @@ class _Actual extends StatelessWidget {
     super.key,
     required this.state,
     required this.canOpen,
-    required this.canMove,
     required this.canPrecuadre,
     required this.canClose,
+    this.canForzar = false,
     required this.onOpen,
-    required this.onMove,
     required this.onPrecuadre,
     required this.onClose,
     required this.onMovementFilter,
@@ -354,11 +346,22 @@ class _Actual extends StatelessWidget {
         onAction: canOpen ? onOpen : null,
       );
     }
-    final summary = session.resumen ??
+    final summary =
+        session.resumen ??
         CajaResumen(
-          totalEntradas: 0,
-          totalSalidas: 0,
-          saldoEsperado: session.montoApertura,
+          version: 'V2',
+          v2: CajaResumenV2(
+            totalVentasBruto: 0,
+            totalAnulaciones: 0,
+            totalVentasNeto: 0,
+            totalDigitalBruto: 0,
+            totalReversDigital: 0,
+            totalDigitalNeto: 0,
+            efectivoEsperado: session.montoApertura,
+            ventasPendientes: 0,
+            cantidadVentas: 0,
+            cantidadAnuladas: 0,
+          ),
         );
     return RefreshIndicator(
       color: AppColors.primary,
@@ -380,56 +383,67 @@ class _Actual extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = (constraints.maxWidth - 10) / 2;
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _Metric(
-                    width: width,
-                    label: 'Apertura',
-                    value: session.montoApertura,
-                    icon: Icons.play_circle_outline_rounded,
-                    color: AppColors.textSecondary,
-                  ),
-                  _Metric(
-                    width: width,
-                    label: 'Entradas',
-                    value: summary.totalEntradas,
-                    icon: Icons.south_west_rounded,
-                    color: AppColors.success,
-                  ),
-                  _Metric(
-                    width: width,
-                    label: 'Salidas',
-                    value: summary.totalSalidas,
-                    icon: Icons.north_east_rounded,
-                    color: AppColors.error,
-                  ),
-                  _Metric(
-                    width: width,
-                    label: 'Saldo esperado',
-                    value: summary.saldoEsperado,
-                    icon: Icons.account_balance_rounded,
-                    color: AppColors.primary,
-                  ),
-                ],
-              );
-            },
-          ),
+          // ── Resumen principal V2 ────────────────────────────────────
+          if (summary.isV2 && summary.v2 != null) ...[
+            CajaResumenPrincipalV2(
+              resumen: summary.v2!,
+              montoApertura: session.montoApertura,
+            ),
+            const SizedBox(height: 12),
+            CajaBilleteraCard(porBilletera: summary.v2!.porBilletera),
+            if (summary.v2!.porBilletera.isNotEmpty) const SizedBox(height: 12),
+            CajaVendedoraTable(porVendedora: summary.v2!.porVendedora),
+            if (summary.v2!.porVendedora.isNotEmpty) const SizedBox(height: 12),
+            CajaProductosTable(resumenProductos: summary.v2!.resumenProductos),
+          ] else ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _Metric(
+                      width: width,
+                      label: 'Apertura',
+                      value: session.montoApertura,
+                      icon: Icons.play_circle_outline_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                    _Metric(
+                      width: width,
+                      label: 'Ventas neto',
+                      value: summary.v1?.totalEntradas ?? 0,
+                      icon: Icons.south_west_rounded,
+                      color: AppColors.success,
+                    ),
+                    _Metric(
+                      width: width,
+                      label: 'Salidas',
+                      value: summary.v1?.totalSalidas ?? 0,
+                      icon: Icons.north_east_rounded,
+                      color: AppColors.primary,
+                    ),
+                    _Metric(
+                      width: width,
+                      label: 'Efectivo esperado',
+                      value: summary.efectivoEsperado,
+                      icon: Icons.account_balance_rounded,
+                      color: AppColors.warning,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (canMove)
-                FilledButton.icon(
-                  onPressed: state.isActing ? null : onMove,
-                  icon: const Icon(Icons.swap_vert_rounded, size: 18),
-                  label: const Text('Movimiento'),
-                ),
+              // Movimientos manuales eliminados por regla de negocio V2.
+              // Las entradas se generan automáticamente desde ventas.
+              // Las salidas digitales se generan desde conciliación.
               if (canPrecuadre)
                 OutlinedButton.icon(
                   onPressed: state.isActing ? null : onPrecuadre,
@@ -511,97 +525,97 @@ class _Historial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
-        children: [
-          _FilterRow(
-            selected: state.estadoFiltro,
-            values: const [null, 'ABIERTA', 'CERRADA'],
-            labels: const ['Todas', 'Abiertas', 'Cerradas'],
-            onChanged: onFilter,
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+    children: [
+      _FilterRow(
+        selected: state.estadoFiltro,
+        values: const [null, 'ABIERTA', 'CERRADA'],
+        labels: const ['Todas', 'Abiertas', 'Cerradas'],
+        onChanged: onFilter,
+      ),
+      const SizedBox(height: 12),
+      if (state.historial.isEmpty)
+        const Padding(
+          padding: EdgeInsets.only(top: 80),
+          child: AppEmptyState(
+            icon: Icons.history_rounded,
+            title: 'Sin sesiones de caja',
+            description: 'No hay resultados para el filtro seleccionado.',
           ),
-          const SizedBox(height: 12),
-          if (state.historial.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 80),
-              child: AppEmptyState(
-                icon: Icons.history_rounded,
-                title: 'Sin sesiones de caja',
-                description: 'No hay resultados para el filtro seleccionado.',
-              ),
-            )
-          else
-            for (final session in state.historial)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: AppCard(
-                  onTap: () => onDetail(session.id),
-                  child: Row(
+        )
+      else
+        for (final session in state.historial)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AppCard(
+              onTap: () => onDetail(session.id),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: session.estado == 'ABIERTA'
+                          ? AppColors.successLight
+                          : AppColors.backgroundAlt,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(
+                      session.estado == 'ABIERTA'
+                          ? Icons.lock_open_rounded
+                          : Icons.lock_rounded,
+                      color: session.estado == 'ABIERTA'
+                          ? AppColors.success
+                          : AppColors.textSecondary,
+                      size: 19,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(session.sede, style: AppTextStyles.titleMedium),
+                        Text(
+                          '${_dateTime(session.abiertaAt)} · ${session.usuarioApertura}',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: session.estado == 'ABIERTA'
-                              ? AppColors.successLight
-                              : AppColors.backgroundAlt,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Icon(
-                          session.estado == 'ABIERTA'
-                              ? Icons.lock_open_rounded
-                              : Icons.lock_rounded,
-                          color: session.estado == 'ABIERTA'
-                              ? AppColors.success
-                              : AppColors.textSecondary,
-                          size: 19,
-                        ),
+                      _StatusPill(
+                        label: session.estado,
+                        color: session.estado == 'ABIERTA'
+                            ? AppColors.success
+                            : AppColors.textSecondary,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(session.sede, style: AppTextStyles.titleMedium),
-                            Text(
-                              '${_dateTime(session.abiertaAt)} · ${session.usuarioApertura}',
-                              style: AppTextStyles.labelSmall,
-                            ),
-                          ],
+                      const SizedBox(height: 5),
+                      Text(
+                        _money(
+                          session.resumen?.efectivoEsperado ??
+                              session.montoApertura,
                         ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          _StatusPill(
-                            label: session.estado,
-                            color: session.estado == 'ABIERTA'
-                                ? AppColors.success
-                                : AppColors.textSecondary,
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            _money(
-                              session.resumen?.saldoEsperado ??
-                                  session.montoApertura,
-                            ),
-                            style: AppTextStyles.labelLarge.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-          _Pager(
-            page: state.historialPagina,
-            pages: state.historialPaginas,
-            total: state.historialTotal,
-            onPage: onPage,
+            ),
           ),
-        ],
-      );
+      _Pager(
+        page: state.historialPagina,
+        pages: state.historialPaginas,
+        total: state.historialTotal,
+        onPage: onPage,
+      ),
+    ],
+  );
 }
 
 class _OpeningSheet extends ConsumerStatefulWidget {
@@ -618,10 +632,9 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
   bool _loading = false;
 
   double get _total => _controllers.entries.fold(
-        0,
-        (sum, entry) =>
-            sum + entry.key * (int.tryParse(entry.value.text) ?? 0),
-      );
+    0,
+    (sum, entry) => sum + entry.key * (int.tryParse(entry.value.text) ?? 0),
+  );
 
   @override
   void dispose() {
@@ -633,46 +646,43 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
 
   @override
   Widget build(BuildContext context) => _SheetFrame(
-        title: 'Apertura de caja',
-        subtitle: 'Conteo obligatorio de las 10 denominaciones PEN',
-        child: Column(
+    title: 'Apertura de caja',
+    subtitle: 'Conteo obligatorio de las 10 denominaciones PEN',
+    child: Column(
+      children: [
+        GridView.count(
+          crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 2.5,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
           children: [
-            GridView.count(
-              crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 2.5,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              children: [
-                for (final value in cajaDenominaciones)
-                  TextFormField(
-                    controller: _controllers[value],
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      labelText: 'S/ ${_denomination(value)}',
-                      hintText: '0',
-                      prefixIcon: const Icon(
-                        Icons.payments_outlined,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _TotalBand(label: 'Total de apertura', value: _total),
-            const SizedBox(height: 18),
-            PrimaryButton(
-              label: 'Abrir caja',
-              icon: Icons.lock_open_rounded,
-              isLoading: _loading,
-              onPressed: _submit,
-            ),
+            for (final value in cajaDenominaciones)
+              TextFormField(
+                controller: _controllers[value],
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'S/ ${_denomination(value)}',
+                  hintText: '0',
+                  prefixIcon: const Icon(Icons.payments_outlined, size: 18),
+                ),
+              ),
           ],
         ),
-      );
+        const SizedBox(height: 16),
+        _TotalBand(label: 'Total de apertura', value: _total),
+        const SizedBox(height: 18),
+        PrimaryButton(
+          label: 'Abrir caja',
+          icon: Icons.lock_open_rounded,
+          isLoading: _loading,
+          onPressed: _submit,
+        ),
+      ],
+    ),
+  );
 
   Future<void> _submit() async {
     setState(() => _loading = true);
@@ -690,275 +700,10 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
   }
 }
 
-class _MovementOption {
-  final String label;
-  final String tipo;
-  final String origen;
-  final String medio;
-  final bool voucher;
-
-  const _MovementOption(
-    this.label,
-    this.tipo,
-    this.origen,
-    this.medio, {
-    this.voucher = false,
-  });
-}
-
-const _movementOptions = [
-  _MovementOption('Entrada manual en efectivo', 'ENTRADA', 'MANUAL', 'EFECTIVO'),
-  _MovementOption('Venta en efectivo', 'ENTRADA', 'VENTA', 'EFECTIVO'),
-  _MovementOption('Salida en efectivo', 'SALIDA', 'MANUAL', 'EFECTIVO'),
-  _MovementOption('Salida con tarjeta', 'SALIDA', 'MANUAL', 'TARJETA'),
-  _MovementOption('Otra salida', 'SALIDA', 'MANUAL', 'OTRO'),
-  _MovementOption(
-    'Pago por Yape',
-    'SALIDA',
-    'PAGO_NO_EFECTIVO',
-    'YAPE',
-    voucher: true,
-  ),
-  _MovementOption(
-    'Pago por transferencia',
-    'SALIDA',
-    'PAGO_NO_EFECTIVO',
-    'TRANSFERENCIA',
-    voucher: true,
-  ),
-];
-
-class _MovementSheet extends ConsumerStatefulWidget {
-  const _MovementSheet();
-
-  @override
-  ConsumerState<_MovementSheet> createState() => _MovementSheetState();
-}
-
-class _MovementSheetState extends ConsumerState<_MovementSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _conceptController = TextEditingController();
-  final _amountController = TextEditingController();
-  final _referenceController = TextEditingController();
-  final _voucherController = TextEditingController();
-  _MovementOption _option = _movementOptions.first;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _conceptController.dispose();
-    _amountController.dispose();
-    _referenceController.dispose();
-    _voucherController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => _SheetFrame(
-        title: 'Registrar movimiento',
-        subtitle: 'Los tipos y medios se ajustan a las reglas de caja',
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              DropdownButtonFormField<_MovementOption>(
-                value: _option,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Operacion'),
-                items: _movementOptions
-                    .map(
-                      (option) => DropdownMenuItem(
-                        value: option,
-                        child: Text(option.label),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) setState(() => _option = value);
-                },
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _ReadOnlyChip(label: _option.tipo)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ReadOnlyChip(label: _option.origen)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ReadOnlyChip(label: _option.medio)),
-                ],
-              ),
-              const SizedBox(height: 14),
-              AppTextField(
-                label: 'Concepto',
-                hint: 'Motivo del movimiento',
-                controller: _conceptController,
-                maxLength: 160,
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'El concepto es obligatorio'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                label: 'Monto (S/)',
-                hint: '0.00',
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  final amount = double.tryParse(value ?? '');
-                  return amount == null || amount <= 0 ? 'Monto invalido' : null;
-                },
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                label: 'Referencia (opcional)',
-                hint: 'Documento o correlativo',
-                controller: _referenceController,
-                maxLength: 100,
-              ),
-              if (_option.voucher) ...[
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Voucher o comprobante',
-                  hint: 'URL o identificador del voucher',
-                  controller: _voucherController,
-                  maxLength: 500,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Yape y transferencia requieren voucher'
-                      : null,
-                ),
-              ],
-              const SizedBox(height: 20),
-              PrimaryButton(
-                label: 'Registrar movimiento',
-                isLoading: _loading,
-                onPressed: _submit,
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    try {
-      await ref.read(cajaProvider.notifier).registrarMovimiento({
-        'tipo': _option.tipo,
-        'origen': _option.origen,
-        'medioPago': _option.medio,
-        'concepto': _conceptController.text.trim(),
-        'monto': double.parse(_amountController.text),
-        if (_referenceController.text.trim().isNotEmpty)
-          'referencia': _referenceController.text.trim(),
-        if (_option.voucher) 'comprobante': _voucherController.text.trim(),
-      });
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (error) {
-      if (mounted) _sheetError(context, error);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-}
-
-class _ArqueoSheet extends ConsumerStatefulWidget {
-  final bool cierre;
-
-  const _ArqueoSheet({required this.cierre});
-
-  @override
-  ConsumerState<_ArqueoSheet> createState() => _ArqueoSheetState();
-}
-
-class _ArqueoSheetState extends ConsumerState<_ArqueoSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  final _notesController = TextEditingController();
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final expected = ref.watch(cajaProvider).actual?.resumen?.saldoEsperado ?? 0;
-    final declared = double.tryParse(_amountController.text) ?? 0;
-    return _SheetFrame(
-      title: widget.cierre ? 'Cerrar caja' : 'Registrar precuadre',
-      subtitle: widget.cierre
-          ? 'El cierre es definitivo para este turno'
-          : 'Compara el efectivo contado con el saldo esperado',
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            _TotalBand(label: 'Saldo esperado', value: expected),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Monto declarado (S/)',
-              hint: '0.00',
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (_) => setState(() {}),
-              validator: (value) {
-                final amount = double.tryParse(value ?? '');
-                return amount == null || amount < 0 ? 'Monto invalido' : null;
-              },
-            ),
-            const SizedBox(height: 10),
-            _Difference(value: declared - expected),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Observaciones (opcional)',
-              hint: 'Detalle del arqueo',
-              controller: _notesController,
-              maxLength: 500,
-              maxLines: 3,
-            ),
-            const SizedBox(height: 20),
-            AppButton(
-              label: widget.cierre ? 'Confirmar cierre' : 'Guardar precuadre',
-              isFullWidth: true,
-              isLoading: _loading,
-              variant: widget.cierre
-                  ? AppButtonVariant.danger
-                  : AppButtonVariant.primary,
-              onPressed: _submit,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    try {
-      final amount = double.parse(_amountController.text);
-      if (widget.cierre) {
-        await ref
-            .read(cajaProvider.notifier)
-            .cerrar(amount, _notesController.text);
-      } else {
-        await ref
-            .read(cajaProvider.notifier)
-            .precuadre(amount, _notesController.text);
-      }
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (error) {
-      if (mounted) _sheetError(context, error);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-}
+// === MOVIMIENTOS MANUALES ELIMINADOS ===
+// Las entradas y salidas se generan automaticamente desde ventas y conciliacion.
+// _MovementOption, _MovementSheet y _ArqueoSheet removidos por regla de negocio V2.
+// Los sheets de arqueo están en widgets/caja_arqueo_sheets.dart.
 
 class _DetailSheet extends StatelessWidget {
   final Future<CajaSesion> future;
@@ -967,70 +712,84 @@ class _DetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _SheetFrame(
-        title: 'Detalle de caja',
-        subtitle: 'Resumen y arqueos registrados por el servidor',
-        child: FutureBuilder<CajaSesion>(
-          future: future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const _InlineSkeleton();
-            }
-            if (snapshot.hasError) {
-              return AppErrorState(message: snapshot.error.toString());
-            }
-            final session = snapshot.data!;
-            final values = <String, String>{
-              'Sede': session.sede,
-              'Estado': session.estado,
-              'Apertura': _money(session.montoApertura),
-              'Abierta por': session.usuarioApertura,
-              'Fecha de apertura': _dateTime(session.abiertaAt),
-              if (session.resumen != null)
-                'Saldo esperado': _money(session.resumen!.saldoEsperado),
-              if (session.montoDeclaradoPrecuadre != null)
-                'Precuadre declarado':
-                    _money(session.montoDeclaradoPrecuadre!),
-              if (session.diferenciaPrecuadre != null)
-                'Diferencia precuadre': _money(session.diferenciaPrecuadre!),
-              if (session.montoDeclaradoCierre != null)
-                'Cierre declarado': _money(session.montoDeclaradoCierre!),
-              if (session.diferenciaCierre != null)
-                'Diferencia cierre': _money(session.diferenciaCierre!),
-              if (session.cerradaAt != null)
-                'Fecha de cierre': _dateTime(session.cerradaAt!),
-              if (session.observacionesCierre?.isNotEmpty ?? false)
-                'Observaciones': session.observacionesCierre!,
-            };
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final entry in values.entries) ...[
-                  _DetailRow(label: entry.key, value: entry.value),
-                  const Divider(height: 18),
-                ],
-                const SizedBox(height: 8),
-                const Text(
-                  'Conteo de apertura',
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: session.denominaciones
-                      .map(
-                        (item) => _ReadOnlyChip(
-                          label:
-                              'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-            );
-          },
-        ),
-      );
+    title: 'Detalle de caja',
+    subtitle: 'Resumen y arqueos registrados por el servidor',
+    child: FutureBuilder<CajaSesion>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _InlineSkeleton();
+        }
+        if (snapshot.hasError) {
+          return AppErrorState(message: snapshot.error.toString());
+        }
+        final session = snapshot.data!;
+        final values = <String, String>{
+          'Sede': session.sede,
+          'Estado': session.estado,
+          'Apertura': _money(session.montoApertura),
+          'Abierta por': session.usuarioApertura,
+          'Fecha de apertura': _dateTime(session.abiertaAt),
+          if (session.resumen != null)
+            'Saldo esperado': _money(session.resumen!.efectivoEsperado),
+          if (session.montoDeclaradoPrecuadre != null)
+            'Precuadre declarado': _money(session.montoDeclaradoPrecuadre!),
+          if (session.diferenciaPrecuadre != null)
+            'Diferencia precuadre': _money(session.diferenciaPrecuadre!),
+          if (session.montoDeclaradoCierre != null)
+            'Cierre declarado': _money(session.montoDeclaradoCierre!),
+          if (session.diferenciaCierre != null)
+            'Diferencia cierre': _money(session.diferenciaCierre!),
+          if (session.cerradaAt != null)
+            'Fecha de cierre': _dateTime(session.cerradaAt!),
+          if (session.observacionesCierre?.isNotEmpty ?? false)
+            'Observaciones': session.observacionesCierre!,
+        };
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final entry in values.entries) ...[
+              _DetailRow(label: entry.key, value: entry.value),
+              const Divider(height: 18),
+            ],
+            const SizedBox(height: 8),
+            const Text('Conteo de apertura', style: AppTextStyles.titleMedium),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: session.denominaciones
+                  .map(
+                    (item) => _ReadOnlyChip(
+                      label:
+                          'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
+                    ),
+                  )
+                  .toList(),
+            ),
+            if (session.resumen?.v2?.porBilletera.isNotEmpty ?? false) ...[
+              const SizedBox(height: 16),
+              CajaBilleteraCard(
+                porBilletera: session.resumen!.v2!.porBilletera,
+              ),
+            ],
+            if (session.resumen?.v2?.porVendedora.isNotEmpty ?? false) ...[
+              const SizedBox(height: 16),
+              CajaVendedoraTable(
+                porVendedora: session.resumen!.v2!.porVendedora,
+              ),
+            ],
+            if (session.resumen?.v2?.resumenProductos.isNotEmpty ?? false) ...[
+              const SizedBox(height: 16),
+              CajaProductosTable(
+                resumenProductos: session.resumen!.v2!.resumenProductos,
+              ),
+            ],
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class _SheetFrame extends StatelessWidget {
@@ -1046,59 +805,57 @@ class _SheetFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+    ),
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    decoration: const BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+    ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 38,
+          height: 4,
+          margin: const EdgeInsets.only(top: 10),
+          decoration: BoxDecoration(
+            color: AppColors.border,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 38,
-              height: 4,
-              margin: const EdgeInsets.only(top: 10),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: AppTextStyles.headlineMedium),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: AppTextStyles.labelSmall),
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title, style: AppTextStyles.headlineMedium),
-                        const SizedBox(height: 3),
-                        Text(subtitle, style: AppTextStyles.labelSmall),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
               ),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: child,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
+        const Divider(height: 1),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: child,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Metric extends StatelessWidget {
@@ -1118,27 +875,27 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: width,
-        child: AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    width: width,
+    child: AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: color, size: 18),
-                  const SizedBox(width: 7),
-                  Expanded(child: Text(label, style: AppTextStyles.labelSmall)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _money(value),
-                style: AppTextStyles.titleLarge.copyWith(color: color),
-              ),
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 7),
+              Expanded(child: Text(label, style: AppTextStyles.labelSmall)),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 10),
+          Text(
+            _money(value),
+            style: AppTextStyles.titleLarge.copyWith(color: color),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _MovementTile extends StatelessWidget {
@@ -1159,7 +916,7 @@ class _MovementTile extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -1217,31 +974,31 @@ class _FilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(values.length, (index) {
-            final active = selected == values[index];
-            return Padding(
-              padding: const EdgeInsets.only(right: 7),
-              child: ChoiceChip(
-                selected: active,
-                label: Text(labels[index]),
-                onSelected: (_) => onChanged(values[index]),
-                showCheckmark: false,
-                visualDensity: VisualDensity.compact,
-                selectedColor: AppColors.primarySurface,
-                side: BorderSide(
-                  color: active ? AppColors.primaryBorder : AppColors.border,
-                ),
-                labelStyle: AppTextStyles.labelSmall.copyWith(
-                  color: active ? AppColors.primary : AppColors.textSecondary,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            );
-          }),
-        ),
-      );
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: List.generate(values.length, (index) {
+        final active = selected == values[index];
+        return Padding(
+          padding: const EdgeInsets.only(right: 7),
+          child: ChoiceChip(
+            selected: active,
+            label: Text(labels[index]),
+            onSelected: (_) => onChanged(values[index]),
+            showCheckmark: false,
+            visualDensity: VisualDensity.compact,
+            selectedColor: AppColors.primarySurface,
+            side: BorderSide(
+              color: active ? AppColors.primaryBorder : AppColors.border,
+            ),
+            labelStyle: AppTextStyles.labelSmall.copyWith(
+              color: active ? AppColors.primary : AppColors.textSecondary,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        );
+      }),
+    ),
+  );
 }
 
 class _Pager extends StatelessWidget {
@@ -1293,27 +1050,27 @@ class _PrecuadreBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.warningLight,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.warning.withOpacity(0.28)),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.fact_check_outlined, color: AppColors.warning),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Precuadre ${_money(session.montoDeclaradoPrecuadre ?? 0)} · diferencia ${_money(session.diferenciaPrecuadre ?? 0)}',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppColors.warningLight,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.fact_check_outlined, color: AppColors.warning),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Precuadre ${_money(session.montoDeclaradoPrecuadre ?? 0)} · diferencia ${_money(session.diferenciaPrecuadre ?? 0)}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textPrimary,
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _TotalBand extends StatelessWidget {
@@ -1324,48 +1081,23 @@ class _TotalBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.primarySurface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.primaryBorder),
-        ),
-        child: Row(
-          children: [
-            Text(label, style: AppTextStyles.bodyMedium),
-            const Spacer(),
-            Text(
-              _money(value),
-              style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
-            ),
-          ],
-        ),
-      );
-}
-
-class _Difference extends StatelessWidget {
-  final double value;
-
-  const _Difference({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = value == 0
-        ? AppColors.success
-        : value < 0
-            ? AppColors.error
-            : AppColors.warning;
-    return Row(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppColors.primarySurface,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: AppColors.primaryBorder),
+    ),
+    child: Row(
       children: [
-        const Text('Diferencia estimada', style: AppTextStyles.bodySmall),
+        Text(label, style: AppTextStyles.bodyMedium),
         const Spacer(),
         Text(
           _money(value),
-          style: AppTextStyles.labelLarge.copyWith(color: color),
+          style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
         ),
       ],
-    );
-  }
+    ),
+  );
 }
 
 class _ReadOnlyChip extends StatelessWidget {
@@ -1375,23 +1107,23 @@ class _ReadOnlyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.backgroundAlt,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Text(
-          label.replaceAll('_', ' '),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+    decoration: BoxDecoration(
+      color: AppColors.backgroundAlt,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Text(
+      label.replaceAll('_', ' '),
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.labelSmall.copyWith(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
 
 class _StatusPill extends StatelessWidget {
@@ -1402,19 +1134,19 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(100),
+    ),
+    child: Text(
+      label,
+      style: AppTextStyles.labelSmall.copyWith(
+        color: color,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }
 
 class _DetailRow extends StatelessWidget {
@@ -1425,22 +1157,22 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: Text(label, style: AppTextStyles.labelSmall)),
-          Expanded(
-            flex: 2,
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: Text(label, style: AppTextStyles.labelSmall)),
+      Expanded(
+        flex: 2,
+        child: Text(
+          value,
+          textAlign: TextAlign.end,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 }
 
 class _CajaSkeleton extends StatelessWidget {
@@ -1448,31 +1180,31 @@ class _CajaSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          Row(
-            children: [
-              Expanded(child: _SkeletonBox(height: 96)),
-              SizedBox(width: 10),
-              Expanded(child: _SkeletonBox(height: 96)),
-            ],
-          ),
-          SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _SkeletonBox(height: 96)),
-              SizedBox(width: 10),
-              Expanded(child: _SkeletonBox(height: 96)),
-            ],
-          ),
-          SizedBox(height: 24),
-          _SkeletonBox(height: 64),
-          SizedBox(height: 8),
-          _SkeletonBox(height: 64),
-          SizedBox(height: 8),
-          _SkeletonBox(height: 64),
+    padding: const EdgeInsets.all(16),
+    children: const [
+      Row(
+        children: [
+          Expanded(child: _SkeletonBox(height: 96)),
+          SizedBox(width: 10),
+          Expanded(child: _SkeletonBox(height: 96)),
         ],
-      );
+      ),
+      SizedBox(height: 10),
+      Row(
+        children: [
+          Expanded(child: _SkeletonBox(height: 96)),
+          SizedBox(width: 10),
+          Expanded(child: _SkeletonBox(height: 96)),
+        ],
+      ),
+      SizedBox(height: 24),
+      _SkeletonBox(height: 64),
+      SizedBox(height: 8),
+      _SkeletonBox(height: 64),
+      SizedBox(height: 8),
+      _SkeletonBox(height: 64),
+    ],
+  );
 }
 
 class _InlineSkeleton extends StatelessWidget {
@@ -1480,14 +1212,14 @@ class _InlineSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Column(
-        children: [
-          _SkeletonBox(height: 48),
-          SizedBox(height: 10),
-          _SkeletonBox(height: 48),
-          SizedBox(height: 10),
-          _SkeletonBox(height: 48),
-        ],
-      );
+    children: [
+      _SkeletonBox(height: 48),
+      SizedBox(height: 10),
+      _SkeletonBox(height: 48),
+      SizedBox(height: 10),
+      _SkeletonBox(height: 48),
+    ],
+  );
 }
 
 class _SkeletonBox extends StatelessWidget {
@@ -1497,16 +1229,16 @@ class _SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.35, end: 0.8),
-        duration: const Duration(milliseconds: 800),
-        builder: (_, opacity, __) => Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: AppColors.border.withOpacity(opacity),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-        ),
-      );
+    tween: Tween(begin: 0.35, end: 0.8),
+    duration: const Duration(milliseconds: 800),
+    builder: (_, opacity, _) => Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.border.withValues(alpha: opacity),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+    ),
+  );
 }
 
 void _sheetError(BuildContext context, Object error) {

@@ -17,13 +17,16 @@ class ApiConstants {
   //   static const String baseUrl = 'http://192.168.X.X:3001/api';
   //
   // OPCIÓN C — Emulador Android:
-  //   static const String baseUrl = 'http://10.0.2.2:3001/api';
+  //   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001/api
+  //
+  // OPCIÓN D — Servidor compartido (producción/Tailscale):
+  //   flutter run --dart-define=API_BASE_URL=https://hia-server.tail99b0ec.ts.net/backend-bar/api
   // ─────────────────────────────────────────────────────────────────────────
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const Duration sendTimeout = Duration(seconds: 30);
 
-  // Auth
+  // ── Auth ─────────────────────────────────────────────────────────────────
   static const String login = '/auth/login';
   static const String refresh = '/auth/refresh';
   static const String logout = '/auth/logout';
@@ -33,28 +36,80 @@ class ApiConstants {
   static const String sessions = '/auth/sesiones';
   static String revokeSession(String id) => '/auth/sesiones/$id';
 
-  // Users
+  // ── Users ────────────────────────────────────────────────────────────────
   static const String users = '/usuarios';
   static String user(String id) => '/usuarios/$id';
   static String resetUserPassword(String id) =>
       '/usuarios/$id/resetear-password';
 
-  // Roles
+  // ── Roles ────────────────────────────────────────────────────────────────
   static const String roles = '/roles';
   static String role(String id) => '/roles/$id';
   static String rolePermissions(String id) => '/roles/$id/permisos';
 
-  // Permissions
+  // ── Permissions ──────────────────────────────────────────────────────────
   static const String permissions = '/permisos';
   static const String permissionsGrouped = '/permisos/agrupados';
 
-  // Establishments
+  // ── Establishments ───────────────────────────────────────────────────────
   static const String establishments = '/establecimientos';
   static String establishment(String id) => '/establecimientos/$id';
 
-  // Audit
+  // ── Audit ────────────────────────────────────────────────────────────────
   static const String audit = '/audit';
 
-  // Health
+  // ── Products ─────────────────────────────────────────────────────────────
+  static const String products = '/productos';
+  static const String productsResumen = '/productos/resumen';
+  static String product(String id) => '/productos/$id';
+
+  // ── Categories ───────────────────────────────────────────────────────────
+  static const String categories = '/categorias';
+  static String category(String id) => '/categorias/$id';
+
+  // ── Inventory ────────────────────────────────────────────────────────────
+  static const String inventory = '/inventario';
+  static const String inventoryResumen = '/inventario/resumen';
+  static String inventoryAdjust(String id) => '/inventario/$id/ajuste';
+
+  // ── Kardex ───────────────────────────────────────────────────────────────
+  static const String kardex = '/kardex';
+  static const String kardexResumen = '/kardex/resumen';
+
+  // ── Purchases ────────────────────────────────────────────────────────────
+  static const String purchases = '/compras';
+  static const String purchasesResumen = '/compras/resumen';
+  static String purchase(String id) => '/compras/$id';
+  static String purchaseStatus(String id) => '/compras/$id/estado';
+  static const String providers = '/compras/proveedores';
+  static String provider(String id) => '/compras/proveedores/$id';
+
+  // ── Attendance ───────────────────────────────────────────────────────────
+  static const String attendance = '/asistencia';
+  static const String attendanceResumen = '/asistencia/resumen';
+  static String attendanceById(String id) => '/asistencia/$id';
+
+  // ── Cash Register (Caja) ─────────────────────────────────────────────────
+  static const String cajaActual = '/caja/actual';
+  static const String cajaHistorial = '/caja/historial';
+  static const String cajaApertura = '/caja/apertura';
+  static String cajaById(String id) => '/caja/$id';
+  static String cajaMovimientos(String id) => '/caja/$id/movimientos';
+  static String cajaPrecuadre(String id) => '/caja/$id/precuadre';
+  static String cajaCierre(String id) => '/caja/$id/cierre';
+
+  // ── Ventas (NUEVO - Fase 2B) ────────────────────────────────────────────
+  static const String ventas = '/ventas';
+  static const String misVentas = '/ventas/mias';
+  static String venta(String id) => '/ventas/$id';
+  static String anularVenta(String id) => '/ventas/$id/anular';
+  static String conciliarVenta(String id) => '/ventas/$id/conciliacion';
+
+  // ── Etiquetas (billeteras digitales) ─────────────────────────────────────
+  static const String etiquetas = '/etiquetas';
+  static String etiqueta(String id) => '/etiquetas/$id';
+  static String etiquetaEstado(String id) => '/etiquetas/$id/estado';
+
+  // ── Health ───────────────────────────────────────────────────────────────
   static const String health = '/health';
 }

@@ -44,18 +44,17 @@ class CategoriasState {
     int? limite,
     int? total,
     int? totalPaginas,
-  }) =>
-      CategoriasState(
-        categorias: categorias ?? this.categorias,
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : error ?? this.error,
-        search: search ?? this.search,
-        activo: clearActivo ? null : activo ?? this.activo,
-        pagina: pagina ?? this.pagina,
-        limite: limite ?? this.limite,
-        total: total ?? this.total,
-        totalPaginas: totalPaginas ?? this.totalPaginas,
-      );
+  }) => CategoriasState(
+    categorias: categorias ?? this.categorias,
+    isLoading: isLoading ?? this.isLoading,
+    error: clearError ? null : error ?? this.error,
+    search: search ?? this.search,
+    activo: clearActivo ? null : activo ?? this.activo,
+    pagina: pagina ?? this.pagina,
+    limite: limite ?? this.limite,
+    total: total ?? this.total,
+    totalPaginas: totalPaginas ?? this.totalPaginas,
+  );
 }
 
 class CategoriasNotifier extends StateNotifier<CategoriasState> {
@@ -99,7 +98,10 @@ class CategoriasNotifier extends StateNotifier<CategoriasState> {
   void search(String value) {
     _searchTimer?.cancel();
     state = state.copyWith(search: value);
-    _searchTimer = Timer(const Duration(milliseconds: 350), () => load(pagina: 1));
+    _searchTimer = Timer(
+      const Duration(milliseconds: 350),
+      () => load(pagina: 1),
+    );
   }
 
   void filterActivo(bool? value) {
@@ -149,5 +151,5 @@ class CategoriasNotifier extends StateNotifier<CategoriasState> {
 
 final categoriasProvider =
     StateNotifierProvider<CategoriasNotifier, CategoriasState>(
-  (ref) => CategoriasNotifier(ref.watch(categoriasRepositoryProvider)),
-);
+      (ref) => CategoriasNotifier(ref.watch(categoriasRepositoryProvider)),
+    );
