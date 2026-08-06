@@ -1,7 +1,15 @@
 import '../../../core/network/api_client.dart';
 
 class KardexMovimiento {
-  final String id, producto, codigo, tipo, unidad, referencia, usuario, fecha, hora;
+  final String id,
+      producto,
+      codigo,
+      tipo,
+      unidad,
+      referencia,
+      usuario,
+      fecha,
+      hora;
   final double cantidad, stockAnterior, stockNuevo, valor;
 
   const KardexMovimiento({
@@ -57,7 +65,12 @@ class KardexResumen {
 class KardexPage {
   final List<KardexMovimiento> data;
   final int total, pagina, totalPaginas;
-  const KardexPage({required this.data, required this.total, required this.pagina, required this.totalPaginas});
+  const KardexPage({
+    required this.data,
+    required this.total,
+    required this.pagina,
+    required this.totalPaginas,
+  });
 }
 
 class KardexRepository {
@@ -74,20 +87,26 @@ class KardexRepository {
     String? hasta,
     String? sedeId,
   }) async {
-    final r = await _api.get('/kardex', queryParameters: {
-      'pagina': pagina,
-      'limite': limite,
-      if (q != null && q.isNotEmpty) 'q': q,
-      if (tipo != null) 'tipo': tipo,
-      if (productoId != null) 'productoId': productoId,
-      if (desde != null) 'desde': desde,
-      if (hasta != null) 'hasta': hasta,
-      if (sedeId != null) 'sedeId': sedeId,
-    });
+    final r = await _api.get(
+      '/kardex',
+      queryParameters: {
+        'pagina': pagina,
+        'limite': limite,
+        if (q != null && q.isNotEmpty) 'q': q,
+        if (tipo != null) 'tipo': tipo,
+        if (productoId != null) 'productoId': productoId,
+        if (desde != null) 'desde': desde,
+        if (hasta != null) 'hasta': hasta,
+        if (sedeId != null) 'sedeId': sedeId,
+      },
+    );
     final json = Map<String, dynamic>.from(r.data as Map);
     return KardexPage(
       data: (json['data'] as List? ?? [])
-          .map((e) => KardexMovimiento.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) =>
+                KardexMovimiento.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
           .toList(),
       total: (json['total'] as num?)?.toInt() ?? 0,
       pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
@@ -102,13 +121,16 @@ class KardexRepository {
     String? hasta,
     String? sedeId,
   }) async {
-    final r = await _api.get('/kardex/resumen', queryParameters: {
-      if (tipo != null) 'tipo': tipo,
-      if (productoId != null) 'productoId': productoId,
-      if (desde != null) 'desde': desde,
-      if (hasta != null) 'hasta': hasta,
-      if (sedeId != null) 'sedeId': sedeId,
-    });
+    final r = await _api.get(
+      '/kardex/resumen',
+      queryParameters: {
+        if (tipo != null) 'tipo': tipo,
+        if (productoId != null) 'productoId': productoId,
+        if (desde != null) 'desde': desde,
+        if (hasta != null) 'hasta': hasta,
+        if (sedeId != null) 'sedeId': sedeId,
+      },
+    );
     return KardexResumen.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 }

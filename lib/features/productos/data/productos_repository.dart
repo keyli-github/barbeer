@@ -7,6 +7,7 @@ class Producto {
   final double precioVenta, precioCosto;
   final bool disponiblePos, activo;
   final double margin;
+  final int? stockDisponible;
 
   const Producto({
     required this.id,
@@ -21,6 +22,7 @@ class Producto {
     required this.disponiblePos,
     required this.activo,
     required this.margin,
+    this.stockDisponible,
   });
 
   factory Producto.fromJson(Map<String, dynamic> j) => Producto(
@@ -36,6 +38,7 @@ class Producto {
     disponiblePos: j['disponiblePos'] as bool? ?? false,
     activo: j['activo'] as bool? ?? true,
     margin: (j['margin'] as num?)?.toDouble() ?? 0,
+    stockDisponible: (j['stockDisponible'] as num?)?.toInt(),
   );
 }
 
@@ -80,13 +83,16 @@ class ProductosRepository {
     String? categoriaId,
     String? activo,
   }) async {
-    final r = await _api.get('/productos', queryParameters: {
-      'pagina': pagina,
-      'limite': limite,
-      if (q != null && q.isNotEmpty) 'q': q,
-      if (categoriaId != null) 'categoriaId': categoriaId,
-      if (activo != null) 'activo': activo,
-    });
+    final r = await _api.get(
+      '/productos',
+      queryParameters: {
+        'pagina': pagina,
+        'limite': limite,
+        if (q != null && q.isNotEmpty) 'q': q,
+        if (categoriaId != null) 'categoriaId': categoriaId,
+        if (activo != null) 'activo': activo,
+      },
+    );
     final json = Map<String, dynamic>.from(r.data as Map);
     return ProductosPage(
       data: (json['data'] as List? ?? [])
@@ -119,17 +125,21 @@ class ProductosRepository {
     bool disponiblePos = false,
     bool activo = true,
   }) async {
-    final r = await _api.post('/productos', data: {
-      'codigo': codigo,
-      'nombre': nombre,
-      'categoriaId': categoriaId,
-      'precioVenta': precioVenta,
-      'precioCosto': precioCosto,
-      if (descripcion?.trim().isNotEmpty ?? false) 'descripcion': descripcion!.trim(),
-      if (unidad != null) 'unidad': unidad,
-      'disponiblePos': disponiblePos,
-      'activo': activo,
-    });
+    final r = await _api.post(
+      '/productos',
+      data: {
+        'codigo': codigo,
+        'nombre': nombre,
+        'categoriaId': categoriaId,
+        'precioVenta': precioVenta,
+        'precioCosto': precioCosto,
+        if (descripcion?.trim().isNotEmpty ?? false)
+          'descripcion': descripcion!.trim(),
+        if (unidad != null) 'unidad': unidad,
+        'disponiblePos': disponiblePos,
+        'activo': activo,
+      },
+    );
     return Producto.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
@@ -141,11 +151,14 @@ class ProductosRepository {
   Future<void> delete(String id) => _api.delete('/productos/$id');
 
   Future<List<Categoria>> categorias({String? activo = 'true'}) async {
-    final r = await _api.get('/categorias', queryParameters: {
-      'pagina': 1,
-      'limite': 100,
-      if (activo != null) 'activo': activo,
-    });
+    final r = await _api.get(
+      '/categorias',
+      queryParameters: {
+        'pagina': 1,
+        'limite': 100,
+        if (activo != null) 'activo': activo,
+      },
+    );
     final json = Map<String, dynamic>.from(r.data as Map);
     return (json['data'] as List? ?? [])
         .map((e) => Categoria.fromJson(Map<String, dynamic>.from(e as Map)))

@@ -51,20 +51,19 @@ class ProductosState {
     int? limite,
     int? total,
     int? totalPaginas,
-  }) =>
-      ProductosState(
-        productos: productos ?? this.productos,
-        resumen: resumen ?? this.resumen,
-        isLoading: isLoading ?? this.isLoading,
-        error: clearError ? null : error ?? this.error,
-        search: search ?? this.search,
-        categoriaId: clearCategoria ? null : categoriaId ?? this.categoriaId,
-        activo: clearActivo ? null : activo ?? this.activo,
-        pagina: pagina ?? this.pagina,
-        limite: limite ?? this.limite,
-        total: total ?? this.total,
-        totalPaginas: totalPaginas ?? this.totalPaginas,
-      );
+  }) => ProductosState(
+    productos: productos ?? this.productos,
+    resumen: resumen ?? this.resumen,
+    isLoading: isLoading ?? this.isLoading,
+    error: clearError ? null : error ?? this.error,
+    search: search ?? this.search,
+    categoriaId: clearCategoria ? null : categoriaId ?? this.categoriaId,
+    activo: clearActivo ? null : activo ?? this.activo,
+    pagina: pagina ?? this.pagina,
+    limite: limite ?? this.limite,
+    total: total ?? this.total,
+    totalPaginas: totalPaginas ?? this.totalPaginas,
+  );
 }
 
 class ProductosNotifier extends StateNotifier<ProductosState> {
@@ -114,7 +113,10 @@ class ProductosNotifier extends StateNotifier<ProductosState> {
   void search(String value) {
     _searchTimer?.cancel();
     state = state.copyWith(search: value);
-    _searchTimer = Timer(const Duration(milliseconds: 350), () => load(pagina: 1));
+    _searchTimer = Timer(
+      const Duration(milliseconds: 350),
+      () => load(pagina: 1),
+    );
   }
 
   void filterCategory(String? id) {
@@ -153,6 +155,7 @@ class ProductosNotifier extends StateNotifier<ProductosState> {
   }
 }
 
-final productosProvider = StateNotifierProvider<ProductosNotifier, ProductosState>(
-  (ref) => ProductosNotifier(ref.watch(productosRepositoryProvider)),
-);
+final productosProvider =
+    StateNotifierProvider<ProductosNotifier, ProductosState>(
+      (ref) => ProductosNotifier(ref.watch(productosRepositoryProvider)),
+    );

@@ -1,7 +1,15 @@
 import '../../../core/network/api_client.dart';
 
 class InventarioItem {
-  final String id, productoId, sedeId, codigo, producto, categoria, unidad, ubicacion, estado;
+  final String id,
+      productoId,
+      sedeId,
+      codigo,
+      producto,
+      categoria,
+      unidad,
+      ubicacion,
+      estado;
   final double stock, min, max, costo;
   final String updatedAt;
 
@@ -50,19 +58,25 @@ class InventarioResumen {
     required this.critico,
     required this.valorTotal,
   });
-  factory InventarioResumen.fromJson(Map<String, dynamic> j) => InventarioResumen(
-    totalItems: (j['totalItems'] as num?)?.toInt() ?? 0,
-    ok: (j['ok'] as num?)?.toInt() ?? 0,
-    alerta: (j['alerta'] as num?)?.toInt() ?? 0,
-    critico: (j['critico'] as num?)?.toInt() ?? 0,
-    valorTotal: (j['valorTotal'] as num?)?.toDouble() ?? 0,
-  );
+  factory InventarioResumen.fromJson(Map<String, dynamic> j) =>
+      InventarioResumen(
+        totalItems: (j['totalItems'] as num?)?.toInt() ?? 0,
+        ok: (j['ok'] as num?)?.toInt() ?? 0,
+        alerta: (j['alerta'] as num?)?.toInt() ?? 0,
+        critico: (j['critico'] as num?)?.toInt() ?? 0,
+        valorTotal: (j['valorTotal'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 class InventarioPage {
   final List<InventarioItem> data;
   final int total, pagina, totalPaginas;
-  const InventarioPage({required this.data, required this.total, required this.pagina, required this.totalPaginas});
+  const InventarioPage({
+    required this.data,
+    required this.total,
+    required this.pagina,
+    required this.totalPaginas,
+  });
 }
 
 class InventarioRepository {
@@ -77,18 +91,23 @@ class InventarioRepository {
     String? estado,
     String? sedeId,
   }) async {
-    final r = await _api.get('/inventario', queryParameters: {
-      'pagina': pagina,
-      'limite': limite,
-      if (q != null && q.isNotEmpty) 'q': q,
-      if (categoriaId != null) 'categoriaId': categoriaId,
-      if (estado != null) 'estado': estado,
-      if (sedeId != null) 'sedeId': sedeId,
-    });
+    final r = await _api.get(
+      '/inventario',
+      queryParameters: {
+        'pagina': pagina,
+        'limite': limite,
+        if (q != null && q.isNotEmpty) 'q': q,
+        if (categoriaId != null) 'categoriaId': categoriaId,
+        if (estado != null) 'estado': estado,
+        if (sedeId != null) 'sedeId': sedeId,
+      },
+    );
     final json = Map<String, dynamic>.from(r.data as Map);
     return InventarioPage(
       data: (json['data'] as List? ?? [])
-          .map((e) => InventarioItem.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) => InventarioItem.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
           .toList(),
       total: (json['total'] as num?)?.toInt() ?? 0,
       pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
@@ -97,9 +116,10 @@ class InventarioRepository {
   }
 
   Future<InventarioResumen> resumen({String? sedeId}) async {
-    final r = await _api.get('/inventario/resumen', queryParameters: {
-      if (sedeId != null) 'sedeId': sedeId,
-    });
+    final r = await _api.get(
+      '/inventario/resumen',
+      queryParameters: {if (sedeId != null) 'sedeId': sedeId},
+    );
     return InventarioResumen.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
@@ -110,13 +130,16 @@ class InventarioRepository {
     double? stockMax,
     String? ubicacion,
   }) async {
-    final r = await _api.post('/inventario', data: {
-      'productoId': productoId,
-      if (sedeId != null) 'sedeId': sedeId,
-      if (stockMin != null) 'stockMin': stockMin,
-      if (stockMax != null) 'stockMax': stockMax,
-      if (ubicacion != null) 'ubicacion': ubicacion,
-    });
+    final r = await _api.post(
+      '/inventario',
+      data: {
+        'productoId': productoId,
+        if (sedeId != null) 'sedeId': sedeId,
+        if (stockMin != null) 'stockMin': stockMin,
+        if (stockMax != null) 'stockMax': stockMax,
+        if (ubicacion != null) 'ubicacion': ubicacion,
+      },
+    );
     return InventarioItem.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
@@ -126,11 +149,15 @@ class InventarioRepository {
     required double cantidad,
     String? referencia,
   }) async {
-    final r = await _api.patch('/inventario/$id/ajuste', data: {
-      'tipo': tipo,
-      'cantidad': cantidad,
-      if (referencia?.trim().isNotEmpty ?? false) 'referencia': referencia!.trim(),
-    });
+    final r = await _api.patch(
+      '/inventario/$id/ajuste',
+      data: {
+        'tipo': tipo,
+        'cantidad': cantidad,
+        if (referencia?.trim().isNotEmpty ?? false)
+          'referencia': referencia!.trim(),
+      },
+    );
     return InventarioItem.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 }

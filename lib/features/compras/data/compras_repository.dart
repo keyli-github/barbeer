@@ -22,10 +22,18 @@ class Proveedor {
   factory Proveedor.fromJson(Map<String, dynamic> j) => Proveedor(
     id: j['id'] as String? ?? '',
     nombre: j['nombre'] as String? ?? '',
-    categoria: (j['categoria'] as String?)?.isEmpty ?? true ? null : j['categoria'] as String?,
-    contacto: (j['contacto'] as String?)?.isEmpty ?? true ? null : j['contacto'] as String?,
-    telefono: (j['telefono'] as String?)?.isEmpty ?? true ? null : j['telefono'] as String?,
-    email: (j['email'] as String?)?.isEmpty ?? true ? null : j['email'] as String?,
+    categoria: (j['categoria'] as String?)?.isEmpty ?? true
+        ? null
+        : j['categoria'] as String?,
+    contacto: (j['contacto'] as String?)?.isEmpty ?? true
+        ? null
+        : j['contacto'] as String?,
+    telefono: (j['telefono'] as String?)?.isEmpty ?? true
+        ? null
+        : j['telefono'] as String?,
+    email: (j['email'] as String?)?.isEmpty ?? true
+        ? null
+        : j['email'] as String?,
     activo: j['activo'] as bool? ?? true,
     ordenes: (j['ordenes'] as num?)?.toInt() ?? 0,
     total: (j['total'] as num?)?.toDouble() ?? 0,
@@ -56,7 +64,14 @@ class CompraItem {
 }
 
 class Compra {
-  final String id, orden, fecha, proveedor, proveedorId, estado, solicitadoPor, notas;
+  final String id,
+      orden,
+      fecha,
+      proveedor,
+      proveedorId,
+      estado,
+      solicitadoPor,
+      notas;
   final int articulos;
   final double total;
   final String? eta, recibidaAt;
@@ -93,8 +108,10 @@ class Compra {
     recibidaAt: j['recibidaAt'] as String?,
     items: j['items'] is List
         ? (j['items'] as List)
-            .map((e) => CompraItem.fromJson(Map<String, dynamic>.from(e as Map)))
-            .toList()
+              .map(
+                (e) => CompraItem.fromJson(Map<String, dynamic>.from(e as Map)),
+              )
+              .toList()
         : null,
   );
 }
@@ -119,7 +136,12 @@ class ComprasResumen {
 class ComprasPage<T> {
   final List<T> data;
   final int total, pagina, totalPaginas;
-  const ComprasPage({required this.data, required this.total, required this.pagina, required this.totalPaginas});
+  const ComprasPage({
+    required this.data,
+    required this.total,
+    required this.pagina,
+    required this.totalPaginas,
+  });
 }
 
 class ComprasRepository {
@@ -133,12 +155,15 @@ class ComprasRepository {
     String? q,
     String? activo,
   }) async {
-    final r = await _api.get('/compras/proveedores', queryParameters: {
-      'pagina': pagina,
-      'limite': limite,
-      if (q != null && q.isNotEmpty) 'q': q,
-      if (activo != null) 'activo': activo,
-    });
+    final r = await _api.get(
+      '/compras/proveedores',
+      queryParameters: {
+        'pagina': pagina,
+        'limite': limite,
+        if (q != null && q.isNotEmpty) 'q': q,
+        if (activo != null) 'activo': activo,
+      },
+    );
     final json = Map<String, dynamic>.from(r.data as Map);
     return ComprasPage(
       data: (json['data'] as List? ?? [])
@@ -157,17 +182,24 @@ class ComprasRepository {
     String? telefono,
     String? email,
   }) async {
-    final r = await _api.post('/compras/proveedores', data: {
-      'nombre': nombre,
-      if (categoria?.trim().isNotEmpty ?? false) 'categoria': categoria!.trim(),
-      if (contacto?.trim().isNotEmpty ?? false) 'contacto': contacto!.trim(),
-      if (telefono?.trim().isNotEmpty ?? false) 'telefono': telefono!.trim(),
-      if (email?.trim().isNotEmpty ?? false) 'email': email!.trim(),
-    });
+    final r = await _api.post(
+      '/compras/proveedores',
+      data: {
+        'nombre': nombre,
+        if (categoria?.trim().isNotEmpty ?? false)
+          'categoria': categoria!.trim(),
+        if (contacto?.trim().isNotEmpty ?? false) 'contacto': contacto!.trim(),
+        if (telefono?.trim().isNotEmpty ?? false) 'telefono': telefono!.trim(),
+        if (email?.trim().isNotEmpty ?? false) 'email': email!.trim(),
+      },
+    );
     return Proveedor.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
-  Future<Proveedor> updateProveedor(String id, Map<String, dynamic> data) async {
+  Future<Proveedor> updateProveedor(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
     final r = await _api.patch('/compras/proveedores/$id', data: data);
     return Proveedor.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
@@ -180,13 +212,16 @@ class ComprasRepository {
     String? estado,
     String? proveedorId,
   }) async {
-    final r = await _api.get('/compras', queryParameters: {
-      'pagina': pagina,
-      'limite': limite,
-      if (q != null && q.isNotEmpty) 'q': q,
-      if (estado != null) 'estado': estado,
-      if (proveedorId != null) 'proveedorId': proveedorId,
-    });
+    final r = await _api.get(
+      '/compras',
+      queryParameters: {
+        'pagina': pagina,
+        'limite': limite,
+        if (q != null && q.isNotEmpty) 'q': q,
+        if (estado != null) 'estado': estado,
+        if (proveedorId != null) 'proveedorId': proveedorId,
+      },
+    );
     final json = Map<String, dynamic>.from(r.data as Map);
     return ComprasPage(
       data: (json['data'] as List? ?? [])
@@ -199,9 +234,10 @@ class ComprasRepository {
   }
 
   Future<ComprasResumen> resumen({String? estado}) async {
-    final r = await _api.get('/compras/resumen', queryParameters: {
-      if (estado != null) 'estado': estado,
-    });
+    final r = await _api.get(
+      '/compras/resumen',
+      queryParameters: {if (estado != null) 'estado': estado},
+    );
     return ComprasResumen.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
@@ -216,12 +252,15 @@ class ComprasRepository {
     String? eta,
     String? notas,
   }) async {
-    final r = await _api.post('/compras', data: {
-      'proveedorId': proveedorId,
-      'items': items,
-      if (eta != null) 'eta': eta,
-      if (notas?.trim().isNotEmpty ?? false) 'notas': notas!.trim(),
-    });
+    final r = await _api.post(
+      '/compras',
+      data: {
+        'proveedorId': proveedorId,
+        'items': items,
+        if (eta != null) 'eta': eta,
+        if (notas?.trim().isNotEmpty ?? false) 'notas': notas!.trim(),
+      },
+    );
     return Compra.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 

@@ -18,11 +18,11 @@ class CategoriasSheet extends ConsumerWidget {
   const CategoriasSheet({super.key});
 
   static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        isScrollControlled: true,
-        builder: (_) => const CategoriasSheet(),
-      );
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (_) => const CategoriasSheet(),
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,8 +43,9 @@ class CategoriasSheet extends ConsumerWidget {
             Container(
               decoration: const BoxDecoration(
                 color: AppColors.surface,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.xl),
+                ),
               ),
               child: Column(
                 children: [
@@ -65,10 +66,14 @@ class CategoriasSheet extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Categorias',
-                                  style: AppTextStyles.headlineMedium),
-                              Text('Organiza el catalogo global',
-                                  style: AppTextStyles.labelSmall),
+                              Text(
+                                'Categorias',
+                                style: AppTextStyles.headlineMedium,
+                              ),
+                              Text(
+                                'Organiza el catalogo global',
+                                style: AppTextStyles.labelSmall,
+                              ),
                             ],
                           ),
                         ),
@@ -89,8 +94,7 @@ class CategoriasSheet extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: AppSearchBar(
                       hint: 'Buscar categoria...',
-                      onChanged:
-                          ref.read(categoriasProvider.notifier).search,
+                      onChanged: ref.read(categoriasProvider.notifier).search,
                     ),
                   ),
                   _CategoryFilters(state: state),
@@ -148,9 +152,8 @@ class CategoriasSheet extends ConsumerWidget {
                 page: state.pagina,
                 totalPages: state.totalPaginas,
                 total: state.total,
-                onPage: (page) => ref
-                    .read(categoriasProvider.notifier)
-                    .load(pagina: page),
+                onPage: (page) =>
+                    ref.read(categoriasProvider.notifier).load(pagina: page),
               );
             }
             final categoria = state.categorias[index];
@@ -183,8 +186,10 @@ class CategoriasSheet extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(categoria.nombre,
-                              style: AppTextStyles.titleMedium),
+                          Text(
+                            categoria.nombre,
+                            style: AppTextStyles.titleMedium,
+                          ),
                           Text(
                             '${categoria.productosCount} producto${categoria.productosCount == 1 ? '' : 's'}',
                             style: AppTextStyles.labelSmall,
@@ -196,8 +201,11 @@ class CategoriasSheet extends ConsumerWidget {
                     if (auth.hasPermission('categorias:editar') ||
                         auth.hasPermission('categorias:eliminar'))
                       PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert_rounded,
-                            size: 19, color: AppColors.textTertiary),
+                        icon: const Icon(
+                          Icons.more_vert_rounded,
+                          size: 19,
+                          color: AppColors.textTertiary,
+                        ),
                         onSelected: (value) {
                           if (value == 'edit') {
                             _showForm(context, ref, categoria: categoria);
@@ -215,8 +223,10 @@ class CategoriasSheet extends ConsumerWidget {
                               categoria.activo)
                             const PopupMenuItem(
                               value: 'delete',
-                              child: Text('Desactivar',
-                                  style: TextStyle(color: AppColors.error)),
+                              child: Text(
+                                'Desactivar',
+                                style: TextStyle(color: AppColors.error),
+                              ),
                             ),
                         ],
                       ),
@@ -231,10 +241,12 @@ class CategoriasSheet extends ConsumerWidget {
   }
 
   Future<void> _showDetail(
-      BuildContext context, WidgetRef ref, String id) async {
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+  ) async {
     try {
-      final categoria =
-          await ref.read(categoriasProvider.notifier).detail(id);
+      final categoria = await ref.read(categoriasProvider.notifier).detail(id);
       if (!context.mounted) return;
       await AppBottomSheet.show<void>(
         context: context,
@@ -251,12 +263,11 @@ class CategoriasSheet extends ConsumerWidget {
                   : 'Sin descripcion',
             ),
             _DetailRow(
-                label: 'Productos', value: '${categoria.productosCount}'),
+              label: 'Productos',
+              value: '${categoria.productosCount}',
+            ),
             if (categoria.createdAt != null)
-              _DetailRow(
-                label: 'Creada',
-                value: _date(categoria.createdAt!),
-              ),
+              _DetailRow(label: 'Creada', value: _date(categoria.createdAt!)),
             if (categoria.updatedAt != null)
               _DetailRow(
                 label: 'Actualizada',
@@ -281,18 +292,17 @@ class CategoriasSheet extends ConsumerWidget {
       isScrollControlled: true,
       builder: (_) => _CategoriaForm(
         categoria: categoria,
-        onSave: ({
-          required nombre,
-          required descripcion,
-          required activo,
-        }) async {
-          await ref.read(categoriasProvider.notifier).save(
-                categoria: categoria,
-                nombre: nombre,
-                descripcion: descripcion,
-                activo: activo,
-              );
-        },
+        onSave:
+            ({required nombre, required descripcion, required activo}) async {
+              await ref
+                  .read(categoriasProvider.notifier)
+                  .save(
+                    categoria: categoria,
+                    nombre: nombre,
+                    descripcion: descripcion,
+                    activo: activo,
+                  );
+            },
       ),
     );
   }
@@ -340,37 +350,34 @@ class _CategoryFilters extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Row(
-            children: [
-              _FilterChip(
-                label: 'Todas',
-                selected: state.activo == null,
-                onTap: () => ref
-                    .read(categoriasProvider.notifier)
-                    .filterActivo(null),
-              ),
-              _FilterChip(
-                label: 'Activas',
-                selected: state.activo == true,
-                onTap: () => ref
-                    .read(categoriasProvider.notifier)
-                    .filterActivo(true),
-              ),
-              _FilterChip(
-                label: 'Inactivas',
-                selected: state.activo == false,
-                onTap: () => ref
-                    .read(categoriasProvider.notifier)
-                    .filterActivo(false),
-              ),
-            ],
+    behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Row(
+        children: [
+          _FilterChip(
+            label: 'Todas',
+            selected: state.activo == null,
+            onTap: () =>
+                ref.read(categoriasProvider.notifier).filterActivo(null),
           ),
-        ),
-      );
+          _FilterChip(
+            label: 'Activas',
+            selected: state.activo == true,
+            onTap: () =>
+                ref.read(categoriasProvider.notifier).filterActivo(true),
+          ),
+          _FilterChip(
+            label: 'Inactivas',
+            selected: state.activo == false,
+            onTap: () =>
+                ref.read(categoriasProvider.notifier).filterActivo(false),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _CategoriaForm extends StatefulWidget {
@@ -379,7 +386,8 @@ class _CategoriaForm extends StatefulWidget {
     required String nombre,
     required String descripcion,
     required bool activo,
-  }) onSave;
+  })
+  onSave;
 
   const _CategoriaForm({this.categoria, required this.onSave});
 
@@ -398,8 +406,9 @@ class _CategoriaFormState extends State<_CategoriaForm> {
   void initState() {
     super.initState();
     _nombre = TextEditingController(text: widget.categoria?.nombre ?? '');
-    _descripcion =
-        TextEditingController(text: widget.categoria?.descripcion ?? '');
+    _descripcion = TextEditingController(
+      text: widget.categoria?.descripcion ?? '',
+    );
     _activo = widget.categoria?.activo ?? true;
   }
 
@@ -412,91 +421,91 @@ class _CategoriaFormState extends State<_CategoriaForm> {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    decoration: const BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+    ),
+    child: SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
+                  Expanded(
+                    child: Text(
+                      widget.categoria == null
+                          ? 'Nueva categoria'
+                          : 'Editar categoria',
+                      style: AppTextStyles.headlineMedium,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.categoria == null
-                              ? 'Nueva categoria'
-                              : 'Editar categoria',
-                          style: AppTextStyles.headlineMedium,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  AppTextField(
-                    label: 'Nombre',
-                    controller: _nombre,
-                    maxLength: 80,
-                    textCapitalization: TextCapitalization.sentences,
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Ingresa un nombre'
-                        : null,
-                  ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Descripcion',
-                    hint: 'Opcional',
-                    controller: _descripcion,
-                    maxLength: 300,
-                    maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
-                  ),
-                  const SizedBox(height: 8),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Categoria activa',
-                        style: AppTextStyles.bodyMedium),
-                    value: _activo,
-                    onChanged: (value) => setState(() => _activo = value),
-                  ),
-                  const SizedBox(height: 16),
-                  PrimaryButton(
-                    label: widget.categoria == null
-                        ? 'Crear categoria'
-                        : 'Guardar cambios',
-                    isLoading: _saving,
-                    onPressed: _submit,
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+              AppTextField(
+                label: 'Nombre',
+                controller: _nombre,
+                maxLength: 80,
+                textCapitalization: TextCapitalization.sentences,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Ingresa un nombre'
+                    : null,
+              ),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Descripcion',
+                hint: 'Opcional',
+                controller: _descripcion,
+                maxLength: 300,
+                maxLines: 3,
+                textCapitalization: TextCapitalization.sentences,
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Categoria activa',
+                  style: AppTextStyles.bodyMedium,
+                ),
+                value: _activo,
+                onChanged: (value) => setState(() => _activo = value),
+              ),
+              const SizedBox(height: 16),
+              PrimaryButton(
+                label: widget.categoria == null
+                    ? 'Crear categoria'
+                    : 'Guardar cambios',
+                isLoading: _saving,
+                onPressed: _submit,
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -511,7 +520,10 @@ class _CategoriaFormState extends State<_CategoriaForm> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString()), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text(error.toString()),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -533,31 +545,29 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(right: 7),
-        child: InkWell(
+    padding: const EdgeInsets.only(right: 7),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.full),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primarySurface : AppColors.backgroundAlt,
           borderRadius: BorderRadius.circular(AppRadius.full),
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.primarySurface
-                  : AppColors.backgroundAlt,
-              borderRadius: BorderRadius.circular(AppRadius.full),
-              border: Border.all(
-                color: selected ? AppColors.primaryBorder : AppColors.border,
-              ),
-            ),
-            child: Text(
-              label,
-              style: AppTextStyles.labelLarge.copyWith(
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
+          border: Border.all(
+            color: selected ? AppColors.primaryBorder : AppColors.border,
           ),
         ),
-      );
+        child: Text(
+          label,
+          style: AppTextStyles.labelLarge.copyWith(
+            color: selected ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _ActivePill extends StatelessWidget {
@@ -567,18 +577,18 @@ class _ActivePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: active ? AppColors.successLight : AppColors.backgroundAlt,
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-        child: Text(
-          active ? 'Activa' : 'Inactiva',
-          style: AppTextStyles.labelSmall.copyWith(
-            color: active ? AppColors.success : AppColors.textTertiary,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: active ? AppColors.successLight : AppColors.backgroundAlt,
+      borderRadius: BorderRadius.circular(AppRadius.full),
+    ),
+    child: Text(
+      active ? 'Activa' : 'Inactiva',
+      style: AppTextStyles.labelSmall.copyWith(
+        color: active ? AppColors.success : AppColors.textTertiary,
+      ),
+    ),
+  );
 }
 
 class _DetailRow extends StatelessWidget {
@@ -589,24 +599,25 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 94,
-              child: Text(label, style: AppTextStyles.labelLarge),
-            ),
-            Expanded(
-              child: Text(
-                value,
-                style: AppTextStyles.bodyMedium
-                    .copyWith(color: AppColors.textPrimary),
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 9),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 94,
+          child: Text(label, style: AppTextStyles.labelLarge),
         ),
-      );
+        Expanded(
+          child: Text(
+            value,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Pager extends StatelessWidget {
@@ -624,24 +635,26 @@ class _Pager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Row(
-          children: [
-            Text('$total resultados', style: AppTextStyles.labelSmall),
-            const Spacer(),
-            IconButton.filledTonal(
-              onPressed: page > 1 ? () => onPage(page - 1) : null,
-              icon: const Icon(Icons.chevron_left_rounded),
-            ),
-            Text('$page / ${totalPages == 0 ? 1 : totalPages}',
-                style: AppTextStyles.labelLarge),
-            IconButton.filledTonal(
-              onPressed: page < totalPages ? () => onPage(page + 1) : null,
-              icon: const Icon(Icons.chevron_right_rounded),
-            ),
-          ],
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      children: [
+        Text('$total resultados', style: AppTextStyles.labelSmall),
+        const Spacer(),
+        IconButton.filledTonal(
+          onPressed: page > 1 ? () => onPage(page - 1) : null,
+          icon: const Icon(Icons.chevron_left_rounded),
         ),
-      );
+        Text(
+          '$page / ${totalPages == 0 ? 1 : totalPages}',
+          style: AppTextStyles.labelLarge,
+        ),
+        IconButton.filledTonal(
+          onPressed: page < totalPages ? () => onPage(page + 1) : null,
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
+    ),
+  );
 }
 
 class _CategorySkeleton extends StatelessWidget {
@@ -649,16 +662,16 @@ class _CategorySkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 6,
-        itemBuilder: (_, index) => Container(
-          height: 68,
-          margin: const EdgeInsets.only(bottom: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.borderLight),
-          ),
-        ),
-      );
+    padding: const EdgeInsets.all(16),
+    itemCount: 6,
+    itemBuilder: (_, index) => Container(
+      height: 68,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+    ),
+  );
 }

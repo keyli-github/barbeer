@@ -47,17 +47,16 @@ class _AsistenciaState {
     int? totalPages,
     int? total,
     String? fecha,
-  }) =>
-      _AsistenciaState(
-        items: items ?? this.items,
-        resumen: resumen ?? this.resumen,
-        loading: loading ?? this.loading,
-        error: clearError ? null : (error ?? this.error),
-        page: page ?? this.page,
-        totalPages: totalPages ?? this.totalPages,
-        total: total ?? this.total,
-        fecha: fecha ?? this.fecha,
-      );
+  }) => _AsistenciaState(
+    items: items ?? this.items,
+    resumen: resumen ?? this.resumen,
+    loading: loading ?? this.loading,
+    error: clearError ? null : (error ?? this.error),
+    page: page ?? this.page,
+    totalPages: totalPages ?? this.totalPages,
+    total: total ?? this.total,
+    fecha: fecha ?? this.fecha,
+  );
 }
 
 class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
@@ -77,21 +76,51 @@ class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
       ]);
       final page = results[0] as AsistenciaPage;
       final resumen = results[1] as AsistenciaResumen;
-      state = state.copyWith(items: page.data, resumen: resumen, total: page.total, totalPages: page.totalPaginas, page: page.pagina, loading: false);
+      state = state.copyWith(
+        items: page.data,
+        resumen: resumen,
+        total: page.total,
+        totalPages: page.totalPaginas,
+        page: page.pagina,
+        loading: false,
+      );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
   }
 
-  void setFecha(String f) { state = state.copyWith(fecha: f); load(resetPage: true); }
-  void setPage(int p) { state = state.copyWith(page: p); load(); }
+  void setFecha(String f) {
+    state = state.copyWith(fecha: f);
+    load(resetPage: true);
+  }
 
-  Future<void> crear({required String usuarioId, String? estado, String? turno, String? notas}) async {
-    await _repo.crear(usuarioId: usuarioId, fecha: state.fecha, estado: estado, turno: turno, notas: notas);
+  void setPage(int p) {
+    state = state.copyWith(page: p);
+    load();
+  }
+
+  Future<void> crear({
+    required String usuarioId,
+    String? estado,
+    String? turno,
+    String? notas,
+  }) async {
+    await _repo.crear(
+      usuarioId: usuarioId,
+      fecha: state.fecha,
+      estado: estado,
+      turno: turno,
+      notas: notas,
+    );
     await load();
   }
 
-  Future<void> editar(String id, {String? estado, String? turno, String? notas}) async {
+  Future<void> editar(
+    String id, {
+    String? estado,
+    String? turno,
+    String? notas,
+  }) async {
     await _repo.editar(id, estado: estado, turno: turno, notas: notas);
     await load();
   }
@@ -102,9 +131,10 @@ class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
   }
 }
 
-final _asistenciaProvider = StateNotifierProvider<_AsistenciaNotifier, _AsistenciaState>(
-  (ref) => _AsistenciaNotifier(ref.watch(_asistenciaRepoProvider)),
-);
+final _asistenciaProvider =
+    StateNotifierProvider<_AsistenciaNotifier, _AsistenciaState>(
+      (ref) => _AsistenciaNotifier(ref.watch(_asistenciaRepoProvider)),
+    );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -142,37 +172,74 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today_rounded, color: AppColors.primary, size: 22),
+                        const Icon(
+                          Icons.calendar_today_rounded,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
                         const SizedBox(width: 10),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Asistencia', style: AppTextStyles.headlineLarge),
-                          Text(state.fecha, style: AppTextStyles.labelSmall),
-                        ])),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Asistencia',
+                                style: AppTextStyles.headlineLarge,
+                              ),
+                              Text(
+                                state.fecha,
+                                style: AppTextStyles.labelSmall,
+                              ),
+                            ],
+                          ),
+                        ),
                         // Date picker
                         GestureDetector(
                           onTap: () async {
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: DateTime.tryParse(state.fecha) ?? DateTime.now(),
+                              initialDate:
+                                  DateTime.tryParse(state.fecha) ??
+                                  DateTime.now(),
                               firstDate: DateTime(2020),
                               lastDate: DateTime.now(),
                             );
                             if (picked != null) {
-                              notifier.setFecha(DateFormat('yyyy-MM-dd').format(picked));
+                              notifier.setFecha(
+                                DateFormat('yyyy-MM-dd').format(picked),
+                              );
                             }
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primarySurface,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.primaryBorder),
+                              border: Border.all(
+                                color: AppColors.primaryBorder,
+                              ),
                             ),
-                            child: const Row(children: [
-                              Icon(Icons.calendar_month_rounded, size: 16, color: AppColors.primary),
-                              SizedBox(width: 4),
-                              Text('Fecha', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                            ]),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_month_rounded,
+                                  size: 16,
+                                  color: AppColors.primary,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Fecha',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -182,48 +249,116 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                   Container(
                     margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(color: AppColors.backgroundAlt, borderRadius: BorderRadius.circular(AppRadius.sm)),
-                    child: Row(children: [
-                      Expanded(child: GestureDetector(
-                        onTap: () => setState(() => _showHistorial = false),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: !_showHistorial ? AppColors.surface : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: !_showHistorial ? [const BoxShadow(color: Color(0x1A000000), blurRadius: 4)] : null,
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundAlt,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _showHistorial = false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !_showHistorial
+                                    ? AppColors.surface
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: !_showHistorial
+                                    ? [
+                                        const BoxShadow(
+                                          color: Color(0x1A000000),
+                                          blurRadius: 4,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Text(
+                                'Planilla del día',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: !_showHistorial
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: Text('Planilla del día', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: !_showHistorial ? AppColors.primary : AppColors.textSecondary)),
                         ),
-                      )),
-                      Expanded(child: GestureDetector(
-                        onTap: () => setState(() => _showHistorial = true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _showHistorial ? AppColors.surface : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: _showHistorial ? [const BoxShadow(color: Color(0x1A000000), blurRadius: 4)] : null,
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _showHistorial = true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _showHistorial
+                                    ? AppColors.surface
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: _showHistorial
+                                    ? [
+                                        const BoxShadow(
+                                          color: Color(0x1A000000),
+                                          blurRadius: 4,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Text(
+                                'Marcajes',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _showHistorial
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: Text('Marcajes', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _showHistorial ? AppColors.primary : AppColors.textSecondary)),
                         ),
-                      )),
-                    ]),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
             // ─── KPIs ───────────────────────────────────────────
             if (state.resumen != null && !state.loading)
-              Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: Row(children: [
-                _Chip('Total', '${state.resumen!.totalEmpleados}', AppColors.textSecondary),
-                const SizedBox(width: 8),
-                _Chip('Presentes', '${state.resumen!.presente}', AppColors.success),
-                const SizedBox(width: 8),
-                _Chip('Ausentes', '${state.resumen!.ausente}', AppColors.error),
-                const SizedBox(width: 8),
-                _Chip('Tardanza', '${state.resumen!.tardanza}', AppColors.warning),
-              ])),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
+                  children: [
+                    _Chip(
+                      'Total',
+                      '${state.resumen!.totalEmpleados}',
+                      AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    _Chip(
+                      'Presentes',
+                      '${state.resumen!.presente}',
+                      AppColors.success,
+                    ),
+                    const SizedBox(width: 8),
+                    _Chip(
+                      'Ausentes',
+                      '${state.resumen!.ausente}',
+                      AppColors.error,
+                    ),
+                    const SizedBox(width: 8),
+                    _Chip(
+                      'Tardanza',
+                      '${state.resumen!.tardanza}',
+                      AppColors.warning,
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 4),
             // ─── Contenido ──────────────────────────────────────
             Expanded(
@@ -232,32 +367,49 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                 child: state.loading
                     ? const AppLoading(key: ValueKey('l'))
                     : state.error != null
-                        ? AppErrorState(key: const ValueKey('e'), message: state.error!, onRetry: () => notifier.load())
-                        : state.items.isEmpty
-                            ? const AppEmptyState(key: ValueKey('empty'), icon: Icons.calendar_today_outlined, title: 'Sin empleados disponibles')
-                            : !_showHistorial
-                                ? _PlanillaView(
-                                    key: const ValueKey('planilla'),
-                                    items: state.items,
-                                    page: state.page,
-                                    totalPages: state.totalPages,
-                                    total: state.total,
-                                    canCreate: canCreate,
-                                    canEdit: canEdit,
-                                    canDelete: canDelete,
-                                    onPageChange: notifier.setPage,
-                                    onRegister: (emp) => _showRegistrar(context, emp, notifier, false),
-                                    onEdit: (emp) => _showRegistrar(context, emp, notifier, true),
-                                    onDelete: (emp) async {
-                                      if (emp.asistenciaId == null) return;
-                                      final ok = await ConfirmDialog.show(context: context, title: 'Eliminar asistencia', description: '¿Eliminar el registro de ${emp.username}?', confirmLabel: 'Eliminar', isDanger: true);
-                                      if (ok) await notifier.eliminar(emp.asistenciaId!);
-                                    },
-                                  )
-                                : _MarcajesView(
-                                    key: const ValueKey('marcajes'),
-                                    items: state.items,
-                                  ),
+                    ? AppErrorState(
+                        key: const ValueKey('e'),
+                        message: state.error!,
+                        onRetry: () => notifier.load(),
+                      )
+                    : state.items.isEmpty
+                    ? const AppEmptyState(
+                        key: ValueKey('empty'),
+                        icon: Icons.calendar_today_outlined,
+                        title: 'Sin empleados disponibles',
+                      )
+                    : !_showHistorial
+                    ? _PlanillaView(
+                        key: const ValueKey('planilla'),
+                        items: state.items,
+                        page: state.page,
+                        totalPages: state.totalPages,
+                        total: state.total,
+                        canCreate: canCreate,
+                        canEdit: canEdit,
+                        canDelete: canDelete,
+                        onPageChange: notifier.setPage,
+                        onRegister: (emp) =>
+                            _showRegistrar(context, emp, notifier, false),
+                        onEdit: (emp) =>
+                            _showRegistrar(context, emp, notifier, true),
+                        onDelete: (emp) async {
+                          if (emp.asistenciaId == null) return;
+                          final ok = await ConfirmDialog.show(
+                            context: context,
+                            title: 'Eliminar asistencia',
+                            description:
+                                '¿Eliminar el registro de ${emp.username}?',
+                            confirmLabel: 'Eliminar',
+                            isDanger: true,
+                          );
+                          if (ok) await notifier.eliminar(emp.asistenciaId!);
+                        },
+                      )
+                    : _MarcajesView(
+                        key: const ValueKey('marcajes'),
+                        items: state.items,
+                      ),
               ),
             ),
           ],
@@ -266,7 +418,12 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     );
   }
 
-  void _showRegistrar(BuildContext context, AsistenciaPlanilla emp, _AsistenciaNotifier notifier, bool isEdit) {
+  void _showRegistrar(
+    BuildContext context,
+    AsistenciaPlanilla emp,
+    _AsistenciaNotifier notifier,
+    bool isEdit,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -276,9 +433,19 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
         isEdit: isEdit,
         onSaved: (estado, turno, notas) async {
           if (isEdit && emp.asistenciaId != null) {
-            await notifier.editar(emp.asistenciaId!, estado: estado, turno: turno, notas: notas);
+            await notifier.editar(
+              emp.asistenciaId!,
+              estado: estado,
+              turno: turno,
+              notas: notas,
+            );
           } else {
-            await notifier.crear(usuarioId: emp.usuarioId, estado: estado, turno: turno, notas: notas);
+            await notifier.crear(
+              usuarioId: emp.usuarioId,
+              estado: estado,
+              turno: turno,
+              notas: notas,
+            );
           }
         },
       ),
@@ -317,7 +484,12 @@ class _PlanillaView extends StatelessWidget {
     itemCount: items.length + 1,
     itemBuilder: (_, i) {
       if (i == items.length) {
-        return AppPagination(page: page, totalPages: totalPages, total: total, onPageChange: onPageChange);
+        return AppPagination(
+          page: page,
+          totalPages: totalPages,
+          total: total,
+          onPageChange: onPageChange,
+        );
       }
       final emp = items[i];
       return Padding(
@@ -330,53 +502,119 @@ class _PlanillaView extends StatelessWidget {
             border: Border.all(color: AppColors.borderLight),
             boxShadow: AppShadows.card,
           ),
-          child: Row(children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.avatarColor(emp.username).withOpacity(0.15),
-              child: Text(_initials(emp.username), style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.avatarColor(emp.username), fontSize: 13)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(emp.username, style: AppTextStyles.titleMedium),
-              Text('${emp.rol}${emp.turno != null ? " · ${emp.turno}" : ""}', style: AppTextStyles.bodySmall),
-              if (emp.horaEntrada != null) Text('Entrada: ${_fmtHour(emp.horaEntrada!)}', style: AppTextStyles.labelSmall),
-              if (emp.horasTrabajadas != null) Text('${emp.horasTrabajadas!.toStringAsFixed(1)}h trabajadas', style: AppTextStyles.labelSmall),
-            ])),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              _StatusBadge(estado: emp.estado),
-              const SizedBox(height: 6),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                if (emp.asistenciaId == null && canCreate)
-                  _IconBtn(icon: Icons.add_rounded, color: AppColors.primary, onTap: () => onRegister(emp)),
-                if (emp.asistenciaId != null && canEdit)
-                  _IconBtn(icon: Icons.edit_rounded, color: AppColors.primary, onTap: () => onEdit(emp)),
-                if (emp.asistenciaId != null && canDelete)
-                  _IconBtn(icon: Icons.delete_rounded, color: AppColors.error, onTap: () => onDelete(emp)),
-              ]),
-            ]),
-          ]),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: AppColors.avatarColor(
+                  emp.username,
+                ).withOpacity(0.15),
+                child: Text(
+                  _initials(emp.username),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.avatarColor(emp.username),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(emp.username, style: AppTextStyles.titleMedium),
+                    Text(
+                      '${emp.rol}${emp.turno != null ? " · ${emp.turno}" : ""}',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                    if (emp.horaEntrada != null)
+                      Text(
+                        'Entrada: ${_fmtHour(emp.horaEntrada!)}',
+                        style: AppTextStyles.labelSmall,
+                      ),
+                    if (emp.horasTrabajadas != null)
+                      Text(
+                        '${emp.horasTrabajadas!.toStringAsFixed(1)}h trabajadas',
+                        style: AppTextStyles.labelSmall,
+                      ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _StatusBadge(estado: emp.estado),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (emp.asistenciaId == null && canCreate)
+                        _IconBtn(
+                          icon: Icons.add_rounded,
+                          color: AppColors.primary,
+                          onTap: () => onRegister(emp),
+                        ),
+                      if (emp.asistenciaId != null && canEdit)
+                        _IconBtn(
+                          icon: Icons.edit_rounded,
+                          color: AppColors.primary,
+                          onTap: () => onEdit(emp),
+                        ),
+                      if (emp.asistenciaId != null && canDelete)
+                        _IconBtn(
+                          icon: Icons.delete_rounded,
+                          color: AppColors.error,
+                          onTap: () => onDelete(emp),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
     },
   );
 
-  String _initials(String u) { final p = u.trim().split(' '); return p.length >= 2 ? '${p[0][0]}${p[1][0]}'.toUpperCase() : u.substring(0, 2).toUpperCase(); }
-  String _fmtHour(String iso) { try { return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal()); } catch (_) { return iso; } }
+  String _initials(String u) {
+    final p = u.trim().split(' ');
+    return p.length >= 2
+        ? '${p[0][0]}${p[1][0]}'.toUpperCase()
+        : u.substring(0, 2).toUpperCase();
+  }
+
+  String _fmtHour(String iso) {
+    try {
+      return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal());
+    } catch (_) {
+      return iso;
+    }
+  }
 }
 
 class _IconBtn extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _IconBtn({required this.icon, required this.color, required this.onTap});
+  const _IconBtn({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      width: 30, height: 30, margin: const EdgeInsets.only(left: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+      width: 30,
+      height: 30,
+      margin: const EdgeInsets.only(left: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
       child: Icon(icon, size: 16, color: color),
     ),
   );
@@ -393,16 +631,32 @@ class _MarcajesView extends StatelessWidget {
     final marcajes = <Map<String, String>>[];
     for (final emp in items) {
       if (emp.horaEntrada != null) {
-        marcajes.add({'empleado': emp.username, 'rol': emp.rol, 'tipo': emp.estado == 'TARDANZA' ? 'TARDANZA' : 'ENTRADA', 'hora': emp.horaEntrada!, 'detalle': 'Registro de entrada'});
+        marcajes.add({
+          'empleado': emp.username,
+          'rol': emp.rol,
+          'tipo': emp.estado == 'TARDANZA' ? 'TARDANZA' : 'ENTRADA',
+          'hora': emp.horaEntrada!,
+          'detalle': 'Registro de entrada',
+        });
       }
       if (emp.horaSalida != null) {
-        marcajes.add({'empleado': emp.username, 'rol': emp.rol, 'tipo': 'SALIDA', 'hora': emp.horaSalida!, 'detalle': 'Registro de salida'});
+        marcajes.add({
+          'empleado': emp.username,
+          'rol': emp.rol,
+          'tipo': 'SALIDA',
+          'hora': emp.horaSalida!,
+          'detalle': 'Registro de salida',
+        });
       }
     }
     marcajes.sort((a, b) => a['hora']!.compareTo(b['hora']!));
 
     if (marcajes.isEmpty) {
-      return const AppEmptyState(icon: Icons.login_outlined, title: 'Sin marcajes', description: 'No hay entradas o salidas registradas para esta fecha.');
+      return const AppEmptyState(
+        icon: Icons.login_outlined,
+        title: 'Sin marcajes',
+        description: 'No hay entradas o salidas registradas para esta fecha.',
+      );
     }
 
     return ListView.builder(
@@ -410,7 +664,11 @@ class _MarcajesView extends StatelessWidget {
       itemCount: marcajes.length,
       itemBuilder: (_, i) {
         final m = marcajes[i];
-        final color = m['tipo'] == 'ENTRADA' ? AppColors.success : m['tipo'] == 'TARDANZA' ? AppColors.warning : AppColors.primary;
+        final color = m['tipo'] == 'ENTRADA'
+            ? AppColors.success
+            : m['tipo'] == 'TARDANZA'
+            ? AppColors.warning
+            : AppColors.primary;
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Container(
@@ -421,30 +679,88 @@ class _MarcajesView extends StatelessWidget {
               border: Border.all(color: AppColors.borderLight),
               boxShadow: AppShadows.card,
             ),
-            child: Row(children: [
-              Container(width: 38, height: 38,
-                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                child: Icon(m['tipo'] == 'ENTRADA' || m['tipo'] == 'TARDANZA' ? Icons.login_rounded : Icons.logout_rounded, color: color, size: 18)),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(m['empleado']!, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-                Text('${m['rol']} · ${m['detalle']}', style: AppTextStyles.labelSmall),
-              ])),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                  child: Text(m['tipo']!, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color))),
-                const SizedBox(height: 3),
-                Text(_fmtHour(m['hora']!), style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-              ]),
-            ]),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    m['tipo'] == 'ENTRADA' || m['tipo'] == 'TARDANZA'
+                        ? Icons.login_rounded
+                        : Icons.logout_rounded,
+                    color: color,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        m['empleado']!,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${m['rol']} · ${m['detalle']}',
+                        style: AppTextStyles.labelSmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        m['tipo']!,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _fmtHour(m['hora']!),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  String _fmtHour(String iso) { try { return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal()); } catch (_) { return iso; } }
+  String _fmtHour(String iso) {
+    try {
+      return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal());
+    } catch (_) {
+      return iso;
+    }
+  }
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
@@ -455,18 +771,39 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color c; String label;
+    Color c;
+    String label;
     switch (estado) {
-      case 'PRESENTE': c = AppColors.success; label = 'Presente'; break;
-      case 'TARDANZA': c = AppColors.warning; label = 'Tardanza'; break;
-      case 'AUSENTE': c = AppColors.error; label = 'Ausente'; break;
-      case 'DIA_LIBRE': c = AppColors.textTertiary; label = 'Día libre'; break;
-      default: c = AppColors.textTertiary; label = estado;
+      case 'PRESENTE':
+        c = AppColors.success;
+        label = 'Presente';
+        break;
+      case 'TARDANZA':
+        c = AppColors.warning;
+        label = 'Tardanza';
+        break;
+      case 'AUSENTE':
+        c = AppColors.error;
+        label = 'Ausente';
+        break;
+      case 'DIA_LIBRE':
+        c = AppColors.textTertiary;
+        label = 'Día libre';
+        break;
+      default:
+        c = AppColors.textTertiary;
+        label = estado;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(100)),
-      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c)),
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: c),
+      ),
     );
   }
 }
@@ -480,11 +817,23 @@ class _Chip extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(color: color.withOpacity(0.09), borderRadius: BorderRadius.circular(AppRadius.sm)),
-      child: Column(children: [
-        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-        Text(label, style: AppTextStyles.labelSmall),
-      ]),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.09),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          Text(label, style: AppTextStyles.labelSmall),
+        ],
+      ),
     ),
   );
 }
@@ -495,7 +844,11 @@ class _RegistrarSheet extends StatefulWidget {
   final AsistenciaPlanilla emp;
   final bool isEdit;
   final Future<void> Function(String?, String?, String?) onSaved;
-  const _RegistrarSheet({required this.emp, required this.isEdit, required this.onSaved});
+  const _RegistrarSheet({
+    required this.emp,
+    required this.isEdit,
+    required this.onSaved,
+  });
 
   @override
   State<_RegistrarSheet> createState() => _RegistrarSheetState();
@@ -519,10 +872,17 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
   }
 
   @override
-  void dispose() { _turnoCtrl.dispose(); _notasCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _turnoCtrl.dispose();
+    _notasCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await widget.onSaved(
         _estado,
@@ -531,51 +891,152 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() { _saving = false; _error = e.toString(); });
+      setState(() {
+        _saving = false;
+        _error = e.toString();
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Center(child: Container(width: 40, height: 4, margin: const EdgeInsets.only(top: 12), decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-        Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 0), child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(widget.isEdit ? 'Editar asistencia' : 'Registrar asistencia', style: AppTextStyles.headlineMedium),
-            Text(widget.emp.username, style: AppTextStyles.bodySmall),
-          ])),
-          IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.of(context).pop()),
-        ])),
-        const Divider(),
-        SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 20), child: Column(children: [
-          Text('Estado', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, children: [
-            for (final e in [('PRESENTE', 'Presente'), ('TARDANZA', 'Tardanza'), ('AUSENTE', 'Ausente'), ('DIA_LIBRE', 'Día libre')])
-              GestureDetector(
-                onTap: () => setState(() => _estado = e.$1),
-                child: AnimatedContainer(duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: _estado == e.$1 ? AppColors.primarySurface : AppColors.backgroundAlt,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    border: Border.all(color: _estado == e.$1 ? AppColors.primaryBorder : AppColors.border),
-                  ),
-                  child: Text(e.$2, style: TextStyle(fontSize: 12, fontWeight: _estado == e.$1 ? FontWeight.w700 : FontWeight.w500, color: _estado == e.$1 ? AppColors.primary : AppColors.textSecondary))),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12),
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
               ),
-          ]),
-          const SizedBox(height: 14),
-          AppTextField(label: 'Turno', hint: 'Ej. Apertura, Tarde', controller: _turnoCtrl),
-          const SizedBox(height: 12),
-          AppTextField(label: 'Notas', hint: 'Opcional', controller: _notasCtrl, maxLines: 2),
-          if (_error != null) ...[const SizedBox(height: 8), Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13))],
-          const SizedBox(height: 16),
-          PrimaryButton(label: widget.isEdit ? 'Guardar cambios' : 'Registrar', onPressed: _saving ? null : _submit, isLoading: _saving),
-        ])),
-      ]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.isEdit
+                            ? 'Editar asistencia'
+                            : 'Registrar asistencia',
+                        style: AppTextStyles.headlineMedium,
+                      ),
+                      Text(widget.emp.username, style: AppTextStyles.bodySmall),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              children: [
+                Text(
+                  'Estado',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final e in [
+                      ('PRESENTE', 'Presente'),
+                      ('TARDANZA', 'Tardanza'),
+                      ('AUSENTE', 'Ausente'),
+                      ('DIA_LIBRE', 'Día libre'),
+                    ])
+                      GestureDetector(
+                        onTap: () => setState(() => _estado = e.$1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _estado == e.$1
+                                ? AppColors.primarySurface
+                                : AppColors.backgroundAlt,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                            border: Border.all(
+                              color: _estado == e.$1
+                                  ? AppColors.primaryBorder
+                                  : AppColors.border,
+                            ),
+                          ),
+                          child: Text(
+                            e.$2,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: _estado == e.$1
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: _estado == e.$1
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                AppTextField(
+                  label: 'Turno',
+                  hint: 'Ej. Apertura, Tarde',
+                  controller: _turnoCtrl,
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  label: 'Notas',
+                  hint: 'Opcional',
+                  controller: _notasCtrl,
+                  maxLines: 2,
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  label: widget.isEdit ? 'Guardar cambios' : 'Registrar',
+                  onPressed: _saving ? null : _submit,
+                  isLoading: _saving,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

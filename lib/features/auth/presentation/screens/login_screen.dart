@@ -10,10 +10,12 @@ import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
-  @override ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -26,25 +28,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _anim = AnimationController(duration: const Duration(milliseconds: 600), vsync: this)..forward();
+    _anim = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    )..forward();
     _fade = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
-    _slide = Tween(begin: const Offset(0, 0.08), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
+    _slide = Tween(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
   }
 
-  @override void dispose() { _userCtrl.dispose(); _passCtrl.dispose(); _anim.dispose(); super.dispose(); }
+  @override
+  void dispose() {
+    _userCtrl.dispose();
+    _passCtrl.dispose();
+    _anim.dispose();
+    super.dispose();
+  }
 
   Future<void> _login() async {
-    if (_formKey.currentState == null || !_formKey.currentState!.validate()) return;
+    if (_formKey.currentState == null || !_formKey.currentState!.validate())
+      return;
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      await ref.read(authProvider.notifier).login(
-          username: _userCtrl.text.trim(),
-          password: _passCtrl.text,
-          rememberMe: true);
+      await ref
+          .read(authProvider.notifier)
+          .login(
+            username: _userCtrl.text.trim(),
+            password: _passCtrl.text,
+            rememberMe: true,
+          );
     } catch (e) {
-      String msg = e.toString()
+      String msg = e
+          .toString()
           .replaceAll('AppException: ', '')
           .replaceAll('Exception: ', '')
           .trim();
@@ -99,49 +120,111 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     );
   }
 
-  Widget _brand() => Column(children: [
-    Image.asset('assets/images/barbeer.webp', width: 100, height: 100),
-    const SizedBox(height: 16),
-    Text('Bar Beer', style: AppTextStyles.displayMedium.copyWith(color: AppColors.primary, fontWeight: FontWeight.w900)),
-    const SizedBox(height: 6),
-    const Text('Sistema de gestion', style: AppTextStyles.bodyMedium),
-  ]);
+  Widget _brand() => Column(
+    children: [
+      Image.asset('assets/images/barbeer.webp', width: 100, height: 100),
+      const SizedBox(height: 16),
+      Text(
+        'Bar Beer',
+        style: AppTextStyles.displayMedium.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      const SizedBox(height: 6),
+      const Text('Sistema de gestion', style: AppTextStyles.bodyMedium),
+    ],
+  );
 
   Widget _card() => Theme(
     data: Theme.of(context).copyWith(
-      inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
-        fillColor: Colors.white,
-      ),
+      inputDecorationTheme: Theme.of(
+        context,
+      ).inputDecorationTheme.copyWith(fillColor: Colors.white),
     ),
     child: Container(
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.cardElevated, border: Border.all(color: AppColors.borderLight, width: 0.5)),
-    child: Form(key: _formKey, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Iniciar sesion', style: AppTextStyles.headlineMedium),
-      const SizedBox(height: 4),
-      const Text('Ingresa tus credenciales para continuar', style: AppTextStyles.bodyMedium),
-      const SizedBox(height: 24),
-      if (_error != null) ...[_errBox(_error!), const SizedBox(height: 16)],
-      AppTextField(label: 'Usuario', hint: 'Nombre de usuario', controller: _userCtrl,
-          prefixIcon: Icons.person_outline_rounded, textInputAction: TextInputAction.next,
-          validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null),
-      const SizedBox(height: 14),
-      AppTextField(label: 'Contrasena', hint: 'Ingresa tu contrasena', controller: _passCtrl,
-          prefixIcon: Icons.lock_outline_rounded, obscureText: true,
-          textInputAction: TextInputAction.done, onSubmitted: (_) => _login(),
-          validator: (v) => v == null || v.isEmpty ? 'Requerido' : null),
-       const SizedBox(height: 24),
-      PrimaryButton(label: 'Ingresar', onPressed: _loading ? null : _login, isLoading: _loading, icon: Icons.login_rounded),
-    ]))));
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppShadows.cardElevated,
+        border: Border.all(color: AppColors.borderLight, width: 0.5),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Iniciar sesion', style: AppTextStyles.headlineMedium),
+            const SizedBox(height: 4),
+            const Text(
+              'Ingresa tus credenciales para continuar',
+              style: AppTextStyles.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+            if (_error != null) ...[
+              _errBox(_error!),
+              const SizedBox(height: 16),
+            ],
+            AppTextField(
+              label: 'Usuario',
+              hint: 'Nombre de usuario',
+              controller: _userCtrl,
+              prefixIcon: Icons.person_outline_rounded,
+              textInputAction: TextInputAction.next,
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Requerido' : null,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Contrasena',
+              hint: 'Ingresa tu contrasena',
+              controller: _passCtrl,
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _login(),
+              validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+            ),
+            const SizedBox(height: 24),
+            PrimaryButton(
+              label: 'Ingresar',
+              onPressed: _loading ? null : _login,
+              isLoading: _loading,
+              icon: Icons.login_rounded,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 
   Widget _errBox(String msg) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(color: const Color(0xFFFFEBEB), borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.error.withOpacity(0.3))),
-    child: Row(children: [
-      const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
-      const SizedBox(width: 10),
-      Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w500))),
-    ]));
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFEBEB),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      border: Border.all(color: AppColors.error.withOpacity(0.3)),
+    ),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.error_outline_rounded,
+          color: AppColors.error,
+          size: 18,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            msg,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

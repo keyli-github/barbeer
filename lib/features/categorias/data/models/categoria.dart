@@ -18,14 +18,14 @@ class Categoria {
   });
 
   factory Categoria.fromJson(Map<String, dynamic> json) => Categoria(
-        id: json['id'] as String? ?? '',
-        nombre: json['nombre'] as String? ?? '',
-        descripcion: json['descripcion'] as String?,
-        activo: json['activo'] as bool? ?? false,
-        productosCount: (json['productosCount'] as num?)?.toInt() ?? 0,
-        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
-        updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
-      );
+    id: json['id'] as String? ?? '',
+    nombre: json['nombre'] as String? ?? '',
+    descripcion: json['descripcion'] as String?,
+    activo: json['activo'] as bool? ?? false,
+    productosCount: (json['productosCount'] as num?)?.toInt() ?? 0,
+    createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+    updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
+  );
 }
 
 class CategoriasPage {
@@ -44,13 +44,13 @@ class CategoriasPage {
   });
 
   factory CategoriasPage.fromJson(Map<String, dynamic> json) => CategoriasPage(
-        data: (json['data'] as List? ?? const [])
-            .whereType<Map>()
-            .map((item) => Categoria.fromJson(Map<String, dynamic>.from(item)))
-            .toList(),
-        total: (json['total'] as num?)?.toInt() ?? 0,
-        pagina: (json['pagina'] as num?)?.toInt() ?? 1,
-        limite: (json['limite'] as num?)?.toInt() ?? 25,
-        totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 0,
-      );
+    data: (json['data'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Categoria.fromJson(Map<String, dynamic>.from(item)))
+        .toList(),
+    total: (json['total'] as num?)?.toInt() ?? 0,
+    pagina: (json['pagina'] as num?)?.toInt() ?? 1,
+    limite: (json['limite'] as num?)?.toInt() ?? 25,
+    totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 0,
+  );
 }
