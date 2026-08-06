@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_dimensions.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/widgets.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
 
@@ -84,7 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -94,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           child: GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               child: FadeTransition(
                 opacity: _fade,
                 child: SlideTransition(
@@ -102,13 +101,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox(height: size.height * 0.08),
-                      _brand(),
-                      SizedBox(height: size.height * 0.05),
-                      _card(),
-                      const SizedBox(height: 16),
-                      Text('Bar Beer 2024', style: AppTextStyles.labelSmall),
-                      const SizedBox(height: 24),
+                      SizedBox(height: size.height * 0.1),
+                      _buildBrand(),
+                      SizedBox(height: size.height * 0.06),
+                      _buildLoginForm(),
+                      SizedBox(height: AppSpacing.xl),
+                      _buildFooter(),
+                      SizedBox(height: AppSpacing.xl),
                     ],
                   ),
                 ),
@@ -120,111 +119,165 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  Widget _brand() => Column(
-    children: [
-      Image.asset('assets/images/barbeer.webp', width: 100, height: 100),
-      const SizedBox(height: 16),
-      Text(
-        'Bar Beer',
-        style: AppTextStyles.displayMedium.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      const SizedBox(height: 6),
-      const Text('Sistema de gestion', style: AppTextStyles.bodyMedium),
-    ],
-  );
+  Widget _buildBrand() => Column(
+        children: [
+          // Logo con sombra suave
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
+              boxShadow: AppShadows.card,
+              border: Border.all(color: AppColors.border, width: 1),
+            ),
+            padding: EdgeInsets.all(AppSpacing.md),
+            child: Image.asset(
+              'assets/images/barbeerLogo.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          SizedBox(height: AppSpacing.lg),
+          // Título
+          Text(
+            'Bar Beer',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          SizedBox(height: AppSpacing.xxs),
+          // Subtítulo
+          Text(
+            'Sistema de gestión',
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      );
 
-  Widget _card() => Theme(
-    data: Theme.of(context).copyWith(
-      inputDecorationTheme: Theme.of(
-        context,
-      ).inputDecorationTheme.copyWith(fillColor: Colors.white),
-    ),
-    child: Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.cardElevated,
-        border: Border.all(color: AppColors.borderLight, width: 0.5),
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Iniciar sesion', style: AppTextStyles.headlineMedium),
-            const SizedBox(height: 4),
-            const Text(
-              'Ingresa tus credenciales para continuar',
-              style: AppTextStyles.bodyMedium,
-            ),
-            const SizedBox(height: 24),
-            if (_error != null) ...[
-              _errBox(_error!),
-              const SizedBox(height: 16),
+  Widget _buildLoginForm() => Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(AppSpacing.xl),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+          boxShadow: AppShadows.card,
+          border: Border.all(color: AppColors.border, width: 1),
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Iniciar sesión',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: AppSpacing.xxs),
+              Text(
+                'Ingresa tus credenciales para continuar',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              SizedBox(height: AppSpacing.xl),
+              // Error message si existe
+              if (_error != null) ...[
+                _buildErrorBox(_error!),
+                SizedBox(height: AppSpacing.md),
+              ],
+              // Campo usuario
+              AppTextField(
+                label: 'Usuario',
+                hint: 'Nombre de usuario',
+                controller: _userCtrl,
+                prefixIcon: Icons.person_outline_rounded,
+                textInputAction: TextInputAction.next,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Requerido' : null,
+              ),
+              SizedBox(height: AppSpacing.md),
+              // Campo contraseña
+              AppTextField(
+                label: 'Contraseña',
+                hint: 'Ingresa tu contraseña',
+                controller: _passCtrl,
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _login(),
+                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+              ),
+              SizedBox(height: AppSpacing.xl),
+              // Botón de login
+              PrimaryButton(
+                text: 'Ingresar',
+                onPressed: _loading ? null : _login,
+                isLoading: _loading,
+                icon: Icons.login_rounded,
+              ),
             ],
-            AppTextField(
-              label: 'Usuario',
-              hint: 'Nombre de usuario',
-              controller: _userCtrl,
-              prefixIcon: Icons.person_outline_rounded,
-              textInputAction: TextInputAction.next,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Requerido' : null,
+          ),
+        ),
+      );
+
+  Widget _buildErrorBox(String msg) => Container(
+        padding: EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: AppColors.errorLight,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+          border: Border.all(color: AppColors.errorBorder, width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.error,
+              size: AppSpacing.iconSM,
             ),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Contrasena',
-              hint: 'Ingresa tu contrasena',
-              controller: _passCtrl,
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: true,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _login(),
-              validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
-            ),
-            const SizedBox(height: 24),
-            PrimaryButton(
-              label: 'Ingresar',
-              onPressed: _loading ? null : _login,
-              isLoading: _loading,
-              icon: Icons.login_rounded,
+            SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                msg,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
-      ),
-    ),
-  );
+      );
 
-  Widget _errBox(String msg) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFFEBEB),
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      border: Border.all(color: AppColors.error.withOpacity(0.3)),
-    ),
-    child: Row(
-      children: [
-        const Icon(
-          Icons.error_outline_rounded,
-          color: AppColors.error,
-          size: 18,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            msg,
-            style: const TextStyle(
+  Widget _buildFooter() => Column(
+        children: [
+          Text(
+            'Bar Beer © 2024',
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.error,
-              fontWeight: FontWeight.w500,
+              color: AppColors.textTertiary,
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          SizedBox(height: AppSpacing.xxs),
+          Text(
+            'Sistema de gestión empresarial',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ],
+      );
 }

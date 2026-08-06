@@ -1,37 +1,68 @@
 import 'package:flutter/material.dart';
 
+/// Design tokens de BarBeer — modo claro, estilo iPhone
 class AppColors {
   AppColors._();
-  static const Color primary = Color(0xFF2563EB);
-  static const Color primaryDark = Color(0xFF1D4ED8);
-  static const Color primaryLight = Color(0xFF3B82F6);
-  static const Color primarySurface = Color(0xFFEFF6FF);
-  static const Color primaryBorder = Color(0xFFBFDBFE);
-  static const Color accent = Color(0xFFF59E0B);
-  static const Color accentLight = Color(0xFFFEF3C7);
-  static const Color background = Color(0xFFFFFFFF);
-  static const Color backgroundAlt = Color(0xFFF6F8FB);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF0F172A);
-  static const Color textSecondary = Color(0xFF475569);
-  static const Color textTertiary = Color(0xFF94A3B8);
-  static const Color textHint = Color(0xFFBCC5D3);
-  static const Color border = Color(0xFFE2E8F0);
-  static const Color borderLight = Color(0xFFEDF2F7);
-  static const Color divider = Color(0xFFF1F5F9);
-  static const Color success = Color(0xFF10B981);
-  static const Color successLight = Color(0xFFD1FAE5);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color warningLight = Color(0xFFFEF3C7);
-  static const Color error = Color(0xFFEF4444);
-  static const Color errorLight = Color(0xFFFEE2E2);
-  static const Color navActive = Color(0xFF2563EB);
-  static const Color navInactive = Color(0xFF94A3B8);
-  static const Color roleSuperadmin = Color(0xFF7C3AED);
-  static const Color roleAdmin = Color(0xFF16A34A);
-  static const Color roleCajero = Color(0xFF2563EB);
-  static const Color roleVendedora = Color(0xFFF59E0B);
 
+  // ── Azul primario (acciones, tabs activos, botones) ──────────────────────
+  static const Color primary        = Color(0xFF2563EB);
+  static const Color primaryDark    = Color(0xFF1D4ED8);
+  static const Color primaryLight   = Color(0xFF60A5FA);
+  static const Color primarySurface = Color(0xFFEFF6FF);
+  static const Color primaryBorder  = Color(0xFFBFDBFE);
+
+  // ── Naranja BarBeer (marca, etiqueta de rol, acentos) ───────────────────
+  static const Color brand        = Color(0xFFF97316);
+  static const Color brandDark    = Color(0xFFEA580C);
+  static const Color brandLight   = Color(0xFFFED7AA);
+  static const Color brandSurface = Color(0xFFFFF7ED);
+
+  // ── Fondos ───────────────────────────────────────────────────────────────
+  static const Color background    = Color(0xFFFFFFFF);
+  static const Color backgroundAlt = Color(0xFFF9FAFB);
+  static const Color surface       = Color(0xFFFFFFFF);
+  static const Color surfaceAlt    = Color(0xFFF3F4F6);
+
+  // ── Texto ────────────────────────────────────────────────────────────────
+  static const Color textPrimary   = Color(0xFF111827);
+  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textTertiary  = Color(0xFF9CA3AF);
+  static const Color textDisabled  = Color(0xFFD1D5DB);
+
+  // ── Bordes & divisores ───────────────────────────────────────────────────
+  static const Color border      = Color(0xFFE5E7EB);
+  static const Color borderLight = Color(0xFFF3F4F6);
+  static const Color divider     = Color(0xFFF3F4F6);
+
+  // ── Estados semánticos ───────────────────────────────────────────────────
+  static const Color success        = Color(0xFF10B981);
+  static const Color successLight   = Color(0xFFD1FAE5);
+  static const Color successBorder  = Color(0xFF6EE7B7);
+
+  static const Color warning        = Color(0xFFF59E0B);
+  static const Color warningLight   = Color(0xFFFEF3C7);
+  static const Color warningBorder  = Color(0xFFFCD34D);
+
+  static const Color error          = Color(0xFFEF4444);
+  static const Color errorLight     = Color(0xFFFEE2E2);
+  static const Color errorBorder    = Color(0xFFFCA5A5);
+
+  static const Color info           = Color(0xFF3B82F6);
+  static const Color infoLight      = Color(0xFFDCEAFE);
+  static const Color infoBorder     = Color(0xFF93C5FD);
+
+  // ── Navegación ───────────────────────────────────────────────────────────
+  static const Color navActive     = Color(0xFF2563EB);
+  static const Color navInactive   = Color(0xFF9CA3AF);
+  static const Color navBackground = Color(0xFFFFFFFF);
+
+  // ── Roles ────────────────────────────────────────────────────────────────
+  static const Color roleSuperadmin = Color(0xFF7C3AED);
+  static const Color roleAdmin      = Color(0xFF059669);
+  static const Color roleCajero     = Color(0xFF2563EB);
+  static const Color roleVendedora  = Color(0xFFF97316);
+
+  // ── Avatares ─────────────────────────────────────────────────────────────
   static const List<Color> avatarColors = [
     Color(0xFF3B82F6),
     Color(0xFF8B5CF6),
@@ -49,59 +80,68 @@ class AppColors {
 
   static Color roleColor(String role) {
     switch (role.toUpperCase()) {
-      case 'SUPERADMIN':
-        return roleSuperadmin;
-      case 'ADMIN':
-        return roleAdmin;
-      case 'CAJERO':
-        return roleCajero;
-      case 'VENDEDORA':
-        return roleVendedora;
-      default:
-        return primary;
+      case 'SUPERADMIN': return roleSuperadmin;
+      case 'ADMIN':      return roleAdmin;
+      case 'CAJERO':     return roleCajero;
+      case 'VENDEDORA':  return roleVendedora;
+      default:           return primary;
     }
   }
 }
 
+/// Sombras calibradas para estilo iOS/iPhone
 class AppShadows {
   AppShadows._();
+
   static final List<BoxShadow> card = [
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.035),
-      blurRadius: 14,
-      offset: const Offset(0, 4),
-      spreadRadius: -3,
+      color: const Color(0xFF000000).withValues(alpha: 0.04),
+      blurRadius: 8,
+      offset: const Offset(0, 1),
+    ),
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.02),
+      blurRadius: 2,
+      offset: const Offset(0, 0),
     ),
   ];
+
   static final List<BoxShadow> cardElevated = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.07),
-      blurRadius: 22,
-      offset: const Offset(0, 8),
-      spreadRadius: -5,
+      color: const Color(0xFF000000).withValues(alpha: 0.08),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
     ),
   ];
+
   static final List<BoxShadow> sheet = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.10),
+      color: const Color(0xFF000000).withValues(alpha: 0.10),
       blurRadius: 32,
-      offset: const Offset(0, -6),
+      offset: const Offset(0, -4),
     ),
   ];
+
   static final List<BoxShadow> nav = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.06),
+      color: const Color(0xFF000000).withValues(alpha: 0.06),
       blurRadius: 20,
       offset: const Offset(0, -4),
-      spreadRadius: -4,
+    ),
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.03),
+      blurRadius: 4,
+      offset: const Offset(0, -1),
     ),
   ];
+
   static final List<BoxShadow> button = [
     BoxShadow(
-      color: AppColors.primary.withOpacity(0.22),
-      blurRadius: 14,
-      offset: const Offset(0, 5),
-      spreadRadius: -3,
+      color: AppColors.primary.withValues(alpha: 0.25),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
     ),
   ];
+
+  static final List<BoxShadow> none = [];
 }

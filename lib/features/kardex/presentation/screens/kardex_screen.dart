@@ -124,7 +124,7 @@ class KardexScreen extends ConsumerWidget {
     final notifier = ref.read(_kardexProvider.notifier);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(

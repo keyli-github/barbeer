@@ -158,7 +158,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     final canDelete = auth.hasPermission('asistencia:eliminar');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(

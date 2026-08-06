@@ -130,7 +130,7 @@ class RolesScreen extends ConsumerWidget {
     final isSuperAdmin = auth.user?.isSuperAdmin ?? false;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(

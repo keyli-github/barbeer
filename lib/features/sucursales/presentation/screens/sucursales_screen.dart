@@ -9,8 +9,7 @@ import '../../../../core/widgets/app_badge.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
-import '../../../../core/widgets/app_empty_state.dart';
-import '../../../../core/widgets/app_loading.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -108,9 +107,10 @@ class SucursalesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(sucursalesProvider);
     final auth = ref.watch(authProvider);
+    final canCreate = auth.hasPermission('establecimientos:crear');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -118,31 +118,39 @@ class SucursalesScreen extends ConsumerWidget {
           onRefresh: () => ref.read(sucursalesProvider.notifier).load(),
           child: Column(
             children: [
-              Container(
-                color: AppColors.background,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              Padding(
+                padding: EdgeInsets.all(AppSpacing.md),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.store_rounded,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Sucursales',
-                        style: AppTextStyles.headlineLarge,
+                    Icon(Icons.store_rounded, color: AppColors.primary, size: 24),
+                    SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sucursales',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${state.total} sedes',
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        ],
                       ),
                     ),
-                    if (auth.hasPermission('establecimientos:crear'))
+                    if (canCreate)
                       FilledButton.icon(
                         onPressed: () => _showForm(context, ref, null),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Nueva'),
+                        icon: Icon(Icons.add_rounded, size: 18),
+                        label: Text('Nueva'),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(
+                          padding: EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 10,
                           ),
@@ -153,18 +161,18 @@ class SucursalesScreen extends ConsumerWidget {
               ),
               Expanded(
                 child: state.isLoading
-                    ? const AppLoading()
+                    ? AppLoadingIndicator()
                     : state.error != null
                     ? AppErrorState(
                         message: state.error!,
-                        onRetry: () =>
+                        onActionPressed: () =>
                             ref.read(sucursalesProvider.notifier).load(),
                       )
                     : state.sedes.isEmpty
-                    ? const AppEmptyState(
+                    ? AppEmptyState(
                         icon: Icons.store_outlined,
                         title: 'Sin sucursales',
-                        description: 'No hay sucursales registradas',
+                        message: 'No hay sucursales registradas',
                       )
                     : ListView(
                         children: [

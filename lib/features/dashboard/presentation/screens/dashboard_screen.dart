@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_dimensions.dart';
-import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/widgets.dart';
 import '../../../../core/widgets/app_badge.dart';
-import '../../../../core/widgets/app_loading.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 
@@ -20,127 +18,103 @@ class DashboardScreen extends ConsumerWidget {
     final user = auth.user;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(dashboardProvider.notifier).load(),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // App bar
-              SliverAppBar(
-                floating: true,
-                snap: true,
-                backgroundColor: AppColors.background,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                leading: Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(
-                      Icons.menu_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+      backgroundColor: AppColors.background,
+      appBar: AppHeader(
+        title: 'Inicio',
+
+        actions: [
+          if (user?.sede != null)
+            Container(
+              margin: EdgeInsets.only(right: AppSpacing.sm),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xxs,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.primarySurface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusRound),
+                border: Border.all(color: AppColors.primaryBorder, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.store_rounded,
+                    size: 14,
+                    color: AppColors.primary,
                   ),
-                ),
-                title: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySurface,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.local_bar_rounded,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
+                  SizedBox(width: AppSpacing.xxs),
+                  Text(
+                    user!.sedeName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
                     ),
-                    const SizedBox(width: 10),
-                    const Text('Bar Beer', style: AppTextStyles.appBarTitle),
-                  ],
-                ),
-                actions: [
-                  if (user?.sede != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Chip(
-                        avatar: const Icon(
-                          Icons.store_rounded,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        label: Text(
-                          user!.sedeName,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        backgroundColor: AppColors.primarySurface,
-                        side: const BorderSide(color: AppColors.primaryBorder),
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
+                  ),
                 ],
               ),
-              // Content
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  120,
+            ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(dashboardProvider.notifier).load(),
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tarjeta de bienvenida compacta
+              _WelcomeCard(user: user),
+              SizedBox(height: AppSpacing.lg),
+              
+              // Contenido basado en el estado
+              if (dash.isLoading)
+                AppLoadingIndicator(message: 'Cargando datos...')
+              else if (dash.error != null)
+                AppErrorState(
+                  title: 'Error al cargar datos',
+                  message: dash.error!,
+                  onActionPressed: () =>
+                      ref.read(dashboardProvider.notifier).load(),
+                )
+              else if (dash.data != null) ...[
+                _StatsGrid(data: dash.data!),
+                SizedBox(height: AppSpacing.lg),
+                
+                if (auth.hasPermission('roles:leer')) ...[
+                  _UsersByRole(data: dash.data!),
+                  SizedBox(height: AppSpacing.lg),
+                ],
+                
+                if (auth.hasPermission('establecimientos:leer')) ...[
+                  _SedesCard(
+                    sedes: List<Map<String, dynamic>>.from(
+                      dash.data!.sedes,
+                    ),
+                  ),
+                  SizedBox(height: AppSpacing.lg),
+                ],
+                
+                if (auth.hasPermission('audit:leer')) ...[
+                  _AuditCard(
+                    audit: List<Map<String, dynamic>>.from(
+                      dash.data!.audit,
+                    ),
+                  ),
+                  SizedBox(height: AppSpacing.lg),
+                ],
+                
+                _SessionsCard(
+                  sessions: List<Map<String, dynamic>>.from(
+                    dash.data!.sessions,
+                  ),
                 ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _WelcomeCard(user: user),
-                    const SizedBox(height: 20),
-                    if (dash.isLoading)
-                      const AppLoading(message: 'Cargando datos...')
-                    else if (dash.error != null)
-                      _ErrCard(
-                        err: dash.error!,
-                        retry: () =>
-                            ref.read(dashboardProvider.notifier).load(),
-                      )
-                    else if (dash.data != null) ...[
-                      _StatsRow(data: dash.data!),
-                      const SizedBox(height: 20),
-                      if (auth.hasPermission('roles:leer')) ...[
-                        _UsersByRole(data: dash.data!),
-                        const SizedBox(height: 20),
-                      ],
-                      if (auth.hasPermission('establecimientos:leer')) ...[
-                        _SedesCard(
-                          sedes: List<Map<String, dynamic>>.from(
-                            dash.data!.sedes,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      if (auth.hasPermission('audit:leer')) ...[
-                        _AuditCard(
-                          audit: List<Map<String, dynamic>>.from(
-                            dash.data!.audit,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      _SessionsCard(
-                        sessions: List<Map<String, dynamic>>.from(
-                          dash.data!.sessions,
-                        ),
-                      ),
-                    ],
-                  ]),
-                ),
-              ),
+              ],
+              
+              SizedBox(height: AppSpacing.xxxl),
             ],
           ),
         ),
@@ -159,138 +133,226 @@ class _WelcomeCard extends StatelessWidget {
     final role = user?.rol ?? '';
     final h = DateTime.now().hour;
     final greet = h < 12
-        ? 'Buenos dias'
+        ? 'Buenos días'
         : h < 18
         ? 'Buenas tardes'
         : 'Buenas noches';
+    
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDark],
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.button,
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: AppShadows.card,
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.white.withOpacity(0.2),
+          // Avatar con iniciales
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+            ),
+            alignment: Alignment.center,
             child: Text(
               FormatUtils.initials(un),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: Colors.black,
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: AppSpacing.sm),
+          // Información
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$greet,',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  '$greet',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
                 Text(
                   un,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 17,
                     fontWeight: FontWeight.w700,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    FormatUtils.roleName(role),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const Icon(Icons.local_bar_rounded, color: Colors.white, size: 32),
+          // Badge de rol
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xxs,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.roleColor(role).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSM),
+              border: Border.all(
+                color: AppColors.roleColor(role).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              FormatUtils.roleName(role),
+              style: TextStyle(
+                color: AppColors.roleColor(role),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _StatsRow extends StatelessWidget {
+class _StatsGrid extends StatelessWidget {
   final DashboardData data;
-  const _StatsRow({required this.data});
+  const _StatsGrid({required this.data});
 
   @override
   Widget build(BuildContext context) {
     final actUsers = data.users.where((u) => u['activo'] == true).length;
     final actSedes = data.sedes.where((s) => s['activo'] == true).length;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Resumen', style: AppTextStyles.titleLarge),
-        const SizedBox(height: 12),
+        Text(
+          'Resumen',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
-              child: StatCard(
-                label: 'Usuarios activos',
+              child: _StatCard(
+                label: 'Usuarios',
                 value: '$actUsers',
                 icon: Icons.people_rounded,
-                iconColor: AppColors.primary,
+                color: AppColors.primary,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: StatCard(
+              child: _StatCard(
                 label: 'Sucursales',
                 value: '$actSedes',
                 icon: Icons.store_rounded,
-                iconColor: AppColors.success,
+                color: AppColors.success,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
-              child: StatCard(
+              child: _StatCard(
                 label: 'Sesiones',
                 value: '${data.sessions.length}',
                 icon: Icons.devices_rounded,
-                iconColor: AppColors.accent,
+                color: AppColors.primary,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: StatCard(
+              child: _StatCard(
                 label: 'Roles',
                 value: '${data.roles.length}',
                 icon: Icons.admin_panel_settings_rounded,
-                iconColor: AppColors.roleSuperadmin,
+                color: AppColors.roleSuperadmin,
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSM),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppSpacing.sm),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              height: 1,
+            ),
+          ),
+          SizedBox(height: AppSpacing.xxs),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -308,70 +370,89 @@ class _UsersByRole extends StatelessWidget {
     }
     if (m.isEmpty) return const SizedBox.shrink();
     final mx = m.values.reduce((a, b) => a > b ? a : b);
-    return AppCard(
+    
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.bar_chart_rounded,
                 color: AppColors.primary,
-                size: 20,
+                size: AppSpacing.iconSM,
               ),
-              const SizedBox(width: 8),
-              const Text('Usuarios por rol', style: AppTextStyles.titleMedium),
+              SizedBox(width: AppSpacing.xs),
+              Text(
+                'Usuarios por rol',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppSpacing.md),
           for (final e in m.entries) ...[
-            Row(
-              children: [
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    FormatUtils.roleName(e.key),
-                    style: AppTextStyles.bodySmall.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Container(
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppColors.backgroundAlt,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+            Padding(
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 85,
+                    child: Text(
+                      FormatUtils.roleName(e.key),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
                       ),
-                      FractionallySizedBox(
-                        widthFactor: mx > 0 ? e.value / mx : 0.0,
-                        child: Container(
-                          height: 8,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 6,
                           decoration: BoxDecoration(
-                            color: AppColors.roleColor(e.key),
-                            borderRadius: BorderRadius.circular(4),
+                            color: AppColors.backgroundAlt,
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
-                      ),
-                    ],
+                        FractionallySizedBox(
+                          widthFactor: mx > 0 ? e.value / mx : 0.0,
+                          child: Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: AppColors.roleColor(e.key),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '${e.value}',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.roleColor(e.key),
+                  SizedBox(width: AppSpacing.sm),
+                  Text(
+                    '${e.value}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.roleColor(e.key),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
           ],
         ],
       ),
@@ -386,63 +467,81 @@ class _SedesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (sedes.isEmpty) return const SizedBox.shrink();
-    return AppCard(
+    
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.store_rounded,
                 color: AppColors.success,
-                size: 20,
+                size: AppSpacing.iconSM,
               ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Sucursales', style: AppTextStyles.titleMedium),
+              SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Sucursales',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
               Text(
                 '${sedes.where((s) => s['activo'] == true).length} activas',
-                style: AppTextStyles.bodySmall,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          for (int i = 0; i < sedes.length && i < 4; i++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: sedes[i]['activo'] == true
-                          ? AppColors.success
-                          : AppColors.textTertiary,
-                      shape: BoxShape.circle,
+          SizedBox(height: AppSpacing.sm),
+          ...sedes.take(4).map((sede) => Padding(
+            padding: EdgeInsets.only(top: AppSpacing.xs),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: sede['activo'] == true
+                        ? AppColors.success
+                        : AppColors.textTertiary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    sede['nombre'] as String? ?? '',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      sedes[i]['nombre'] as String? ?? '',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
+                ),
+                if (sede['ruc'] != null)
+                  Text(
+                    'RUC: ${sede["ruc"]}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
                     ),
                   ),
-                  if (sedes[i]['ruc'] != null)
-                    Text(
-                      'RUC: ${sedes[i]["ruc"]}',
-                      style: AppTextStyles.labelSmall,
-                    ),
-                ],
-              ),
+              ],
             ),
-            if (i < 3 && i < sedes.length - 1) const Divider(height: 4),
-          ],
+          )),
         ],
       ),
     );
@@ -456,38 +555,46 @@ class _AuditCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (audit.isEmpty) return const SizedBox.shrink();
-    return AppCard(
+    
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.history_rounded,
                 color: AppColors.primary,
-                size: 20,
+                size: AppSpacing.iconSM,
               ),
-              const SizedBox(width: 8),
-              const Text(
+              SizedBox(width: AppSpacing.xs),
+              Text(
                 'Actividad reciente',
-                style: AppTextStyles.titleMedium,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          for (int i = 0; i < audit.length; i++) ...[
-            _ARow(log: audit[i]),
-            if (i < audit.length - 1) const Divider(height: 1),
-          ],
+          SizedBox(height: AppSpacing.sm),
+          ...audit.map((log) => _AuditRow(log: log)),
         ],
       ),
     );
   }
 }
 
-class _ARow extends StatelessWidget {
+class _AuditRow extends StatelessWidget {
   final Map<String, dynamic> log;
-  const _ARow({required this.log});
+  const _AuditRow({required this.log});
 
   @override
   Widget build(BuildContext context) {
@@ -497,42 +604,53 @@ class _ARow extends StatelessWidget {
     try {
       dt = DateTime.parse(log['createdAt'] ?? '').toLocal();
     } catch (_) {}
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.only(top: AppSpacing.xs),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: AppColors.primarySurface,
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSM),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.bolt_rounded,
-              size: 16,
+              size: 14,
               color: AppColors.primary,
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   action.replaceAll('_', ' '),
-                  style: AppTextStyles.bodySmall.copyWith(
+                  style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                Text(username, style: AppTextStyles.labelSmall),
+                Text(
+                  username,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
               ],
             ),
           ),
           Text(
             dt != null ? FormatUtils.timeAgo(dt) : '',
-            style: AppTextStyles.labelSmall,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.textTertiary,
+            ),
           ),
         ],
       ),
@@ -545,69 +663,116 @@ class _SessionsCard extends StatelessWidget {
   const _SessionsCard({required this.sessions});
 
   @override
-  Widget build(BuildContext context) => AppCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(
-              Icons.devices_rounded,
-              color: AppColors.accent,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            const Text('Sesiones activas', style: AppTextStyles.titleMedium),
-            const Spacer(),
-            CountBadge(count: sessions.length, color: AppColors.primary),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (sessions.isEmpty)
-          const Text('Sin sesiones activas', style: AppTextStyles.bodyMedium)
-        else
-          for (int i = 0; i < sessions.length && i < 3; i++) ...[
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.devices_rounded,
+                color: AppColors.primary,
+                size: AppSpacing.iconSM,
+              ),
+              SizedBox(width: AppSpacing.xs),
+              Text(
+                'Sesiones activas',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Spacer(),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySurface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusRound),
+                ),
+                child: Text(
+                  '${sessions.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppSpacing.sm),
+          if (sessions.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                'Sin sesiones activas',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            )
+          else
+            ...sessions.take(3).map((session) => Padding(
+              padding: EdgeInsets.only(top: AppSpacing.xs),
               child: Row(
                 children: [
                   Icon(
-                    _icon(sessions[i]['deviceType'] as String?),
+                    _getDeviceIcon(session['deviceType'] as String?),
                     size: 18,
                     color: AppColors.textSecondary,
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          sessions[i]['deviceName'] as String? ?? 'Dispositivo',
-                          style: AppTextStyles.bodySmall.copyWith(
+                          session['deviceName'] as String? ?? 'Dispositivo',
+                          style: TextStyle(
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (sessions[i]['ip'] != null)
+                        if (session['ip'] != null)
                           Text(
-                            sessions[i]['ip']!,
-                            style: AppTextStyles.labelSmall,
+                            session['ip']!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textTertiary,
+                            ),
                           ),
                       ],
                     ),
                   ),
-                  if (sessions[i]['actual'] == true)
+                  if (session['actual'] == true)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.successLight,
-                        borderRadius: BorderRadius.circular(100),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSM),
+                        border: Border.all(
+                          color: AppColors.successBorder,
+                          width: 1,
+                        ),
                       ),
-                      child: const Text(
-                        'Esta sesion',
+                      child: Text(
+                        'Actual',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -617,14 +782,14 @@ class _SessionsCard extends StatelessWidget {
                     ),
                 ],
               ),
-            ),
-          ],
-      ],
-    ),
-  );
+            )),
+        ],
+      ),
+    );
+  }
 
-  IconData _icon(String? t) {
-    switch (t) {
+  IconData _getDeviceIcon(String? type) {
+    switch (type) {
       case 'android':
         return Icons.android_rounded;
       case 'ios':
@@ -633,29 +798,4 @@ class _SessionsCard extends StatelessWidget {
         return Icons.computer_rounded;
     }
   }
-}
-
-class _ErrCard extends StatelessWidget {
-  final String err;
-  final VoidCallback retry;
-  const _ErrCard({required this.err, required this.retry});
-
-  @override
-  Widget build(BuildContext context) => AppCard(
-    child: Column(
-      children: [
-        const Icon(Icons.wifi_off_rounded, color: AppColors.error, size: 40),
-        const SizedBox(height: 12),
-        const Text('Error al cargar datos', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 8),
-        Text(err, style: AppTextStyles.bodySmall, textAlign: TextAlign.center),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          onPressed: retry,
-          icon: const Icon(Icons.refresh_rounded, size: 18),
-          label: const Text('Reintentar'),
-        ),
-      ],
-    ),
-  );
 }
