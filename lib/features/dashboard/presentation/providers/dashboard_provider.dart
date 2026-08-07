@@ -2,174 +2,333 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../inventario/data/models/inventario.dart';
+import '../../../caja/data/caja_repository.dart';
+
+// ─── Modelos ──────────────────────────────────────────────────────────────────
+
+class DashboardSede {
+  final String id, nombre, codigo;
+  final bool activo;
+  const DashboardSede({
+    required this.id,
+    required this.nombre,
+    required this.codigo,
+    required this.activo,
+  });
+  factory DashboardSede.fromMap(Map<String, dynamic> m) => DashboardSede(
+    id: m['id'] as String? ?? '',
+    nombre: m['nombre'] as String? ?? '',
+    codigo: m['codigo'] as String? ?? '',
+    activo: m['activo'] as bool? ?? true,
+  );
+}
 
 class DashboardData {
-  final List roles, sedes, audit, sessions, users;
-  // Datos para vendedora/cajero
-  final int misVentasHoy;
-  final double misTotalesHoy;
+  // Sede seleccionada
+  final List<DashboardSede> sedes;
+  final String? selectedSedeId;
+
+  // KPIs
+  final double ventasHoy;
+  final int ventasCountHoy;
+  final double ventasAyer;
+  final int cajaAperturas;
+  final CajaSesion? cajaActual;
+  final int stockBajo; // alerta + critico
+  final int sedesActivas;
+  final int sedesTotal;
+
+  // Gráfica — últimos 7 días
+  final List<double> ventasSemana; // 7 valores, 0=hace6días 6=hoy
+  final double ventasSemanaAnterior; // misma semana anterior para %
+
+  // Actividad reciente
+  final List<Map<String, dynamic>> audit;
+
+  // Estado de carga
+  final bool loading;
+  final String? error;
+
+  // Stats mes (vendedora/cajero)
   final int misVentasMes;
   final double misTotalesMes;
-  // Ventas últimos 7 días para gráfica (index 0 = hace 6 días, 6 = hoy)
-  final List<double> ventasUltimos7Dias;
+
   const DashboardData({
-    this.roles = const [],
     this.sedes = const [],
+    this.selectedSedeId,
+    this.ventasHoy = 0,
+    this.ventasCountHoy = 0,
+    this.ventasAyer = 0,
+    this.cajaAperturas = 0,
+    this.cajaActual,
+    this.stockBajo = 0,
+    this.sedesActivas = 0,
+    this.sedesTotal = 0,
+    this.ventasSemana = const [0, 0, 0, 0, 0, 0, 0],
+    this.ventasSemanaAnterior = 0,
     this.audit = const [],
-    this.sessions = const [],
-    this.users = const [],
-    this.misVentasHoy = 0,
-    this.misTotalesHoy = 0,
+    this.loading = true,
+    this.error,
     this.misVentasMes = 0,
     this.misTotalesMes = 0,
-    this.ventasUltimos7Dias = const [0, 0, 0, 0, 0, 0, 0],
   });
+
+  DashboardData copyWith({
+    List<DashboardSede>? sedes,
+    String? selectedSedeId,
+    bool clearSede = false,
+    double? ventasHoy,
+    int? ventasCountHoy,
+    double? ventasAyer,
+    int? cajaAperturas,
+    CajaSesion? cajaActual,
+    bool clearCaja = false,
+    int? stockBajo,
+    int? sedesActivas,
+    int? sedesTotal,
+    List<double>? ventasSemana,
+    double? ventasSemanaAnterior,
+    List<Map<String, dynamic>>? audit,
+    bool? loading,
+    String? error,
+    bool clearError = false,
+    int? misVentasMes,
+    double? misTotalesMes,
+  }) => DashboardData(
+    sedes: sedes ?? this.sedes,
+    selectedSedeId: clearSede ? null : (selectedSedeId ?? this.selectedSedeId),
+    ventasHoy: ventasHoy ?? this.ventasHoy,
+    ventasCountHoy: ventasCountHoy ?? this.ventasCountHoy,
+    ventasAyer: ventasAyer ?? this.ventasAyer,
+    cajaAperturas: cajaAperturas ?? this.cajaAperturas,
+    cajaActual: clearCaja ? null : (cajaActual ?? this.cajaActual),
+    stockBajo: stockBajo ?? this.stockBajo,
+    sedesActivas: sedesActivas ?? this.sedesActivas,
+    sedesTotal: sedesTotal ?? this.sedesTotal,
+    ventasSemana: ventasSemana ?? this.ventasSemana,
+    ventasSemanaAnterior: ventasSemanaAnterior ?? this.ventasSemanaAnterior,
+    audit: audit ?? this.audit,
+    loading: loading ?? this.loading,
+    error: clearError ? null : (error ?? this.error),
+    misVentasMes: misVentasMes ?? this.misVentasMes,
+    misTotalesMes: misTotalesMes ?? this.misTotalesMes,
+  );
+
+  // % de variación ventas hoy vs ayer
+  double get variacionVsAyer =>
+      ventasAyer > 0 ? ((ventasHoy - ventasAyer) / ventasAyer) * 100 : 0;
+
+  // Total semana
+  double get totalSemana => ventasSemana.fold(0, (a, b) => a + b);
+
+  // % variación semana
+  double get variacionSemana => ventasSemanaAnterior > 0
+      ? ((totalSemana - ventasSemanaAnterior) / ventasSemanaAnterior) * 100
+      : 0;
+
+  DashboardSede? get selectedSede =>
+      sedes.where((s) => s.id == selectedSedeId).firstOrNull;
 }
 
-class DashboardState {
-  final bool isLoading;
-  final String? error;
-  final DashboardData? data;
-  const DashboardState({this.isLoading = false, this.error, this.data});
-}
+// ─── Notifier ─────────────────────────────────────────────────────────────────
 
-class DashboardNotifier extends StateNotifier<DashboardState> {
+class DashboardNotifier extends StateNotifier<DashboardData> {
   final ApiClient _api;
-  final Set<String> _permissions;
-  DashboardNotifier(this._api, Iterable<String> permissions)
-    : _permissions = Set.of(permissions),
-      super(const DashboardState()) {
+  final Set<String> _perms;
+  final String? _userSedeId;
+
+  DashboardNotifier(this._api, this._perms, this._userSedeId)
+    : super(const DashboardData()) {
     load();
   }
 
-  Future<void> load() async {
-    state = const DashboardState(isLoading: true);
+  bool _has(String p) => _perms.contains(p);
 
-    Future<_SectionResult> get(
-      String path, [
-      Map<String, dynamic>? query,
-      String? permission,
-    ]) async {
-      if (permission != null && !_permissions.contains(permission)) {
-        return const _SectionResult.skipped();
-      }
+  Future<void> selectSede(String? sedeId) async {
+    state = state.copyWith(
+      selectedSedeId: sedeId,
+      loading: true,
+      clearError: true,
+    );
+    await _loadData(sedeId ?? _userSedeId);
+  }
+
+  Future<void> load() async {
+    state = state.copyWith(loading: true, clearError: true);
+
+    // Cargar sedes si tiene permiso
+    if (_has('establecimientos:leer')) {
       try {
-        final response = await _api.get(path, queryParameters: query);
-        final body = response.data;
-        if (body is Map) {
-          return _SectionResult.success(List.from(body['data'] ?? const []));
-        }
-        if (body is List) return _SectionResult.success(List.from(body));
-        return const _SectionResult.success([]);
-      } catch (error) {
-        return _SectionResult.failure(error);
-      }
+        final r = await _api.get(
+          ApiConstants.establishments,
+          queryParameters: {'pagina': 1, 'limite': 100},
+        );
+        final list = (r.data as Map)['data'] as List? ?? [];
+        final sedes = list
+            .whereType<Map>()
+            .map((m) => DashboardSede.fromMap(Map<String, dynamic>.from(m)))
+            .toList();
+        state = state.copyWith(sedes: sedes);
+      } catch (_) {}
     }
 
-    // Ventas propias para vendedora/cajero
-    int misVentasHoy = 0;
-    double misTotalesHoy = 0;
+    await _loadData(state.selectedSedeId ?? _userSedeId);
+  }
+
+  Future<void> _loadData(String? sedeId) async {
+    final now = DateTime.now();
+    final hoy = DateTime(now.year, now.month, now.day);
+    final ayer = hoy.subtract(const Duration(days: 1));
+    final hace7 = hoy.subtract(const Duration(days: 6));
+    final hace14 = hoy.subtract(const Duration(days: 13));
+
+    // ── Ventas ────────────────────────────────────────────────────────────────
+    double ventasHoy = 0, ventasAyer = 0;
+    int countHoy = 0;
+    final semana = List<double>.filled(7, 0);
+    double semanaAnterior = 0;
     int misVentasMes = 0;
     double misTotalesMes = 0;
-    List<double> ventasUltimos7Dias = List<double>.filled(7, 0);
 
-    final canLeerPropias = _permissions.contains('ventas:leer-propias');
-    final canLeerTodas = _permissions.contains('ventas:leer');
+    final canLeerPropias = _has('ventas:leer-propias');
+    final canLeerTodas = _has('ventas:leer');
+    final mes = DateTime(now.year, now.month, 1);
 
     if (canLeerPropias || canLeerTodas) {
       try {
         final endpoint = canLeerPropias
             ? ApiConstants.misVentas
             : ApiConstants.ventas;
-        final resp = await _api.get(
-          endpoint,
-          queryParameters: {'limite': 200, 'pagina': 1},
-        );
-        final body = resp.data;
-        if (body is Map) {
-          final ventas = List.from(body['data'] ?? []);
-          final now = DateTime.now();
-          final hoy = DateTime(now.year, now.month, now.day);
-          final mes = DateTime(now.year, now.month, 1);
-          for (final v in ventas) {
-            if (v is! Map) continue;
-            final total = (v['total'] as num?)?.toDouble() ?? 0;
-            final estado = v['estado'] as String? ?? '';
-            if (estado == 'ANULADA') continue;
-            DateTime? dt;
-            try {
-              dt = DateTime.parse(v['createdAt'] as String? ?? '');
-            } catch (_) {}
-            if (dt == null) continue;
-            final diaNorm = DateTime(dt.year, dt.month, dt.day);
-            final diff = hoy.difference(diaNorm).inDays;
-            // Gráfica últimos 7 días
-            if (diff >= 0 && diff < 7) ventasUltimos7Dias[6 - diff] += total;
-            if (!diaNorm.isBefore(hoy)) {
-              misVentasHoy++;
-              misTotalesHoy += total;
-            }
-            if (!diaNorm.isBefore(mes)) {
-              misVentasMes++;
-              misTotalesMes += total;
-            }
+        final q = <String, dynamic>{'limite': 200, 'pagina': 1};
+        if (sedeId != null && canLeerTodas) q['sedeId'] = sedeId;
+        final r = await _api.get(endpoint, queryParameters: q);
+        final ventas = List.from((r.data as Map)['data'] ?? []);
+        for (final v in ventas) {
+          if (v is! Map) continue;
+          final total = (v['total'] as num?)?.toDouble() ?? 0;
+          if ((v['estado'] as String? ?? '') == 'ANULADA') continue;
+          DateTime? dt;
+          try {
+            dt = DateTime.parse(v['createdAt'] as String? ?? '');
+          } catch (_) {}
+          if (dt == null) continue;
+          final d = DateTime(dt.year, dt.month, dt.day);
+          if (!d.isBefore(hoy)) {
+            ventasHoy += total;
+            countHoy++;
+          }
+          if (d == ayer) {
+            ventasAyer += total;
+          }
+          if (!d.isBefore(mes)) {
+            misVentasMes++;
+            misTotalesMes += total;
+          }
+          // Semana actual
+          if (!d.isBefore(hace7)) {
+            final idx = d.difference(hace7).inDays;
+            if (idx >= 0 && idx < 7) semana[idx] += total;
+          }
+          // Semana anterior
+          if (!d.isBefore(hace14) && d.isBefore(hace7)) {
+            semanaAnterior += total;
           }
         }
       } catch (_) {}
     }
 
-    final results = await Future.wait([
-      get(ApiConstants.roles, {'pagina': 1, 'limite': 50}, 'roles:leer'),
-      get(ApiConstants.establishments, {
-        'pagina': 1,
-        'limite': 50,
-      }, 'establecimientos:leer'),
-      get(ApiConstants.audit, {'pagina': 1, 'limite': 8}, 'audit:leer'),
-      get(ApiConstants.sessions),
-      get(ApiConstants.users, {'pagina': 1, 'limite': 100}, 'usuarios:leer'),
-    ]);
-
-    final attempted = results.where((result) => !result.skipped).toList();
-    if (attempted.isNotEmpty &&
-        attempted.every((result) => result.error != null)) {
-      state = DashboardState(error: attempted.first.error.toString());
-      return;
+    // ── Caja ──────────────────────────────────────────────────────────────────
+    CajaSesion? cajaActual;
+    int cajaAperturas = 0;
+    if (_has('caja:leer')) {
+      try {
+        final q = <String, dynamic>{};
+        if (sedeId != null) q['sedeId'] = sedeId;
+        final r = await _api.get(ApiConstants.cajaActual, queryParameters: q);
+        if (r.data != null && r.data is Map) {
+          cajaActual = CajaSesion.fromJson(
+            Map<String, dynamic>.from(r.data as Map),
+          );
+        }
+      } catch (_) {}
+      // Contar aperturas de hoy
+      try {
+        final q = <String, dynamic>{'limite': 1, 'pagina': 1};
+        if (sedeId != null) q['sedeId'] = sedeId;
+        final r = await _api.get(
+          ApiConstants.cajaHistorial,
+          queryParameters: q,
+        );
+        cajaAperturas = (r.data as Map?)?['total'] as int? ?? 0;
+      } catch (_) {}
     }
 
-    state = DashboardState(
-      data: DashboardData(
-        roles: results[0].data,
-        sedes: results[1].data,
-        audit: results[2].data,
-        sessions: results[3].data,
-        users: results[4].data,
-        misVentasHoy: misVentasHoy,
-        misTotalesHoy: misTotalesHoy,
-        misVentasMes: misVentasMes,
-        misTotalesMes: misTotalesMes,
-        ventasUltimos7Dias: ventasUltimos7Dias,
-      ),
+    // ── Inventario ────────────────────────────────────────────────────────────
+    int stockBajo = 0;
+    if (_has('inventario:leer')) {
+      try {
+        final q = <String, dynamic>{};
+        if (sedeId != null) q['sedeId'] = sedeId;
+        final r = await _api.get(
+          ApiConstants.inventoryResumen,
+          queryParameters: q,
+        );
+        final inv = InventarioResumen.fromJson(
+          Map<String, dynamic>.from(r.data as Map),
+        );
+        stockBajo = inv.alerta + inv.critico;
+      } catch (_) {}
+    }
+
+    // ── Sedes activas ─────────────────────────────────────────────────────────
+    int sedesActivas = 0, sedesTotal = 0;
+    if (_has('establecimientos:leer') && state.sedes.isNotEmpty) {
+      sedesTotal = state.sedes.length;
+      sedesActivas = state.sedes.where((s) => s.activo).length;
+    }
+
+    // ── Audit ─────────────────────────────────────────────────────────────────
+    List<Map<String, dynamic>> audit = [];
+    if (_has('audit:leer')) {
+      try {
+        final r = await _api.get(
+          ApiConstants.audit,
+          queryParameters: {'pagina': 1, 'limite': 6},
+        );
+        audit = List.from(
+          (r.data as Map)['data'] ?? [],
+        ).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      } catch (_) {}
+    }
+
+    state = state.copyWith(
+      ventasHoy: ventasHoy,
+      ventasCountHoy: countHoy,
+      ventasAyer: ventasAyer,
+      cajaActual: cajaActual,
+      clearCaja: cajaActual == null,
+      cajaAperturas: cajaAperturas,
+      stockBajo: stockBajo,
+      sedesActivas: sedesActivas,
+      sedesTotal: sedesTotal,
+      ventasSemana: semana,
+      ventasSemanaAnterior: semanaAnterior,
+      audit: audit,
+      misVentasMes: misVentasMes,
+      misTotalesMes: misTotalesMes,
+      loading: false,
+      clearError: true,
     );
   }
 }
 
-class _SectionResult {
-  final List data;
-  final Object? error;
-  final bool skipped;
-
-  const _SectionResult.success(this.data) : error = null, skipped = false;
-  const _SectionResult.failure(this.error) : data = const [], skipped = false;
-  const _SectionResult.skipped()
-    : data = const [],
-      error = null,
-      skipped = true;
-}
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 final dashboardProvider =
-    StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
-      final permissions = ref.watch(
-        authProvider.select((state) => state.permisos),
-      );
-      return DashboardNotifier(ApiClient.instance, permissions);
+    StateNotifierProvider<DashboardNotifier, DashboardData>((ref) {
+      final auth = ref.watch(authProvider);
+      final perms = auth.permisos.toSet();
+      final sedeId = auth.user?.sedeId;
+      return DashboardNotifier(ApiClient.instance, perms, sedeId);
     });
