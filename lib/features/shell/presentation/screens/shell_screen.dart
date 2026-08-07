@@ -196,7 +196,7 @@ class ShellScreen extends ConsumerWidget {
     final visible = _visibleModules(auth);
     final subtitle = _subtitleFor(currentPath, auth);
 
-    const maxInBar = 3;
+    const maxInBar = 4;
     final barModules = visible.take(maxInBar).toList();
     final moreModules = visible.length > maxInBar
         ? visible.sublist(maxInBar)

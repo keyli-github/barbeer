@@ -39,9 +39,16 @@ class DashboardData {
   final int sedesActivas;
   final int sedesTotal;
 
-  // Gráfica — últimos 7 días
+  // Gráfica — últimos 7 días (7 puntos fijos para el periodo 7D)
   final List<double> ventasSemana; // 7 valores, 0=hace6días 6=hoy
-  final double ventasSemanaAnterior; // misma semana anterior para %
+  final double ventasSemanaAnterior;
+
+  // Gráfica dinámica por periodo (usada cuando el usuario cambia el selector)
+  final List<double> chartPoints; // N puntos según periodo
+  final List<String> chartLabels; // etiquetas del eje X
+  final double chartTotal; // total del periodo
+  final double chartPrevTotal; // total periodo anterior (para %)
+  final bool chartLoading;
 
   // Actividad reciente
   final List<Map<String, dynamic>> audit;
@@ -67,6 +74,11 @@ class DashboardData {
     this.sedesTotal = 0,
     this.ventasSemana = const [0, 0, 0, 0, 0, 0, 0],
     this.ventasSemanaAnterior = 0,
+    this.chartPoints = const [],
+    this.chartLabels = const [],
+    this.chartTotal = 0,
+    this.chartPrevTotal = 0,
+    this.chartLoading = false,
     this.audit = const [],
     this.loading = true,
     this.error,
@@ -89,6 +101,11 @@ class DashboardData {
     int? sedesTotal,
     List<double>? ventasSemana,
     double? ventasSemanaAnterior,
+    List<double>? chartPoints,
+    List<String>? chartLabels,
+    double? chartTotal,
+    double? chartPrevTotal,
+    bool? chartLoading,
     List<Map<String, dynamic>>? audit,
     bool? loading,
     String? error,
@@ -108,6 +125,11 @@ class DashboardData {
     sedesTotal: sedesTotal ?? this.sedesTotal,
     ventasSemana: ventasSemana ?? this.ventasSemana,
     ventasSemanaAnterior: ventasSemanaAnterior ?? this.ventasSemanaAnterior,
+    chartPoints: chartPoints ?? this.chartPoints,
+    chartLabels: chartLabels ?? this.chartLabels,
+    chartTotal: chartTotal ?? this.chartTotal,
+    chartPrevTotal: chartPrevTotal ?? this.chartPrevTotal,
+    chartLoading: chartLoading ?? this.chartLoading,
     audit: audit ?? this.audit,
     loading: loading ?? this.loading,
     error: clearError ? null : (error ?? this.error),
@@ -152,6 +174,119 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
       clearError: true,
     );
     await _loadData(sedeId ?? _userSedeId);
+  }
+
+  Future<void> loadChartForPeriod(String period) async {
+    state = state.copyWith(chartLoading: true);
+    final now = DateTime.now();
+    final hoy = DateTime(now.year, now.month, now.day);
+    final sedeId = state.selectedSedeId ?? _userSedeId;
+
+    int days;
+    switch (period) {
+      case '1M':
+        days = 30;
+        break;
+      case '3M':
+        days = 90;
+        break;
+      case '6M':
+        days = 180;
+        break;
+      case '1A':
+        days = 365;
+        break;
+      default:
+        days = 7;
+    }
+
+    final inicio = hoy.subtract(Duration(days: days - 1));
+    final prevInicio = inicio.subtract(Duration(days: days));
+
+    final (int buckets, String fmt) = switch (period) {
+      '1M' => (4, 'semana'),
+      '3M' => (3, 'mes'),
+      '6M' => (6, 'mes'),
+      '1A' => (12, 'mes'),
+      _ => (7, 'dia'),
+    };
+
+    final points = List<double>.filled(buckets, 0);
+    final prevPoints = List<double>.filled(buckets, 0);
+
+    if (_has('ventas:leer-propias') || _has('ventas:leer')) {
+      try {
+        final endpoint = _has('ventas:leer-propias')
+            ? ApiConstants.misVentas
+            : ApiConstants.ventas;
+        final q = <String, dynamic>{'limite': 500, 'pagina': 1};
+        if (sedeId != null && _has('ventas:leer')) q['sedeId'] = sedeId;
+        final r = await _api.get(endpoint, queryParameters: q);
+        final ventas = List.from((r.data as Map)['data'] ?? []);
+        for (final v in ventas) {
+          if (v is! Map) continue;
+          final total = (v['total'] as num?)?.toDouble() ?? 0;
+          if ((v['estado'] as String? ?? '') == 'ANULADA') continue;
+          DateTime? dt;
+          try {
+            dt = DateTime.parse(v['createdAt'] as String? ?? '');
+          } catch (_) {}
+          if (dt == null) continue;
+          final d = DateTime(dt.year, dt.month, dt.day);
+          if (!d.isBefore(inicio) && !d.isAfter(hoy)) {
+            final idx = _bucketIdx(d, inicio, buckets, fmt);
+            if (idx >= 0 && idx < buckets) points[idx] += total;
+          }
+          if (!d.isBefore(prevInicio) && d.isBefore(inicio)) {
+            final idx = _bucketIdx(d, prevInicio, buckets, fmt);
+            if (idx >= 0 && idx < buckets) prevPoints[idx] += total;
+          }
+        }
+      } catch (_) {}
+    }
+
+    state = state.copyWith(
+      chartPoints: points,
+      chartLabels: _labels(inicio, buckets, fmt),
+      chartTotal: points.fold<double>(0, (a, b) => a + b),
+      chartPrevTotal: prevPoints.fold<double>(0, (a, b) => a + b),
+      chartLoading: false,
+    );
+  }
+
+  int _bucketIdx(DateTime d, DateTime start, int buckets, String fmt) {
+    if (fmt == 'dia') return d.difference(start).inDays.clamp(0, buckets - 1);
+    if (fmt == 'semana')
+      return (d.difference(start).inDays ~/ 7).clamp(0, buckets - 1);
+    return ((d.year - start.year) * 12 + (d.month - start.month)).clamp(
+      0,
+      buckets - 1,
+    );
+  }
+
+  List<String> _labels(DateTime start, int buckets, String fmt) {
+    const dn = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    const mn = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
+    if (fmt == 'dia')
+      return List.generate(
+        buckets,
+        (i) => dn[start.add(Duration(days: i)).weekday - 1],
+      );
+    if (fmt == 'semana') return List.generate(buckets, (i) => 'S${i + 1}');
+    return List.generate(buckets, (i) => mn[(start.month - 1 + i) % 12]);
   }
 
   Future<void> load() async {

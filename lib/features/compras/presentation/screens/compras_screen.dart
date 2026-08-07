@@ -219,86 +219,54 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Container(
-              color: AppColors.background,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.shopping_cart_rounded,
-                          color: AppColors.primary,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Compras',
-                            style: AppTextStyles.headlineLarge,
-                          ),
-                        ),
-                        if (canCreate)
-                          ListenableBuilder(
-                            listenable: _tabs,
-                            builder: (_, __) => _tabs.index == 0
-                                ? TextButton.icon(
-                                    onPressed: () => _showNuevaOrden(context),
-                                    icon: const Icon(
-                                      Icons.add_rounded,
-                                      size: 16,
-                                    ),
-                                    label: const Text('Nueva orden'),
-                                  )
-                                : TextButton.icon(
-                                    onPressed: () =>
-                                        _showNuevoProveedor(context),
-                                    icon: const Icon(
-                                      Icons.add_rounded,
-                                      size: 16,
-                                    ),
-                                    label: const Text('Proveedor'),
-                                  ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  TabBar(
-                    controller: _tabs,
-                    indicatorColor: AppColors.primary,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    tabs: const [
-                      Tab(text: 'Órdenes'),
-                      Tab(text: 'Proveedores'),
-                    ],
-                  ),
-                ],
-              ),
+      body: Column(
+        children: [
+          // Solo tabs, sin título (el header viene del Shell)
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabs,
+              indicatorColor: AppColors.primary,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              tabs: const [
+                Tab(text: 'Órdenes'),
+                Tab(text: 'Proveedores'),
+              ],
             ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabs,
-                children: [
-                  _OrdenesTab(
-                    canEdit: canEdit,
-                    onDetail: (id) => _showDetalle(context, id),
-                  ),
-                  _ProvsTab(
-                    canEdit: canEdit,
-                    onEdit: (p) => _showEditProveedor(context, p),
-                  ),
-                ],
-              ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _OrdenesTab(
+                  canEdit: canEdit,
+                  onDetail: (id) => _showDetalle(context, id),
+                ),
+                _ProvsTab(
+                  canEdit: canEdit,
+                  onEdit: (p) => _showEditProveedor(context, p),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+      // FAB dinámico según tab activo
+      floatingActionButton: canCreate
+          ? ListenableBuilder(
+              listenable: _tabs,
+              builder: (_, __) => FloatingActionButton(
+                heroTag: 'compras_fab',
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                onPressed: _tabs.index == 0
+                    ? () => _showNuevaOrden(context)
+                    : () => _showNuevoProveedor(context),
+                child: const Icon(Icons.add_rounded),
+              ),
+            )
+          : null,
     );
   }
 

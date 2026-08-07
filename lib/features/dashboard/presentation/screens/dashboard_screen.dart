@@ -80,32 +80,35 @@ class _Sede extends StatelessWidget {
     return GestureDetector(
       onTap: canSelect ? () => _pick(context) : null,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFEEEFF2)),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFF97316), Color(0xFFEA580C)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: AppColors.brand.withValues(alpha: 0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.store_rounded,
-                color: AppColors.primary,
-                size: 22,
+                color: Colors.white,
+                size: 18,
               ),
             ),
             const SizedBox(width: 10),
@@ -116,39 +119,37 @@ class _Sede extends StatelessWidget {
                   Text(
                     nombre,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: Colors.white,
                     ),
                   ),
                   Row(
                     children: [
                       Container(
-                        width: 6,
-                        height: 6,
+                        width: 5,
+                        height: 5,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
                           color: abierto
-                              ? AppColors.success
-                              : AppColors.textTertiary,
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.45),
+                          shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         abierto ? 'Abierto' : 'Cerrado',
                         style: TextStyle(
-                          fontSize: 11,
-                          color: abierto
-                              ? AppColors.success
-                              : AppColors.textTertiary,
+                          fontSize: 10,
+                          color: Colors.white.withValues(alpha: 0.85),
                         ),
                       ),
                       if (code.isNotEmpty)
                         Text(
                           ' • $code',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textTertiary,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white.withValues(alpha: 0.65),
                           ),
                         ),
                     ],
@@ -157,10 +158,31 @@ class _Sede extends StatelessWidget {
               ),
             ),
             if (canSelect)
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 20,
-                color: AppColors.textTertiary,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Cambiar',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 2),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
               ),
           ],
         ),
@@ -240,7 +262,7 @@ class _Sede extends StatelessWidget {
   }
 }
 
-// ─── KPIs 2×2 blancos, iconos encirculados ────────────────────────────────────
+// ─── KPIs 2×2 compactos ────────────────────────────────────────────────────────
 
 class _Kpis extends StatelessWidget {
   final DashboardData data;
@@ -372,15 +394,15 @@ class _KpiCard extends StatelessWidget {
       GoRouter.of(context).go(k.path);
     },
     child: Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFEEEFF2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -388,30 +410,38 @@ class _KpiCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icono encirculado
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: k.iconBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(k.icon, size: 17, color: k.iconColor),
+          // Icono + label en fila
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: k.iconBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(k.icon, size: 14, color: k.iconColor),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  k.label,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            k.label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 6),
           Text(
             k.value,
             style: const TextStyle(
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
               letterSpacing: -0.3,
@@ -429,6 +459,7 @@ class _KpiCard extends StatelessWidget {
                   ? AppColors.primary
                   : (k.subOk ? AppColors.success : AppColors.error),
             ),
+            maxLines: 1,
           ),
         ],
       ),
@@ -447,10 +478,10 @@ class _SkeletonKpis extends StatelessWidget {
         4,
         (_) => Container(
           width: (MediaQuery.of(context).size.width - 50) / 2,
-          height: 100,
+          height: 80,
           decoration: BoxDecoration(
             color: const Color(0xFFF5F6F8),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
@@ -460,32 +491,55 @@ class _SkeletonKpis extends StatelessWidget {
 
 // ─── Gráfica con selector de periodo ──────────────────────────────────────────
 
-class _Chart extends StatefulWidget {
+class _Chart extends ConsumerStatefulWidget {
   final DashboardData data;
   const _Chart({required this.data});
   @override
-  State<_Chart> createState() => _ChartState();
+  ConsumerState<_Chart> createState() => _ChartState();
 }
 
-class _ChartState extends State<_Chart> {
+class _ChartState extends ConsumerState<_Chart> {
   String _period = '7D';
+  bool _initialized = false;
 
-  static const _days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-  List<String> _labels() {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      // Inicializa con 7D por defecto
+      ref.read(dashboardProvider.notifier).loadChartForPeriod('7D');
+    }
+  }
+
+  List<String> _defaultLabels() {
+    const dn = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
     final now = DateTime.now();
     return List.generate(7, (i) {
       final d = now.subtract(Duration(days: 6 - i));
-      return _days[d.weekday - 1];
+      return dn[d.weekday - 1];
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final vals = widget.data.ventasSemana;
+    final data = ref.watch(dashboardProvider);
+    // Para 7D usamos datos del estado base; para otros usamos chartPoints
+    final vals = _period == '7D' && data.chartPoints.isEmpty
+        ? data.ventasSemana
+        : data.chartPoints;
+    final labels = _period == '7D' && data.chartLabels.isEmpty
+        ? _defaultLabels()
+        : data.chartLabels;
+    final total = _period == '7D' && data.chartPoints.isEmpty
+        ? data.totalSemana
+        : data.chartTotal;
+    final prevTotal = _period == '7D' && data.chartPoints.isEmpty
+        ? data.ventasSemanaAnterior
+        : data.chartPrevTotal;
+    final pct = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0.0;
     final maxVal = vals.fold(0.0, (m, v) => v > m ? v : m);
-    final labels = _labels();
-    final total = widget.data.totalSemana;
-    final pct = widget.data.variacionSemana;
+    final loading = data.chartLoading;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -507,10 +561,10 @@ class _ChartState extends State<_Chart> {
           // Header + selector periodo
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Ventas últimos 7 días',
-                  style: TextStyle(
+                  'Ventas ${_period == '7D' ? 'últimos 7 días' : _period}',
+                  style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -518,21 +572,38 @@ class _ChartState extends State<_Chart> {
               ),
               _PeriodSelector(
                 value: _period,
-                onChanged: (v) => setState(() => _period = v),
+                onChanged: (v) {
+                  setState(() => _period = v);
+                  ref.read(dashboardProvider.notifier).loadChartForPeriod(v);
+                },
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            FormatUtils.currency(total),
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          if (pct != 0)
+          loading
+              ? const SizedBox(
+                  height: 30,
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                )
+              : Text(
+                  FormatUtils.currency(total),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+          if (pct != 0 && !loading)
             Row(
               children: [
                 Icon(
