@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/widgets/app_header.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -125,58 +126,56 @@ class KardexScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _Header(
-              total: state.total,
-              onSearch: notifier.setSearch,
-              tipoFilter: state.tipoFilter,
-              onTipo: notifier.setTipo,
+      appBar: const AppHeader(subtitle: 'Kardex'),
+      body: Column(
+        children: [
+          _Header(
+            total: state.total,
+            onSearch: notifier.setSearch,
+            tipoFilter: state.tipoFilter,
+            onTipo: notifier.setTipo,
+          ),
+          if (state.resumen != null && !state.loading)
+            _KpiRow(resumen: state.resumen!),
+          const SizedBox(height: 4),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: state.loading
+                  ? const AppLoading(key: ValueKey('l'))
+                  : state.error != null
+                  ? AppErrorState(
+                      key: const ValueKey('e'),
+                      message: state.error!,
+                      onRetry: () => notifier.load(),
+                    )
+                  : state.items.isEmpty
+                  ? const AppEmptyState(
+                      key: ValueKey('empty'),
+                      icon: Icons.swap_vert_outlined,
+                      title: 'Sin movimientos',
+                      description:
+                          'No hay movimientos con los filtros actuales.',
+                    )
+                  : ListView.builder(
+                      key: const ValueKey('list'),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: state.items.length + 1,
+                      itemBuilder: (_, i) {
+                        if (i == state.items.length) {
+                          return AppPagination(
+                            page: state.page,
+                            totalPages: state.totalPages,
+                            total: state.total,
+                            onPageChange: notifier.setPage,
+                          );
+                        }
+                        return _MovTile(mov: state.items[i]);
+                      },
+                    ),
             ),
-            if (state.resumen != null && !state.loading)
-              _KpiRow(resumen: state.resumen!),
-            const SizedBox(height: 4),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: state.loading
-                    ? const AppLoading(key: ValueKey('l'))
-                    : state.error != null
-                    ? AppErrorState(
-                        key: const ValueKey('e'),
-                        message: state.error!,
-                        onRetry: () => notifier.load(),
-                      )
-                    : state.items.isEmpty
-                    ? const AppEmptyState(
-                        key: ValueKey('empty'),
-                        icon: Icons.swap_vert_outlined,
-                        title: 'Sin movimientos',
-                        description:
-                            'No hay movimientos con los filtros actuales.',
-                      )
-                    : ListView.builder(
-                        key: const ValueKey('list'),
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: state.items.length + 1,
-                        itemBuilder: (_, i) {
-                          if (i == state.items.length) {
-                            return AppPagination(
-                              page: state.page,
-                              totalPages: state.totalPages,
-                              total: state.total,
-                              onPageChange: notifier.setPage,
-                            );
-                          }
-                          return _MovTile(mov: state.items[i]);
-                        },
-                      ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

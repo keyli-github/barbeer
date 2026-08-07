@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
@@ -111,133 +112,124 @@ class SucursalesScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(sucursalesProvider.notifier).load(),
-          child: Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.store_rounded,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                    SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sucursales',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            '${state.total} sedes',
-                            style: AppTextStyles.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (canCreate)
-                      FilledButton.icon(
-                        onPressed: () => _showForm(context, ref, null),
-                        icon: Icon(Icons.add_rounded, size: 18),
-                        label: Text('Nueva'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
+      appBar: const AppHeader(subtitle: 'Sucursales'),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(sucursalesProvider.notifier).load(),
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Icon(Icons.store_rounded, color: AppColors.primary, size: 24),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sucursales',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
                           ),
                         ),
+                        Text(
+                          '${state.total} sedes',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (canCreate)
+                    FilledButton.icon(
+                      onPressed: () => _showForm(context, ref, null),
+                      icon: Icon(Icons.add_rounded, size: 18),
+                      label: Text('Nueva'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-              Expanded(
-                child: state.isLoading
-                    ? AppLoadingIndicator()
-                    : state.error != null
-                    ? AppErrorState(
-                        message: state.error!,
-                        onActionPressed: () =>
-                            ref.read(sucursalesProvider.notifier).load(),
-                      )
-                    : state.sedes.isEmpty
-                    ? AppEmptyState(
-                        icon: Icons.store_outlined,
-                        title: 'Sin sucursales',
-                        message: 'No hay sucursales registradas',
-                      )
-                    : ListView(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _StatChip(
-                                    label: 'Total',
-                                    value: '${state.total}',
-                                    color: AppColors.primary,
-                                  ),
+            ),
+            Expanded(
+              child: state.isLoading
+                  ? AppLoadingIndicator()
+                  : state.error != null
+                  ? AppErrorState(
+                      message: state.error!,
+                      onActionPressed: () =>
+                          ref.read(sucursalesProvider.notifier).load(),
+                    )
+                  : state.sedes.isEmpty
+                  ? AppEmptyState(
+                      icon: Icons.store_outlined,
+                      title: 'Sin sucursales',
+                      message: 'No hay sucursales registradas',
+                    )
+                  : ListView(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _StatChip(
+                                  label: 'Total',
+                                  value: '${state.total}',
+                                  color: AppColors.primary,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _StatChip(
-                                    label: 'Activas',
-                                    value:
-                                        '${state.sedes.where((s) => s['activo'] == true).length}',
-                                    color: AppColors.success,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _StatChip(
-                                    label: 'Inactivas',
-                                    value:
-                                        '${state.sedes.where((s) => s['activo'] != true).length}',
-                                    color: AppColors.textTertiary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          for (final sede in state.sedes)
-                            _SedeTile(
-                              sede: sede,
-                              auth: auth,
-                              onDetail: () => _showDetail(
-                                context,
-                                ref,
-                                sede['id'] as String,
                               ),
-                              onEdit: () => _showForm(context, ref, sede),
-                              onDelete: () => _deleteSede(context, ref, sede),
-                            ),
-                          AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: (p) => ref
-                                .read(sucursalesProvider.notifier)
-                                .load(page: p),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatChip(
+                                  label: 'Activas',
+                                  value:
+                                      '${state.sedes.where((s) => s['activo'] == true).length}',
+                                  color: AppColors.success,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatChip(
+                                  label: 'Inactivas',
+                                  value:
+                                      '${state.sedes.where((s) => s['activo'] != true).length}',
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 80),
-                        ],
-                      ),
-              ),
-            ],
-          ),
+                        ),
+                        for (final sede in state.sedes)
+                          _SedeTile(
+                            sede: sede,
+                            auth: auth,
+                            onDetail: () =>
+                                _showDetail(context, ref, sede['id'] as String),
+                            onEdit: () => _showForm(context, ref, sede),
+                            onDelete: () => _deleteSede(context, ref, sede),
+                          ),
+                        AppPagination(
+                          page: state.page,
+                          totalPages: state.totalPages,
+                          total: state.total,
+                          onPageChange: (p) => ref
+                              .read(sucursalesProvider.notifier)
+                              .load(page: p),
+                        ),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );

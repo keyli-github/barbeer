@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -218,6 +219,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: const AppHeader(subtitle: 'Compras'),
       body: SafeArea(
         bottom: false,
         child: Column(

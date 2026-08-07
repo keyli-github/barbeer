@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_header.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
@@ -16,97 +16,44 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final data = ref.watch(dashboardProvider);
-    final user = auth.user;
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppHeader(subtitle: FormatUtils.roleName(auth.user?.rol ?? '')),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 12,
-            bottom: 120,
-          ),
+          padding: const EdgeInsets.only(bottom: 120),
           children: [
-            // ── Header BarBeer + Superadmin ────────────────────────────────
+            const SizedBox(height: 8),
+            // ── Sede ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: RichText(
-                text: TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: 'Bar',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const TextSpan(
-                      text: 'Beer',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.brand,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '\n${FormatUtils.roleName(user?.rol ?? '')}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.roleColor(user?.rol ?? ''),
-                        height: 1.8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: _Sede(data: data, ref: ref, auth: auth),
             ),
-
-            const SizedBox(height: 12),
-
-            // ── Sede selector compacto ────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _SedeSelector(data: data, ref: ref, auth: auth),
-            ),
-
-            const SizedBox(height: 12),
-
-            // ── KPIs 2×2 compactos ────────────────────────────────────────
+            const SizedBox(height: 14),
+            // ── KPIs ──
             if (!data.loading)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _CompactKpis(data: data, auth: auth, ctx: context),
+                child: _Kpis(data: data, auth: auth),
               )
             else
               _SkeletonKpis(),
-
-            const SizedBox(height: 16),
-
-            // ── Gráfica ventas con filtro ─────────────────────────────────
+            const SizedBox(height: 14),
+            // ── Chart ──
             if (!data.loading &&
                 (auth.hasPermission('ventas:leer') ||
                     auth.hasPermission('ventas:leer-propias')))
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _ChartSection(data: data),
+                child: _Chart(data: data),
               ),
-
-            const SizedBox(height: 16),
-
-            // ── Actividad reciente (4 items + ver más) ────────────────────
-            if (data.audit.isNotEmpty) _ActivitySection(audit: data.audit),
-
-            const SizedBox(height: 16),
-
-            // ── Accesos rápidos ───────────────────────────────────────────
-            _QuickRow(auth: auth),
+            const SizedBox(height: 14),
+            // ── Activity ──
+            if (data.audit.isNotEmpty) _Activity(audit: data.audit),
           ],
         ),
       ),
@@ -116,15 +63,11 @@ class DashboardScreen extends ConsumerWidget {
 
 // ─── Sede selector ────────────────────────────────────────────────────────────
 
-class _SedeSelector extends StatelessWidget {
+class _Sede extends StatelessWidget {
   final DashboardData data;
   final WidgetRef ref;
   final AuthState auth;
-  const _SedeSelector({
-    required this.data,
-    required this.ref,
-    required this.auth,
-  });
+  const _Sede({required this.data, required this.ref, required this.auth});
 
   bool get canSelect =>
       auth.user?.isSuperAdmin == true && data.sedes.isNotEmpty;
@@ -140,24 +83,30 @@ class _SedeSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFECEDF0)),
+          border: Border.all(color: const Color(0xFFEEEFF2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            // Icono sede
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.store_rounded,
                 color: AppColors.primary,
-                size: 20,
+                size: 22,
               ),
             ),
             const SizedBox(width: 10),
@@ -179,10 +128,10 @@ class _SedeSelector extends StatelessWidget {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
+                          shape: BoxShape.circle,
                           color: abierto
                               ? AppColors.success
                               : AppColors.textTertiary,
-                          shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -220,10 +169,10 @@ class _SedeSelector extends StatelessWidget {
     );
   }
 
-  void _pick(BuildContext context) {
+  void _pick(BuildContext ctx) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
-      context: context,
+      context: ctx,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -242,7 +191,7 @@ class _SedeSelector extends StatelessWidget {
               ),
             ),
             const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -251,24 +200,36 @@ class _SedeSelector extends StatelessWidget {
                 ),
               ),
             ),
-            // Opción "Todas"
-            _SedeOpt(
-              name: 'Todas las sedes',
-              selected: data.selectedSedeId == null,
+            ListTile(
+              dense: true,
+              title: const Text('Todas las sedes'),
+              trailing: data.selectedSedeId == null
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    )
+                  : null,
               onTap: () {
                 ref.read(dashboardProvider.notifier).selectSede(null);
-                Navigator.pop(context);
+                Navigator.pop(ctx);
               },
             ),
             ...data.sedes.map(
-              (s) => _SedeOpt(
-                name: s.nombre,
-                code: s.codigo,
-                active: s.activo,
-                selected: data.selectedSedeId == s.id,
+              (s) => ListTile(
+                dense: true,
+                title: Text(s.nombre),
+                subtitle: Text(s.codigo, style: const TextStyle(fontSize: 11)),
+                trailing: data.selectedSedeId == s.id
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 18,
+                        color: AppColors.primary,
+                      )
+                    : null,
                 onTap: () {
                   ref.read(dashboardProvider.notifier).selectSede(s.id);
-                  Navigator.pop(context);
+                  Navigator.pop(ctx);
                 },
               ),
             ),
@@ -280,139 +241,91 @@ class _SedeSelector extends StatelessWidget {
   }
 }
 
-class _SedeOpt extends StatelessWidget {
-  final String name;
-  final String? code;
-  final bool active, selected;
-  final VoidCallback onTap;
-  const _SedeOpt({
-    required this.name,
-    this.code,
-    this.active = true,
-    required this.selected,
-    required this.onTap,
-  });
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              name,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
-          ),
-          if (code != null)
-            Text(
-              code!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textTertiary,
-              ),
-            ),
-          const SizedBox(width: 8),
-          if (selected)
-            const Icon(Icons.check_rounded, size: 18, color: AppColors.primary),
-        ],
-      ),
-    ),
-  );
-}
+// ─── KPIs 2×2 blancos, iconos encirculados ────────────────────────────────────
 
-// ─── KPIs 2×2 compactos ───────────────────────────────────────────────────────
-
-class _CompactKpis extends StatelessWidget {
+class _Kpis extends StatelessWidget {
   final DashboardData data;
   final AuthState auth;
-  final BuildContext ctx;
-  const _CompactKpis({
-    required this.data,
-    required this.auth,
-    required this.ctx,
-  });
+  const _Kpis({required this.data, required this.auth});
 
   @override
   Widget build(BuildContext context) {
-    final items = <_K>[];
-
+    final items = <_KD>[];
     if (auth.hasPermission('ventas:leer') ||
         auth.hasPermission('ventas:leer-propias')) {
-      final pct = data.variacionVsAyer;
+      final p = data.variacionVsAyer;
       items.add(
-        _K(
-          icon: Icons.bar_chart_rounded,
-          iconColor: AppColors.primary,
-          label: 'Ventas del día',
-          value: FormatUtils.currency(data.ventasHoy),
-          sub: pct != 0
-              ? '↑ ${pct.abs().toStringAsFixed(1)}% vs ayer'
+        _KD(
+          Icons.bar_chart_rounded,
+          const Color(0xFF2563EB),
+          const Color(0xFFEFF6FF),
+          'Ventas del día',
+          FormatUtils.currency(data.ventasHoy),
+          p != 0
+              ? '↑ ${p.abs().toStringAsFixed(1)}% vs ayer'
               : '${data.ventasCountHoy} ventas',
-          subOk: pct >= 0,
-          path: '/ventas',
+          p >= 0,
+          '/ventas',
         ),
       );
     }
     if (auth.hasPermission('caja:leer')) {
       items.add(
-        _K(
-          icon: Icons.account_balance_wallet_rounded,
-          iconColor: const Color(0xFFFF9500),
-          label: 'Caja activa',
-          value: data.cajaActual?.isAbierta == true
+        _KD(
+          Icons.account_balance_wallet_rounded,
+          const Color(0xFFFF9500),
+          const Color(0xFFFFF8EE),
+          'Caja activa',
+          data.cajaActual?.isAbierta == true
               ? FormatUtils.currency(data.cajaActual!.montoApertura)
               : 'Cerrada',
-          sub: data.cajaActual?.isAbierta == true
+          data.cajaActual?.isAbierta == true
               ? 'En ${data.cajaAperturas} apertura${data.cajaAperturas != 1 ? 's' : ''}'
               : 'Sin turno',
-          subOk: data.cajaActual?.isAbierta == true,
-          path: '/caja',
+          data.cajaActual?.isAbierta == true,
+          '/caja',
         ),
       );
     }
     if (auth.hasPermission('inventario:leer')) {
       items.add(
-        _K(
-          icon: Icons.inventory_2_rounded,
-          iconColor: data.stockBajo > 0 ? AppColors.error : AppColors.success,
-          label: 'Stock bajo',
-          value: '${data.stockBajo}',
-          sub: data.stockBajo > 0 ? 'Ver productos' : 'Todo OK',
-          subOk: data.stockBajo == 0,
-          path: '/inventario',
+        _KD(
+          Icons.inventory_2_rounded,
+          data.stockBajo > 0 ? AppColors.error : AppColors.success,
+          data.stockBajo > 0 ? AppColors.errorLight : AppColors.successLight,
+          'Stock bajo',
+          '${data.stockBajo}',
+          data.stockBajo > 0 ? 'Ver productos' : 'Todo OK',
+          data.stockBajo == 0,
+          '/inventario',
         ),
       );
     }
     if (auth.hasPermission('establecimientos:leer') && data.sedesTotal > 0) {
       items.add(
-        _K(
-          icon: Icons.store_rounded,
-          iconColor: AppColors.success,
-          label: 'Sedes activas',
-          value: '${data.sedesActivas} / ${data.sedesTotal}',
-          sub:
-              '${(data.sedesActivas / data.sedesTotal * 100).round()}% operativas',
-          subOk: true,
-          path: '/sucursales',
+        _KD(
+          Icons.store_rounded,
+          AppColors.success,
+          AppColors.successLight,
+          'Sedes activas',
+          '${data.sedesActivas} / ${data.sedesTotal}',
+          '${(data.sedesActivas / data.sedesTotal * 100).round()}% operativas',
+          true,
+          '/sucursales',
         ),
       );
     }
-    // Vendedora/cajero: total mes
     if (items.length < 4 && data.misVentasMes > 0) {
       items.add(
-        _K(
-          icon: Icons.calendar_month_rounded,
-          iconColor: AppColors.info,
-          label: 'Total mes',
-          value: FormatUtils.currency(data.misTotalesMes),
-          sub: '${data.misVentasMes} ventas',
-          subOk: true,
-          path: '/ventas',
+        _KD(
+          Icons.calendar_month_rounded,
+          AppColors.info,
+          AppColors.infoLight,
+          'Total mes',
+          FormatUtils.currency(data.misTotalesMes),
+          '${data.misVentasMes} ventas',
+          true,
+          '/ventas',
         ),
       );
     }
@@ -425,7 +338,7 @@ class _CompactKpis extends StatelessWidget {
           .map(
             (k) => SizedBox(
               width: (MediaQuery.of(context).size.width - 50) / 2,
-              child: _KpiTile(k: k, ctx: ctx),
+              child: _KpiCard(k: k),
             ),
           )
           .toList(),
@@ -433,61 +346,69 @@ class _CompactKpis extends StatelessWidget {
   }
 }
 
-class _K {
+class _KD {
   final IconData icon;
-  final Color iconColor;
+  final Color iconColor, iconBg;
   final String label, value, sub, path;
   final bool subOk;
-  const _K({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.sub,
-    required this.subOk,
-    required this.path,
-  });
+  const _KD(
+    this.icon,
+    this.iconColor,
+    this.iconBg,
+    this.label,
+    this.value,
+    this.sub,
+    this.subOk,
+    this.path,
+  );
 }
 
-class _KpiTile extends StatelessWidget {
-  final _K k;
-  final BuildContext ctx;
-  const _KpiTile({required this.k, required this.ctx});
+class _KpiCard extends StatelessWidget {
+  final _KD k;
+  const _KpiCard({required this.k});
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: () {
       HapticFeedback.lightImpact();
-      GoRouter.of(ctx).go(k.path);
+      GoRouter.of(context).go(k.path);
     },
     child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFECEDF0)),
+        border: Border.all(color: const Color(0xFFEEEFF2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(k.icon, size: 18, color: k.iconColor),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  k.label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+          // Icono encirculado
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: k.iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(k.icon, size: 17, color: k.iconColor),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          Text(
+            k.label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
           Text(
             k.value,
             style: const TextStyle(
@@ -505,11 +426,10 @@ class _KpiTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w500,
-              color: k.sub.startsWith('Ver')
+              color: k.sub.contains('Ver')
                   ? AppColors.primary
                   : (k.subOk ? AppColors.success : AppColors.error),
             ),
-            maxLines: 1,
           ),
         ],
       ),
@@ -528,9 +448,9 @@ class _SkeletonKpis extends StatelessWidget {
         4,
         (_) => Container(
           width: (MediaQuery.of(context).size.width - 50) / 2,
-          height: 80,
+          height: 100,
           decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
+            color: const Color(0xFFF5F6F8),
             borderRadius: BorderRadius.circular(14),
           ),
         ),
@@ -539,11 +459,17 @@ class _SkeletonKpis extends StatelessWidget {
   );
 }
 
-// ─── Gráfica con filtro de periodo ────────────────────────────────────────────
+// ─── Gráfica con selector de periodo ──────────────────────────────────────────
 
-class _ChartSection extends StatelessWidget {
+class _Chart extends StatefulWidget {
   final DashboardData data;
-  const _ChartSection({required this.data});
+  const _Chart({required this.data});
+  @override
+  State<_Chart> createState() => _ChartState();
+}
+
+class _ChartState extends State<_Chart> {
+  String _period = '7D';
 
   static const _days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
   List<String> _labels() {
@@ -556,23 +482,30 @@ class _ChartSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vals = data.ventasSemana;
+    final vals = widget.data.ventasSemana;
     final maxVal = vals.fold(0.0, (m, v) => v > m ? v : m);
     final labels = _labels();
-    final total = data.totalSemana;
-    final pct = data.variacionSemana;
+    final total = widget.data.totalSemana;
+    final pct = widget.data.variacionSemana;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFECEDF0)),
+        border: Border.all(color: const Color(0xFFEEEFF2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header + selector periodo
           Row(
             children: [
               const Expanded(
@@ -584,27 +517,13 @@ class _ChartSection extends StatelessWidget {
                   ),
                 ),
               ),
-              // Selector de periodo (visual — solo 7D activo por ahora)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFE0E2E6)),
-                ),
-                child: const Text(
-                  '7D',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
+              _PeriodSelector(
+                value: _period,
+                onChanged: (v) => setState(() => _period = v),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          // Total
           Text(
             FormatUtils.currency(total),
             style: const TextStyle(
@@ -633,10 +552,9 @@ class _ChartSection extends StatelessWidget {
                 ),
               ],
             ),
-          const SizedBox(height: 12),
-          // Barras
+          const SizedBox(height: 14),
           SizedBox(
-            height: 110,
+            height: 120,
             child: BarChart(
               BarChartData(
                 maxY: maxVal == 0 ? 100 : maxVal * 1.3,
@@ -646,7 +564,7 @@ class _ChartSection extends StatelessWidget {
                   drawVerticalLine: false,
                   horizontalInterval: maxVal == 0 ? 50 : maxVal * 1.3 / 3,
                   getDrawingHorizontalLine: (_) =>
-                      const FlLine(color: Color(0xFFECEDF0), strokeWidth: 0.7),
+                      const FlLine(color: Color(0xFFF0F1F3), strokeWidth: 0.7),
                 ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
@@ -705,7 +623,7 @@ class _ChartSection extends StatelessWidget {
                         toY: vals[i],
                         color: i == 6
                             ? AppColors.primary
-                            : AppColors.primary.withValues(alpha: 0.22),
+                            : AppColors.primary.withValues(alpha: 0.25),
                         width: 24,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(6),
@@ -713,7 +631,7 @@ class _ChartSection extends StatelessWidget {
                         backDrawRodData: BackgroundBarChartRodData(
                           show: true,
                           toY: maxVal == 0 ? 100 : maxVal * 1.3,
-                          color: const Color(0xFFF0F1F3),
+                          color: const Color(0xFFF5F6FA),
                         ),
                       ),
                     ],
@@ -743,11 +661,69 @@ class _ChartSection extends StatelessWidget {
   }
 }
 
-// ─── Actividad reciente (4 items max + ver más) ───────────────────────────────
+class _PeriodSelector extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  const _PeriodSelector({required this.value, required this.onChanged});
 
-class _ActivitySection extends StatelessWidget {
+  static const _options = ['7D', '1M', '3M', '6M', '1A'];
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<String>(
+    onSelected: onChanged,
+    offset: const Offset(0, 36),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    itemBuilder: (_) => _options
+        .map(
+          (o) => PopupMenuItem(
+            value: o,
+            height: 36,
+            child: Text(
+              o,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: value == o ? FontWeight.w700 : FontWeight.w400,
+                color: value == o ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        )
+        .toList(),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDDDFE3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 2),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 14,
+            color: AppColors.textTertiary,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// ─── Actividad reciente — 4 items + ver más ──────────────────────────────────
+
+class _Activity extends StatelessWidget {
   final List<Map<String, dynamic>> audit;
-  const _ActivitySection({required this.audit});
+  const _Activity({required this.audit});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -781,7 +757,7 @@ class _ActivitySection extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         ...audit.take(4).map((log) {
           final accion = log['accion'] as String? ?? '';
           final user = log['username'] as String? ?? '';
@@ -790,22 +766,19 @@ class _ActivitySection extends StatelessWidget {
           try {
             dt = ts != null ? DateTime.parse(ts) : null;
           } catch (_) {}
+          final c = _color(accion);
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceAlt,
-                    borderRadius: BorderRadius.circular(8),
+                    color: c.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    _actIcon(accion),
-                    size: 15,
-                    color: _actColor(accion),
-                  ),
+                  child: Icon(_icon(accion), size: 16, color: c),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -848,7 +821,7 @@ class _ActivitySection extends StatelessWidget {
     ),
   );
 
-  static IconData _actIcon(String a) {
+  static IconData _icon(String a) {
     if (a.contains('COMPRA')) return Icons.local_shipping_rounded;
     if (a.contains('STOCK')) return Icons.warning_rounded;
     if (a.contains('CAJA')) return Icons.account_balance_wallet_rounded;
@@ -856,117 +829,10 @@ class _ActivitySection extends StatelessWidget {
     return Icons.history_rounded;
   }
 
-  static Color _actColor(String a) {
+  static Color _color(String a) {
     if (a.contains('ELIMINAR')) return AppColors.error;
     if (a.contains('STOCK')) return AppColors.warning;
     if (a.contains('CREAR')) return AppColors.success;
     return AppColors.primary;
   }
-}
-
-// ─── Accesos rápidos ──────────────────────────────────────────────────────────
-
-class _QuickRow extends StatelessWidget {
-  final AuthState auth;
-  const _QuickRow({required this.auth});
-  @override
-  Widget build(BuildContext context) {
-    final items = <_QA>[];
-    if (auth.hasPermission('ventas:leer') ||
-        auth.hasPermission('ventas:leer-propias'))
-      items.add(
-        _QA(
-          'Ventas',
-          Icons.shopping_cart_rounded,
-          AppColors.primary,
-          '/ventas',
-        ),
-      );
-    if (auth.hasPermission('productos:crear'))
-      items.add(
-        _QA('Productos', Icons.liquor_rounded, AppColors.brand, '/productos'),
-      );
-    if (auth.hasPermission('inventario:leer'))
-      items.add(
-        _QA(
-          'Inventario',
-          Icons.inventory_2_rounded,
-          AppColors.success,
-          '/inventario',
-        ),
-      );
-    if (auth.hasPermission('caja:leer'))
-      items.add(
-        _QA(
-          'Arqueo',
-          Icons.account_balance_wallet_rounded,
-          const Color(0xFFFF9500),
-          '/caja',
-        ),
-      );
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Accesos rápidos',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: items
-                .take(4)
-                .map(
-                  (a) => Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        GoRouter.of(context).go(a.path);
-                      },
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: a.color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(a.icon, color: a.color, size: 22),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            a.label,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QA {
-  final String label, path;
-  final IconData icon;
-  final Color color;
-  const _QA(this.label, this.icon, this.color, this.path);
 }

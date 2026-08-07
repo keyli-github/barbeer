@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -143,6 +144,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: const AppHeader(subtitle: 'Billeteras'),
       body: SafeArea(
         bottom: false,
         child: Column(

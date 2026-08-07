@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/widgets/app_header.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
@@ -144,61 +145,58 @@ class InventarioScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _Header(
-              total: state.total,
-              onSearch: notifier.setSearch,
-              estadoFilter: state.estadoFilter,
-              onEstado: notifier.setEstado,
-            ),
-            if (state.resumen != null && !state.loading)
-              _KpiRow(resumen: state.resumen!),
-            const SizedBox(height: 4),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: state.loading
-                    ? const AppLoading(key: ValueKey('l'))
-                    : state.error != null
-                    ? AppErrorState(
-                        key: const ValueKey('e'),
-                        message: state.error!,
-                        onRetry: () => notifier.load(),
-                      )
-                    : state.items.isEmpty
-                    ? const AppEmptyState(
-                        key: ValueKey('empty'),
-                        icon: Icons.inventory_2_outlined,
-                        title: 'Sin productos en inventario',
-                      )
-                    : ListView.builder(
-                        key: const ValueKey('list'),
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: state.items.length + 1,
-                        itemBuilder: (_, i) {
-                          if (i == state.items.length) {
-                            return AppPagination(
-                              page: state.page,
-                              totalPages: state.totalPages,
-                              total: state.total,
-                              onPageChange: notifier.setPage,
-                            );
-                          }
-                          return _InventarioTile(
-                            item: state.items[i],
-                            canEdit: canEdit,
-                            onAdjust: () =>
-                                _showAdjust(context, ref, state.items[i]),
+      appBar: const AppHeader(subtitle: 'Inventario'),
+      body: Column(
+        children: [
+          _SearchBar(
+            onSearch: notifier.setSearch,
+            estadoFilter: state.estadoFilter,
+            onEstado: notifier.setEstado,
+          ),
+          if (state.resumen != null && !state.loading)
+            _KpiRow(resumen: state.resumen!),
+          const SizedBox(height: 4),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: state.loading
+                  ? const AppLoading(key: ValueKey('l'))
+                  : state.error != null
+                  ? AppErrorState(
+                      key: const ValueKey('e'),
+                      message: state.error!,
+                      onRetry: () => notifier.load(),
+                    )
+                  : state.items.isEmpty
+                  ? const AppEmptyState(
+                      key: ValueKey('empty'),
+                      icon: Icons.inventory_2_outlined,
+                      title: 'Sin productos en inventario',
+                    )
+                  : ListView.builder(
+                      key: const ValueKey('list'),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: state.items.length + 1,
+                      itemBuilder: (_, i) {
+                        if (i == state.items.length) {
+                          return AppPagination(
+                            page: state.page,
+                            totalPages: state.totalPages,
+                            total: state.total,
+                            onPageChange: notifier.setPage,
                           );
-                        },
-                      ),
-              ),
+                        }
+                        return _InventarioTile(
+                          item: state.items[i],
+                          canEdit: canEdit,
+                          onAdjust: () =>
+                              _showAdjust(context, ref, state.items[i]),
+                        );
+                      },
+                    ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -217,6 +215,111 @@ class InventarioScreen extends ConsumerWidget {
   }
 }
 
+// ─── Barra de búsqueda + filtros (sin título, ya está en AppHeader) ────────────
+
+class _SearchBar extends StatefulWidget {
+  final ValueChanged<String> onSearch, onEstado;
+  final String estadoFilter;
+  const _SearchBar({
+    required this.onSearch,
+    required this.estadoFilter,
+    required this.onEstado,
+  });
+
+  @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.background,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+            child: TextField(
+              controller: _ctrl,
+              onChanged: widget.onSearch,
+              decoration: const InputDecoration(
+                hintText: 'Buscar por nombre o código...',
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textTertiary,
+                  size: 18,
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                for (final e in [
+                  ('', 'Todos'),
+                  ('OK', 'OK'),
+                  ('ALERTA', 'Alerta'),
+                  ('CRITICO', 'Crítico'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => widget.onEstado(e.$1),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.estadoFilter == e.$1
+                              ? AppColors.primarySurface
+                              : AppColors.backgroundAlt,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: widget.estadoFilter == e.$1
+                                ? AppColors.primaryBorder
+                                : AppColors.border,
+                          ),
+                        ),
+                        child: Text(
+                          e.$2,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: widget.estadoFilter == e.$1
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: widget.estadoFilter == e.$1
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Header viejo (mantenido por compatibilidad, ya no se usa) ────────────────
 class _Header extends StatefulWidget {
   final int total;
   final ValueChanged<String> onSearch, onEstado;

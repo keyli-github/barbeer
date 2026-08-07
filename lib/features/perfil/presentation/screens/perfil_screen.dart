@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
@@ -35,19 +36,11 @@ class PerfilScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: const AppHeader(subtitle: 'Perfil'),
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
           slivers: [
-            SliverAppBar(
-              floating: true,
-              snap: true,
-              backgroundColor: AppColors.background,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              automaticallyImplyLeading: false,
-              title: const Text('Mi perfil', style: AppTextStyles.appBarTitle),
-            ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,

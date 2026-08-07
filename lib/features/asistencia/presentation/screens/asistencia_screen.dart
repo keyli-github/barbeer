@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/network/api_client.dart';
@@ -159,6 +160,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: const AppHeader(subtitle: 'Asistencia'),
       body: SafeArea(
         bottom: false,
         child: Column(

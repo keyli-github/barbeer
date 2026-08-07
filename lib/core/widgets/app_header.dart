@@ -1,84 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_spacing.dart';
 
-/// AppHeader unificado para toda la aplicación BarBeer
+/// Header global fijo BarBeer — siempre visible, no se va con scroll.
 ///
-/// - Pantallas principales (isMainScreen=true): logo BarBeer + hamburger si hay drawer
-/// - Subpantallas: flecha atrás + título + acciones
-///
-/// El hamburger detecta el drawer via [DrawerScope] (propagado desde ShellScreen),
-/// no via Scaffold.maybeOf — esto garantiza que funcione aunque la pantalla
-/// tenga su propio Scaffold interno (sin drawer).
+/// En Inicio muestra el rol (Superadmin en naranja).
+/// En otras pantallas muestra el nombre del módulo (Ventas, Caja, etc.)
+/// Subpantallas: flecha ← + título.
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
-  final String title;
-  final String? subtitle;
+  final String? subtitle; // Superadmin, Ventas, Caja...
   final bool showBackButton;
   final VoidCallback? onBackTap;
   final List<Widget>? actions;
-  final Widget? leading;
-  final Color? backgroundColor;
-  final bool showShadow;
-  final bool centerTitle;
-  final bool isMainScreen;
 
   const AppHeader({
     super.key,
-    required this.title,
     this.subtitle,
     this.showBackButton = false,
     this.onBackTap,
     this.actions,
-    this.leading,
-    this.backgroundColor,
-    this.showShadow = false,
-    this.centerTitle = false,
-    this.isMainScreen = false,
   });
 
+  // Shortcuts para módulos
+  const AppHeader.module(String moduleName, {super.key, this.actions})
+    : subtitle = moduleName,
+      showBackButton = false,
+      onBackTap = null;
+
+  const AppHeader.back(String title, {super.key, this.onBackTap, this.actions})
+    : subtitle = title,
+      showBackButton = true;
+
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(56);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: showShadow ? AppColors.border : Colors.transparent,
-            width: 0.75,
-          ),
-        ),
-      ),
+      color: Colors.white,
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: kToolbarHeight,
+          height: 56,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                // ── Leading ──────────────────────────────────────────────
-                _buildLeading(context),
+                // ── Leading ──
+                if (showBackButton)
+                  _BackBtn(
+                    onTap: onBackTap ?? () => Navigator.of(context).pop(),
+                  )
+                else
+                  const SizedBox(width: 4),
 
-                // ── Título ───────────────────────────────────────────────
+                // ── BarBeer + subtítulo ──
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: isMainScreen ? _buildBrandTitle() : _buildTitle(),
-                  ),
+                  child: showBackButton
+                      ? Text(
+                          subtitle ?? '',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.3,
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            RichText(
+                              text: const TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Bar',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.textPrimary,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: 'Beer',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.brand,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (subtitle != null)
+                              Text(
+                                subtitle!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.brand,
+                                  height: 1.3,
+                                ),
+                              ),
+                          ],
+                        ),
                 ),
 
-                // ── Acciones ─────────────────────────────────────────────
-                if (actions != null)
-                  ...actions!.map(
-                    (a) => Padding(
-                      padding: const EdgeInsets.only(left: 2),
-                      child: a,
-                    ),
-                  ),
+                // ── Actions ──
+                if (actions != null) ...actions!,
               ],
             ),
           ),
@@ -86,133 +117,28 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
-
-  Widget _buildLeading(BuildContext context) {
-    if (leading != null) return leading!;
-
-    // Subpantalla → flecha atrás
-    if (showBackButton) {
-      return _HeaderBtn(
-        icon: Icons.arrow_back_ios_new_rounded,
-        onTap: onBackTap ?? () => Navigator.of(context).pop(),
-      );
-    }
-
-    // Pantallas principales → sin hamburger, solo espacio
-    return const SizedBox(width: 8);
-  }
-
-  Widget _buildBrandTitle() {
-    return Row(
-      children: [
-        RichText(
-          text: const TextSpan(
-            children: [
-              TextSpan(
-                text: 'Bar',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              TextSpan(
-                text: 'Beer',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.brand,
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.brand.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: AppColors.brand,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildTitle() {
-    if (subtitle != null) {
-      return Column(
-        crossAxisAlignment: centerTitle
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.3,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            subtitle!,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      );
-    }
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-        letterSpacing: -0.3,
-      ),
-      overflow: TextOverflow.ellipsis,
-    );
-  }
 }
 
-// ─── Botón de header compacto (hamburger / flecha) ────────────────────────────
-
-class _HeaderBtn extends StatelessWidget {
-  final IconData icon;
+class _BackBtn extends StatelessWidget {
   final VoidCallback onTap;
-
-  const _HeaderBtn({required this.icon, required this.onTap});
-
+  const _BackBtn({required this.onTap});
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 44,
-        height: 44,
-        child: Center(
-          child: Icon(icon, size: 22, color: AppColors.textPrimary),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () {
+      HapticFeedback.lightImpact();
+      onTap();
+    },
+    behavior: HitTestBehavior.opaque,
+    child: const SizedBox(
+      width: 44,
+      height: 44,
+      child: Center(
+        child: Icon(
+          Icons.arrow_back_ios_new_rounded,
+          size: 18,
+          color: AppColors.textPrimary,
         ),
       ),
-    );
-  }
+    ),
+  );
 }

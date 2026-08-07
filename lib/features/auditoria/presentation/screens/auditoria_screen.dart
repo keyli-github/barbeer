@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
@@ -115,120 +116,118 @@ class AuditoriaScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Container(
-              color: AppColors.background,
-              child: Column(
-                children: [
+      appBar: const AppHeader(subtitle: 'Auditoría'),
+      body: Column(
+        children: [
+          Container(
+            color: AppColors.background,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.history_rounded,
+                        color: AppColors.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Auditoria',
+                          style: AppTextStyles.headlineLarge,
+                        ),
+                      ),
+                      Text(
+                        '${state.total} registros',
+                        style: AppTextStyles.bodySmall,
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.filter_list_rounded,
+                          color: AppColors.primary,
+                        ),
+                        onPressed: () => _showFilters(context, ref, state),
+                      ),
+                    ],
+                  ),
+                ),
+                if (state.accionFilter != null || state.entidadFilter != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.history_rounded,
-                          color: AppColors.primary,
-                          size: 24,
+                        const Text(
+                          'Filtros activos: ',
+                          style: AppTextStyles.labelSmall,
                         ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Auditoria',
-                            style: AppTextStyles.headlineLarge,
+                        if (state.accionFilter != null)
+                          _FilterChip(
+                            label: state.accionFilter!,
+                            onRemove: () => ref
+                                .read(auditoriaProvider.notifier)
+                                .setFilters(entidad: state.entidadFilter),
                           ),
-                        ),
-                        Text(
-                          '${state.total} registros',
-                          style: AppTextStyles.bodySmall,
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.filter_list_rounded,
-                            color: AppColors.primary,
+                        if (state.entidadFilter != null)
+                          _FilterChip(
+                            label: state.entidadFilter!,
+                            onRemove: () => ref
+                                .read(auditoriaProvider.notifier)
+                                .setFilters(accion: state.accionFilter),
                           ),
-                          onPressed: () => _showFilters(context, ref, state),
-                        ),
                       ],
                     ),
                   ),
-                  if (state.accionFilter != null || state.entidadFilter != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Filtros activos: ',
-                            style: AppTextStyles.labelSmall,
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => ref.read(auditoriaProvider.notifier).load(),
+              child: state.isLoading
+                  ? const AppLoading()
+                  : state.error != null
+                  ? AppErrorState(
+                      message: state.error!,
+                      onRetry: () =>
+                          ref.read(auditoriaProvider.notifier).load(),
+                    )
+                  : state.logs.isEmpty
+                  ? const AppEmptyState(
+                      icon: Icons.history_outlined,
+                      title: 'Sin registros de auditoria',
+                    )
+                  : ListView(
+                      children: [
+                        const SizedBox(height: 8),
+                        for (final log in state.logs)
+                          _LogTile(
+                            log: log,
+                            onTap: () => _showDetail(context, log),
                           ),
-                          if (state.accionFilter != null)
-                            _FilterChip(
-                              label: state.accionFilter!,
-                              onRemove: () => ref
-                                  .read(auditoriaProvider.notifier)
-                                  .setFilters(entidad: state.entidadFilter),
-                            ),
-                          if (state.entidadFilter != null)
-                            _FilterChip(
-                              label: state.entidadFilter!,
-                              onRemove: () => ref
-                                  .read(auditoriaProvider.notifier)
-                                  .setFilters(accion: state.accionFilter),
-                            ),
-                        ],
-                      ),
+                        AppPagination(
+                          page: state.page,
+                          totalPages: state.totalPages,
+                          total: state.total,
+                          onPageChange: (p) {
+                            final s = ref.read(auditoriaProvider);
+                            ref
+                                .read(auditoriaProvider.notifier)
+                                .setFilters(
+                                  accion: s.accionFilter,
+                                  entidad: s.entidadFilter,
+                                );
+                          },
+                        ),
+                        const SizedBox(height: 80),
+                      ],
                     ),
-                ],
-              ),
             ),
-            Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () => ref.read(auditoriaProvider.notifier).load(),
-                child: state.isLoading
-                    ? const AppLoading()
-                    : state.error != null
-                    ? AppErrorState(
-                        message: state.error!,
-                        onRetry: () =>
-                            ref.read(auditoriaProvider.notifier).load(),
-                      )
-                    : state.logs.isEmpty
-                    ? const AppEmptyState(
-                        icon: Icons.history_outlined,
-                        title: 'Sin registros de auditoria',
-                      )
-                    : ListView(
-                        children: [
-                          const SizedBox(height: 8),
-                          for (final log in state.logs)
-                            _LogTile(
-                              log: log,
-                              onTap: () => _showDetail(context, log),
-                            ),
-                          AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: (p) {
-                              final s = ref.read(auditoriaProvider);
-                              ref
-                                  .read(auditoriaProvider.notifier)
-                                  .setFilters(
-                                    accion: s.accionFilter,
-                                    entidad: s.entidadFilter,
-                                  );
-                            },
-                          ),
-                          const SizedBox(height: 80),
-                        ],
-                      ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

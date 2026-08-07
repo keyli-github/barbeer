@@ -159,9 +159,7 @@ class ProductosScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppHeader(
-        title: 'Productos',
-        subtitle: state.total > 0 ? '${state.total} productos' : null,
-
+        subtitle: 'Productos',
         actions: [
           if (canCreate)
             IconButton(
