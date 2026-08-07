@@ -35,8 +35,9 @@ class Proveedor {
         ? null
         : j['email'] as String?,
     activo: j['activo'] as bool? ?? true,
-    ordenes: (j['ordenes'] as num?)?.toInt() ?? 0,
-    total: (j['total'] as num?)?.toDouble() ?? 0,
+    // ordenes y total pueden venir como Map en algunos endpoints
+    ordenes: j['ordenes'] is num ? (j['ordenes'] as num).toInt() : 0,
+    total: j['total'] is num ? (j['total'] as num).toDouble() : 0,
   );
 }
 
@@ -55,8 +56,11 @@ class CompraItem {
   factory CompraItem.fromJson(Map<String, dynamic> j) => CompraItem(
     id: j['id'] as String? ?? '',
     productoId: j['productoId'] as String? ?? '',
-    codigo: j['codigo'] as String? ?? '',
-    producto: j['producto'] as String? ?? '',
+    codigo: j['codigo'] is String ? j['codigo'] as String : '',
+    // 'producto' puede venir como String o como Map {nombre:...}
+    producto: j['producto'] is Map
+        ? ((j['producto'] as Map)['nombre'] as String? ?? '')
+        : j['producto'] as String? ?? '',
     cantidad: (j['cantidad'] as num?)?.toDouble() ?? 0,
     costoUnit: (j['costoUnit'] as num?)?.toDouble() ?? 0,
     subtotal: (j['subtotal'] as num?)?.toDouble() ?? 0,
@@ -97,10 +101,16 @@ class Compra {
     id: j['id'] as String? ?? '',
     orden: j['orden'] as String? ?? '',
     fecha: j['fecha'] as String? ?? '',
-    proveedor: j['proveedor'] as String? ?? '',
+    // 'proveedor' puede venir como String o como Map {nombre:...}
+    proveedor: j['proveedor'] is Map
+        ? ((j['proveedor'] as Map)['nombre'] as String? ?? '')
+        : j['proveedor'] as String? ?? '',
     proveedorId: j['proveedorId'] as String? ?? '',
     estado: j['estado'] as String? ?? 'PENDIENTE',
-    solicitadoPor: j['solicitadoPor'] as String? ?? '',
+    // 'solicitadoPor' puede venir como String o Map {username:...}
+    solicitadoPor: j['solicitadoPor'] is Map
+        ? ((j['solicitadoPor'] as Map)['username'] as String? ?? '')
+        : j['solicitadoPor'] as String? ?? '',
     notas: j['notas'] as String? ?? '',
     articulos: (j['articulos'] as num?)?.toInt() ?? 0,
     total: (j['total'] as num?)?.toDouble() ?? 0,
@@ -108,9 +118,8 @@ class Compra {
     recibidaAt: j['recibidaAt'] as String?,
     items: j['items'] is List
         ? (j['items'] as List)
-              .map(
-                (e) => CompraItem.fromJson(Map<String, dynamic>.from(e as Map)),
-              )
+              .whereType<Map>()
+              .map((e) => CompraItem.fromJson(Map<String, dynamic>.from(e)))
               .toList()
         : null,
   );

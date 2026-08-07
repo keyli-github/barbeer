@@ -10,6 +10,8 @@ class DashboardData {
   final double misTotalesHoy;
   final int misVentasMes;
   final double misTotalesMes;
+  // Ventas últimos 7 días para gráfica (index 0 = hace 6 días, 6 = hoy)
+  final List<double> ventasUltimos7Dias;
   const DashboardData({
     this.roles = const [],
     this.sedes = const [],
@@ -20,6 +22,7 @@ class DashboardData {
     this.misTotalesHoy = 0,
     this.misVentasMes = 0,
     this.misTotalesMes = 0,
+    this.ventasUltimos7Dias = const [0, 0, 0, 0, 0, 0, 0],
   });
 }
 
@@ -68,6 +71,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     double misTotalesHoy = 0;
     int misVentasMes = 0;
     double misTotalesMes = 0;
+    List<double> ventasUltimos7Dias = List<double>.filled(7, 0);
 
     final canLeerPropias = _permissions.contains('ventas:leer-propias');
     final canLeerTodas = _permissions.contains('ventas:leer');
@@ -79,7 +83,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
             : ApiConstants.ventas;
         final resp = await _api.get(
           endpoint,
-          queryParameters: {'limite': 100, 'pagina': 1},
+          queryParameters: {'limite': 200, 'pagina': 1},
         );
         final body = resp.data;
         if (body is Map) {
@@ -97,11 +101,15 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
               dt = DateTime.parse(v['createdAt'] as String? ?? '');
             } catch (_) {}
             if (dt == null) continue;
-            if (!dt.isBefore(hoy)) {
+            final diaNorm = DateTime(dt.year, dt.month, dt.day);
+            final diff = hoy.difference(diaNorm).inDays;
+            // Gráfica últimos 7 días
+            if (diff >= 0 && diff < 7) ventasUltimos7Dias[6 - diff] += total;
+            if (!diaNorm.isBefore(hoy)) {
               misVentasHoy++;
               misTotalesHoy += total;
             }
-            if (!dt.isBefore(mes)) {
+            if (!diaNorm.isBefore(mes)) {
               misVentasMes++;
               misTotalesMes += total;
             }
@@ -139,6 +147,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         misTotalesHoy: misTotalesHoy,
         misVentasMes: misVentasMes,
         misTotalesMes: misTotalesMes,
+        ventasUltimos7Dias: ventasUltimos7Dias,
       ),
     );
   }

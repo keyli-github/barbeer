@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/ds_card.dart';
+import '../../../../core/widgets/ds_chart.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../../core/widgets/ds_list_tile.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -382,6 +383,19 @@ class _CajeroContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
         ],
 
+        // ── Gráfica cajero ───────────────────────────────────────────────
+        if (data != null && data.ventasUltimos7Dias.any((v) => v > 0)) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: DSWeeklySalesChart(
+              data: data.ventasUltimos7Dias,
+              title: 'Ventas gestionadas — 7 días',
+              barColor: AppColors.success,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+
         // ── Accesos rápidos cajero ────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -528,7 +542,20 @@ class _VendedoraContent extends StatelessWidget {
 
         const SizedBox(height: AppSpacing.sm),
 
-        // ── Botón nueva venta ────────────────────────────────────────────
+        // ── Gráfica ventas 7 días ─────────────────────────────────────────
+        if (data != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: DSWeeklySalesChart(
+              data: data.ventasUltimos7Dias,
+              title: 'Mis ventas — últimos 7 días',
+              barColor: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+
+        // ── Botón nueva venta ─────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: GestureDetector(

@@ -47,13 +47,16 @@ class CajaResumenV2 {
     cantidadVentas: (json['cantidadVentas'] as num?)?.toInt() ?? 0,
     cantidadAnuladas: (json['cantidadAnuladas'] as num?)?.toInt() ?? 0,
     porVendedora: (json['porVendedora'] as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList(),
     resumenProductos: (json['resumenProductos'] as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList(),
     porBilletera: (json['porBilletera'] as List? ?? [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
         .toList(),
   );
 }
@@ -271,7 +274,8 @@ class CajaRepository {
     );
     final json = Map<String, dynamic>.from(response.data as Map);
     return (json['data'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
         .where((item) => item['activo'] != false)
         .toList();
   }
@@ -328,9 +332,9 @@ class CajaRepository {
     final json = Map<String, dynamic>.from(response.data as Map);
     return CajaPage(
       data: (json['data'] as List? ?? const [])
+          .whereType<Map>()
           .map(
-            (item) =>
-                CajaMovimiento.fromJson(Map<String, dynamic>.from(item as Map)),
+            (item) => CajaMovimiento.fromJson(Map<String, dynamic>.from(item)),
           )
           .toList(),
       total: (json['total'] as num?)?.toInt() ?? 0,
