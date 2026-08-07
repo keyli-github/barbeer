@@ -148,7 +148,6 @@ class UsuariosScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Usuarios'),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(

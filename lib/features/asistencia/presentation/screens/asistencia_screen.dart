@@ -160,7 +160,6 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Asistencia'),
       body: SafeArea(
         bottom: false,
         child: Column(

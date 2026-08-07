@@ -112,7 +112,6 @@ class SucursalesScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Sucursales'),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(sucursalesProvider.notifier).load(),

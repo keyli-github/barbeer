@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_header.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/ventas_provider.dart';
 import 'nueva_venta_view.dart';
@@ -22,26 +21,24 @@ class VentasScreen extends ConsumerWidget {
         body: Center(child: Text('Sin acceso al módulo de ventas')),
       );
     }
-
     if (canCreate && !canReadAll) return const _VendedoraView();
     if (!canCreate && canReadAll) return const _HistorialView();
     return const _AdminView();
   }
 }
 
-// ─── Historial solo ───────────────────────────────────────────────────────────
+// ─── Solo historial ───────────────────────────────────────────────────────────
 
 class _HistorialView extends StatelessWidget {
   const _HistorialView();
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => const Scaffold(
     backgroundColor: Colors.white,
-    appBar: const AppHeader(subtitle: 'Ventas'),
-    body: const HistorialVentasView(),
+    body: HistorialVentasView(),
   );
 }
 
-// ─── Vendedora: Nueva venta + Mis ventas ─────────────────────────────────────
+// ─── Vendedora ────────────────────────────────────────────────────────────────
 
 class _VendedoraView extends StatefulWidget {
   const _VendedoraView();
@@ -67,48 +64,14 @@ class _VendedoraViewState extends State<_VendedoraView>
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.white,
-    appBar: AppHeader(
-      subtitle: 'Ventas',
-      actions: [
-        PreferredSize(
-          preferredSize: const Size.fromHeight(0),
-          child: TabBar(
-            controller: _tabs,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textTertiary,
-            indicatorColor: AppColors.primary,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            tabs: const [
-              Tab(text: 'Nueva venta'),
-              Tab(text: 'Mis ventas'),
-            ],
-          ),
-        ),
-      ],
-    ),
     body: Column(
       children: [
-        Container(
-          color: Colors.white,
-          child: TabBar(
-            controller: _tabs,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textTertiary,
-            indicatorColor: AppColors.primary,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            tabs: const [
-              Tab(text: 'Nueva venta'),
-              Tab(text: 'Mis ventas'),
-            ],
-          ),
+        _TabBar(
+          controller: _tabs,
+          tabs: const [
+            Tab(text: 'Nueva venta'),
+            Tab(text: 'Mis ventas'),
+          ],
         ),
         Expanded(
           child: TabBarView(
@@ -121,7 +84,7 @@ class _VendedoraViewState extends State<_VendedoraView>
   );
 }
 
-// ─── Admin: Nueva venta + Historial ─────────────────────────────────────────
+// ─── Admin ────────────────────────────────────────────────────────────────────
 
 class _AdminView extends StatefulWidget {
   const _AdminView();
@@ -147,26 +110,14 @@ class _AdminViewState extends State<_AdminView>
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.white,
-    appBar: const AppHeader(subtitle: 'Ventas'),
     body: Column(
       children: [
-        Container(
-          color: Colors.white,
-          child: TabBar(
-            controller: _tabs,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textTertiary,
-            indicatorColor: AppColors.primary,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelStyle: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            tabs: const [
-              Tab(text: 'Nueva venta'),
-              Tab(text: 'Historial'),
-            ],
-          ),
+        _TabBar(
+          controller: _tabs,
+          tabs: const [
+            Tab(text: 'Nueva venta'),
+            Tab(text: 'Historial'),
+          ],
         ),
         Expanded(
           child: TabBarView(
@@ -175,6 +126,25 @@ class _AdminViewState extends State<_AdminView>
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _TabBar extends StatelessWidget {
+  final TabController controller;
+  final List<Widget> tabs;
+  const _TabBar({required this.controller, required this.tabs});
+  @override
+  Widget build(BuildContext context) => Container(
+    color: Colors.white,
+    child: TabBar(
+      controller: controller,
+      labelColor: AppColors.primary,
+      unselectedLabelColor: AppColors.textTertiary,
+      indicatorColor: AppColors.primary,
+      indicatorSize: TabBarIndicatorSize.label,
+      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      tabs: tabs,
     ),
   );
 }

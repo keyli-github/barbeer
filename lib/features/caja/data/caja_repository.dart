@@ -184,6 +184,8 @@ class CajaSesion {
         ? CajaResumen.fromJson(
             Map<String, dynamic>.from(json['resumen'] as Map),
           )
+        : json['resumen'] is String
+        ? null // string inesperado → ignorar
         : null,
     denominaciones: (json['denominaciones'] as List? ?? const [])
         .whereType<Map>()

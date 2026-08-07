@@ -126,7 +126,6 @@ class KardexScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Kardex'),
       body: Column(
         children: [
           _Header(

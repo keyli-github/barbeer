@@ -36,7 +36,6 @@ class PerfilScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Perfil'),
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(

@@ -144,7 +144,6 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Billeteras'),
       body: SafeArea(
         bottom: false,
         child: Column(

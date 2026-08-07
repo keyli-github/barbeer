@@ -145,7 +145,6 @@ class InventarioScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Inventario'),
       body: Column(
         children: [
           _SearchBar(

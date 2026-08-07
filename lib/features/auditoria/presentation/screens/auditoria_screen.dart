@@ -116,7 +116,6 @@ class AuditoriaScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Auditoría'),
       body: Column(
         children: [
           Container(

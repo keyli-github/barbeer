@@ -28,82 +28,78 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(cajaProvider);
     final auth = ref.watch(authProvider);
-    final actual = state.actual;
 
-    return Material(
-      color: AppColors.background,
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _Header(
-              historial: _historial,
-              state: state,
-              isSuperAdmin: auth.user?.isSuperAdmin ?? false,
-              onTab: (value) => setState(() => _historial = value),
-              onSede: (value) {
-                if (value != null) {
-                  ref.read(cajaProvider.notifier).seleccionarSede(value);
-                }
-              },
-            ),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: state.isLoading
-                    ? const _CajaSkeleton(key: ValueKey('loading'))
-                    : state.error != null &&
-                          actual == null &&
-                          state.historial.isEmpty
-                    ? AppErrorState(
-                        key: const ValueKey('error'),
-                        message: state.error!,
-                        onRetry: ref.read(cajaProvider.notifier).load,
-                      )
-                    : _historial
-                    ? _Historial(
-                        key: const ValueKey('history'),
-                        state: state,
-                        onFilter: ref
-                            .read(cajaProvider.notifier)
-                            .filtrarHistorial,
-                        onPage: ref
-                            .read(cajaProvider.notifier)
-                            .cambiarPaginaHistorial,
-                        onDetail: (id) => _showDetail(context, id),
-                      )
-                    : _Actual(
-                        key: const ValueKey('current'),
-                        state: state,
-                        canOpen: auth.hasPermission('caja:aperturar'),
-                        canPrecuadre: auth.hasPermission('caja:precuadre'),
-                        canClose: auth.hasPermission('caja:cerrar'),
+    // Selector de tabs en una barra debajo del header global
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Column(
+        children: [
+          // Tabs: Turno actual / Historial
+          _CajaTabs(
+            historial: _historial,
+            state: state,
+            isSuperAdmin: auth.user?.isSuperAdmin ?? false,
+            onTab: (v) => setState(() => _historial = v),
+            onSede: (v) {
+              if (v != null) ref.read(cajaProvider.notifier).seleccionarSede(v);
+            },
+          ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: state.isLoading
+                  ? const _CajaSkeleton(key: ValueKey('loading'))
+                  : state.error != null &&
+                        state.actual == null &&
+                        state.historial.isEmpty
+                  ? AppErrorState(
+                      key: const ValueKey('error'),
+                      message: state.error!,
+                      onRetry: ref.read(cajaProvider.notifier).load,
+                    )
+                  : _historial
+                  ? _Historial(
+                      key: const ValueKey('history'),
+                      state: state,
+                      onFilter: ref
+                          .read(cajaProvider.notifier)
+                          .filtrarHistorial,
+                      onPage: ref
+                          .read(cajaProvider.notifier)
+                          .cambiarPaginaHistorial,
+                      onDetail: (id) => _showDetail(context, id),
+                    )
+                  : _Actual(
+                      key: const ValueKey('current'),
+                      state: state,
+                      canOpen: auth.hasPermission('caja:aperturar'),
+                      canPrecuadre: auth.hasPermission('caja:precuadre'),
+                      canClose: auth.hasPermission('caja:cerrar'),
+                      canForzar: auth.hasPermission('caja:forzar-cierre'),
+                      onOpen: () => _showOpening(context),
+                      onPrecuadre: () => _showPrecuadre(context),
+                      onClose: () => _showCierre(
+                        context,
                         canForzar: auth.hasPermission('caja:forzar-cierre'),
-                        onOpen: () => _showOpening(context),
-                        onPrecuadre: () => _showPrecuadre(context),
-                        onClose: () => _showCierre(
-                          context,
-                          canForzar: auth.hasPermission('caja:forzar-cierre'),
-                        ),
-                        onMovementFilter: (tipo) {
-                          if (actual != null) {
-                            ref
-                                .read(cajaProvider.notifier)
-                                .filtrarMovimientos(actual.id, tipo);
-                          }
-                        },
-                        onMovementPage: (page) {
-                          if (actual != null) {
-                            ref
-                                .read(cajaProvider.notifier)
-                                .loadMovimientos(actual.id, pagina: page);
-                          }
-                        },
                       ),
-              ),
+                      onMovementFilter: (tipo) {
+                        if (state.actual != null) {
+                          ref
+                              .read(cajaProvider.notifier)
+                              .filtrarMovimientos(state.actual!.id, tipo);
+                        }
+                      },
+                      onMovementPage: (page) {
+                        if (state.actual != null) {
+                          ref
+                              .read(cajaProvider.notifier)
+                              .loadMovimientos(state.actual!.id, pagina: page);
+                        }
+                      },
+                    ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -156,14 +152,14 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 }
 
-class _Header extends StatelessWidget {
+class _CajaTabs extends StatelessWidget {
   final bool historial;
   final CajaState state;
   final bool isSuperAdmin;
   final ValueChanged<bool> onTab;
   final ValueChanged<String?> onSede;
 
-  const _Header({
+  const _CajaTabs({
     required this.historial,
     required this.state,
     required this.isSuperAdmin,
@@ -172,93 +168,58 @@ class _Header extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: AppColors.background,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: AppColors.primary,
-                  size: 21,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Caja', style: AppTextStyles.headlineLarge),
-                    Text(
-                      'Control operativo del turno',
-                      style: AppTextStyles.labelSmall,
+  Widget build(BuildContext context) => Container(
+    color: Colors.white,
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+    child: Column(
+      children: [
+        // Selector de sede solo para SuperAdmin
+        if (isSuperAdmin && state.sedes.isNotEmpty) ...[
+          DropdownButtonFormField<String>(
+            value: state.sedeId,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Sede',
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            items: state.sedes
+                .map(
+                  (s) => DropdownMenuItem(
+                    value: s['id'] as String,
+                    child: Text(
+                      s['nombre'] as String? ?? '',
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
-              ),
-              if (isSuperAdmin && state.sedes.isNotEmpty)
-                SizedBox(
-                  width: 150,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: state.sedeId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Sede',
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                    ),
-                    items: state.sedes
-                        .map(
-                          (sede) => DropdownMenuItem(
-                            value: sede['id'] as String,
-                            child: Text(
-                              sede['nombre'] as String? ?? '',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: onSede,
                   ),
-                ),
+                )
+                .toList(),
+            onChanged: onSede,
+          ),
+          const SizedBox(height: 8),
+        ],
+        // Tabs: Turno actual / Historial
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundAlt,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              _Tab(
+                label: 'Turno actual',
+                selected: !historial,
+                onTap: () => onTab(false),
+              ),
+              _Tab(
+                label: 'Historial',
+                selected: historial,
+                onTap: () => onTab(true),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppColors.backgroundAlt,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Row(
-              children: [
-                _Tab(
-                  label: 'Turno actual',
-                  selected: !historial,
-                  onTap: () => onTab(false),
-                ),
-                _Tab(
-                  label: 'Historial',
-                  selected: historial,
-                  onTap: () => onTab(true),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }

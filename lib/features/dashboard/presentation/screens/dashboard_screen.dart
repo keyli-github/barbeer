@@ -19,7 +19,6 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppHeader(subtitle: FormatUtils.roleName(auth.user?.rol ?? '')),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),

@@ -158,17 +158,6 @@ class ProductosScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppHeader(
-        subtitle: 'Productos',
-        actions: [
-          if (canCreate)
-            IconButton(
-              icon: Icon(Icons.add_rounded, size: spacing.AppSpacing.iconMD),
-              onPressed: () => _showForm(context, ref, null),
-              padding: EdgeInsets.all(AppSpacing.xs),
-            ),
-        ],
-      ),
       body: Column(
         children: [
           // ─── Filtros ────────────────────────────────────────

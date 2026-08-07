@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
+import '../../../../core/widgets/app_header.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─── GlobalKey para abrir el panel "Ver más" ──────────────────────────────────
@@ -160,7 +161,6 @@ class ShellScreen extends ConsumerWidget {
   /// Módulos visibles para este usuario según permisos
   List<_Module> _visibleModules(AuthState auth) => _allModules.where((m) {
     if (m.perm == null) return true;
-    // Ventas: visible si tiene cualquiera de los dos permisos
     if (m.path == '/ventas') {
       return auth.hasPermission('ventas:leer') ||
           auth.hasPermission('ventas:leer-propias') ||
@@ -169,12 +169,33 @@ class ShellScreen extends ConsumerWidget {
     return auth.hasPermission(m.perm!);
   }).toList();
 
+  /// Subtítulo que se muestra debajo de BarBeer según la ruta activa
+  String _subtitleFor(String path, AuthState auth) {
+    if (path.startsWith('/dashboard'))
+      return FormatUtils.roleName(auth.user?.rol ?? '');
+    if (path.startsWith('/ventas')) return 'Ventas';
+    if (path.startsWith('/caja')) return 'Caja';
+    if (path.startsWith('/productos')) return 'Productos';
+    if (path.startsWith('/inventario')) return 'Inventario';
+    if (path.startsWith('/kardex')) return 'Kardex';
+    if (path.startsWith('/compras')) return 'Compras';
+    if (path.startsWith('/asistencia')) return 'Asistencia';
+    if (path.startsWith('/etiquetas')) return 'Billeteras';
+    if (path.startsWith('/usuarios')) return 'Usuarios';
+    if (path.startsWith('/sucursales')) return 'Sucursales';
+    if (path.startsWith('/roles')) return 'Roles';
+    if (path.startsWith('/permisos')) return 'Permisos';
+    if (path.startsWith('/auditoria')) return 'Auditoría';
+    if (path.startsWith('/perfil')) return 'Perfil';
+    return '';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final visible = _visibleModules(auth);
+    final subtitle = _subtitleFor(currentPath, auth);
 
-    // Primeros 3 en el bottom nav; el resto va en "Ver más"
     const maxInBar = 3;
     final barModules = visible.take(maxInBar).toList();
     final moreModules = visible.length > maxInBar
@@ -193,6 +214,8 @@ class ShellScreen extends ConsumerWidget {
       child: Scaffold(
         key: shellScaffoldKey,
         backgroundColor: AppColors.background,
+        // ── Header único para toda la app ─────────────────────────────
+        appBar: AppHeader(subtitle: subtitle),
         // Panel derecho "Ver más"
         endDrawer: showMore
             ? _MorePanel(

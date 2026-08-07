@@ -219,7 +219,6 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Compras'),
       body: SafeArea(
         bottom: false,
         child: Column(

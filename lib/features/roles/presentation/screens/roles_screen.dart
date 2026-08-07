@@ -132,7 +132,6 @@ class RolesScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const AppHeader(subtitle: 'Roles'),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
