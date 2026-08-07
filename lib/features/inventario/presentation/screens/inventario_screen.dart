@@ -143,7 +143,7 @@ class InventarioScreen extends ConsumerWidget {
     final canEdit = auth.hasPermission('inventario:editar');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -491,7 +491,7 @@ class _InventarioTile extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: pct.toDouble(),
                           minHeight: 5,
-                          backgroundColor: AppColors.backgroundAlt,
+                          backgroundColor: AppColors.background,
                           valueColor: AlwaysStoppedAnimation(_statusColor),
                         ),
                       ),
@@ -694,7 +694,7 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                     hintText: '0',
                     hintStyle: const TextStyle(
                       fontSize: 28,
-                      color: AppColors.textHint,
+                      color: AppColors.textDisabled,
                     ),
                     labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
                     contentPadding: const EdgeInsets.symmetric(vertical: 14),

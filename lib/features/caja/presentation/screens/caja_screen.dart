@@ -30,7 +30,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     final actual = state.actual;
 
     return Material(
-      color: AppColors.backgroundAlt,
+      color: AppColors.background,
       child: SafeArea(
         bottom: false,
         child: Column(

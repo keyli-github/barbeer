@@ -114,7 +114,7 @@ class AuditoriaScreen extends ConsumerWidget {
     final state = ref.watch(auditoriaProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(

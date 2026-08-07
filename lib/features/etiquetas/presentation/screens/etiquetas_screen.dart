@@ -142,7 +142,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
     final canManage = auth.user?.hasPermission('etiquetas:crear') ?? false;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(

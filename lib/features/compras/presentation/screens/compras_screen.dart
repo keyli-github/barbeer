@@ -217,7 +217,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
     final canEdit = auth.hasPermission('compras:editar');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(

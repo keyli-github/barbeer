@@ -90,6 +90,6 @@ class AppTextStyles {
   static const TextStyle hintText = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    color: AppColors.textHint,
+    color: AppColors.textDisabled,
   );
 }

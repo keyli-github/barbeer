@@ -34,7 +34,7 @@ class PerfilScreen extends ConsumerWidget {
     final username = user?.username ?? '';
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(

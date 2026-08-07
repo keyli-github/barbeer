@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_dimensions.dart';
-import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/widgets/app_card.dart';
-import '../../../../core/widgets/app_badge.dart';
-import '../../../../core/widgets/app_loading.dart';
+import '../../../../core/widgets/ds_card.dart';
+import '../../../../core/widgets/ds_states.dart';
+import '../../../../core/widgets/ds_list_tile.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../caja/presentation/providers/caja_provider.dart';
 import '../providers/dashboard_provider.dart';
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -16,646 +20,881 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
-    final dash = ref.watch(dashboardProvider);
     final user = auth.user;
+    final rol = user?.rol.toUpperCase() ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.backgroundAlt,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(dashboardProvider.notifier).load(),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // App bar
-              SliverAppBar(
-                floating: true,
-                snap: true,
-                backgroundColor: AppColors.background,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                leading: Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(
-                      Icons.menu_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  ),
-                ),
-                title: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySurface,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.local_bar_rounded,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text('Bar Beer', style: AppTextStyles.appBarTitle),
-                  ],
-                ),
-                actions: [
-                  if (user?.sede != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Chip(
-                        avatar: const Icon(
-                          Icons.store_rounded,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        label: Text(
-                          user!.sedeName,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        backgroundColor: AppColors.primarySurface,
-                        side: const BorderSide(color: AppColors.primaryBorder),
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                ],
-              ),
-              // Content
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  120,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _WelcomeCard(user: user),
-                    const SizedBox(height: 20),
-                    if (dash.isLoading)
-                      const AppLoading(message: 'Cargando datos...')
-                    else if (dash.error != null)
-                      _ErrCard(
-                        err: dash.error!,
-                        retry: () =>
-                            ref.read(dashboardProvider.notifier).load(),
-                      )
-                    else if (dash.data != null) ...[
-                      _StatsRow(data: dash.data!),
-                      const SizedBox(height: 20),
-                      if (auth.hasPermission('roles:leer')) ...[
-                        _UsersByRole(data: dash.data!),
-                        const SizedBox(height: 20),
-                      ],
-                      if (auth.hasPermission('establecimientos:leer')) ...[
-                        _SedesCard(
-                          sedes: List<Map<String, dynamic>>.from(
-                            dash.data!.sedes,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      if (auth.hasPermission('audit:leer')) ...[
-                        _AuditCard(
-                          audit: List<Map<String, dynamic>>.from(
-                            dash.data!.audit,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      _SessionsCard(
-                        sessions: List<Map<String, dynamic>>.from(
-                          dash.data!.sessions,
-                        ),
-                      ),
-                    ],
-                  ]),
-                ),
-              ),
-            ],
-          ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(dashboardProvider.notifier).load(),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _SliverHeader(user: user),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
+
+            // Contenido por rol
+            if (rol == 'SUPERADMIN' || rol == 'ADMIN')
+              _AdminContent(rol: rol, ref: ref, auth: auth)
+            else if (rol == 'CAJERO')
+              _CajeroContent(ref: ref, auth: auth)
+            else
+              _VendedoraContent(ref: ref, auth: auth),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+          ],
         ),
       ),
     );
   }
 }
 
-class _WelcomeCard extends StatelessWidget {
+// ─── Header Sliver ───────────────────────────────────────────────────────────
+
+class _SliverHeader extends StatelessWidget {
   final dynamic user;
-  const _WelcomeCard({this.user});
+  const _SliverHeader({required this.user});
 
   @override
   Widget build(BuildContext context) {
     final un = user?.username ?? '';
-    final role = user?.rol ?? '';
-    final h = DateTime.now().hour;
-    final greet = h < 12
-        ? 'Buenos dias'
-        : h < 18
-        ? 'Buenas tardes'
-        : 'Buenas noches';
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDark],
+    final rol = user?.rol ?? '';
+    final sede = user?.sede;
+
+    return SliverToBoxAdapter(
+      child: Container(
+        color: AppColors.background,
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          MediaQuery.of(context).padding.top + AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
         ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.button,
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            child: Text(
-              FormatUtils.initials(un),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 18,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greet,',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                Text(
-                  un,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 3,
-                  ),
+        child: Row(
+          children: [
+            // Avatar
+            Builder(
+              builder: (ctx) {
+                final color = AppColors.avatarColor(un);
+                final initial = un.isNotEmpty ? un[0].toUpperCase() : '?';
+                return Container(
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    FormatUtils.roleName(role),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                    color: color.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.3),
+                      width: 1.5,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.local_bar_rounded, color: Colors.white, size: 32),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatsRow extends StatelessWidget {
-  final DashboardData data;
-  const _StatsRow({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final actUsers = data.users.where((u) => u['activo'] == true).length;
-    final actSedes = data.sedes.where((s) => s['activo'] == true).length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Resumen', style: AppTextStyles.titleLarge),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: StatCard(
-                label: 'Usuarios activos',
-                value: '$actUsers',
-                icon: Icons.people_rounded,
-                iconColor: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: StatCard(
-                label: 'Sucursales',
-                value: '$actSedes',
-                icon: Icons.store_rounded,
-                iconColor: AppColors.success,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: StatCard(
-                label: 'Sesiones',
-                value: '${data.sessions.length}',
-                icon: Icons.devices_rounded,
-                iconColor: AppColors.accent,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: StatCard(
-                label: 'Roles',
-                value: '${data.roles.length}',
-                icon: Icons.admin_panel_settings_rounded,
-                iconColor: AppColors.roleSuperadmin,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _UsersByRole extends StatelessWidget {
-  final DashboardData data;
-  const _UsersByRole({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final m = <String, int>{};
-    for (final u in data.users) {
-      final r = u['rol']?['nombre'] as String? ?? 'Sin rol';
-      m[r] = (m[r] ?? 0) + 1;
-    }
-    if (m.isEmpty) return const SizedBox.shrink();
-    final mx = m.values.reduce((a, b) => a > b ? a : b);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.bar_chart_rounded,
-                color: AppColors.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text('Usuarios por rol', style: AppTextStyles.titleMedium),
-            ],
-          ),
-          const SizedBox(height: 16),
-          for (final e in m.entries) ...[
-            Row(
-              children: [
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    FormatUtils.roleName(e.key),
-                    style: AppTextStyles.bodySmall.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Container(
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppColors.backgroundAlt,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      FractionallySizedBox(
-                        widthFactor: mx > 0 ? e.value / mx : 0.0,
-                        child: Container(
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.roleColor(e.key),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  '${e.value}',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.roleColor(e.key),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _SedesCard extends StatelessWidget {
-  final List<Map<String, dynamic>> sedes;
-  const _SedesCard({required this.sedes});
-
-  @override
-  Widget build(BuildContext context) {
-    if (sedes.isEmpty) return const SizedBox.shrink();
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.store_rounded,
-                color: AppColors.success,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Sucursales', style: AppTextStyles.titleMedium),
-              ),
-              Text(
-                '${sedes.where((s) => s['activo'] == true).length} activas',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (int i = 0; i < sedes.length && i < 4; i++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: sedes[i]['activo'] == true
-                          ? AppColors.success
-                          : AppColors.textTertiary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
+                  child: Center(
                     child: Text(
-                      sedes[i]['nombre'] as String? ?? '',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
+                      initial,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: color,
                       ),
                     ),
                   ),
-                  if (sedes[i]['ruc'] != null)
-                    Text(
-                      'RUC: ${sedes[i]["ruc"]}',
-                      style: AppTextStyles.labelSmall,
-                    ),
-                ],
-              ),
+                );
+              },
             ),
-            if (i < 3 && i < sedes.length - 1) const Divider(height: 4),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _AuditCard extends StatelessWidget {
-  final List<Map<String, dynamic>> audit;
-  const _AuditCard({required this.audit});
-
-  @override
-  Widget build(BuildContext context) {
-    if (audit.isEmpty) return const SizedBox.shrink();
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.history_rounded,
-                color: AppColors.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Actividad reciente',
-                style: AppTextStyles.titleMedium,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (int i = 0; i < audit.length; i++) ...[
-            _ARow(log: audit[i]),
-            if (i < audit.length - 1) const Divider(height: 1),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ARow extends StatelessWidget {
-  final Map<String, dynamic> log;
-  const _ARow({required this.log});
-
-  @override
-  Widget build(BuildContext context) {
-    final action = log['accion'] as String? ?? '';
-    final username = log['usuario']?['username'] as String? ?? 'Sistema';
-    DateTime? dt;
-    try {
-      dt = DateTime.parse(log['createdAt'] ?? '').toLocal();
-    } catch (_) {}
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.primarySurface,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              size: 16,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  action.replaceAll('_', ' '),
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(username, style: AppTextStyles.labelSmall),
-              ],
-            ),
-          ),
-          Text(
-            dt != null ? FormatUtils.timeAgo(dt) : '',
-            style: AppTextStyles.labelSmall,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionsCard extends StatelessWidget {
-  final List<Map<String, dynamic>> sessions;
-  const _SessionsCard({required this.sessions});
-
-  @override
-  Widget build(BuildContext context) => AppCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(
-              Icons.devices_rounded,
-              color: AppColors.accent,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            const Text('Sesiones activas', style: AppTextStyles.titleMedium),
-            const Spacer(),
-            CountBadge(count: sessions.length, color: AppColors.primary),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (sessions.isEmpty)
-          const Text('Sin sesiones activas', style: AppTextStyles.bodyMedium)
-        else
-          for (int i = 0; i < sessions.length && i < 3; i++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    _icon(sessions[i]['deviceType'] as String?),
-                    size: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // Logo BarBeer
+                  RichText(
+                    text: const TextSpan(
                       children: [
-                        Text(
-                          sessions[i]['deviceName'] as String? ?? 'Dispositivo',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontWeight: FontWeight.w500,
+                        TextSpan(
+                          text: 'Bar',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
+                            height: 1.1,
                           ),
                         ),
-                        if (sessions[i]['ip'] != null)
-                          Text(
-                            sessions[i]['ip']!,
-                            style: AppTextStyles.labelSmall,
+                        TextSpan(
+                          text: 'Beer',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.brand,
+                            height: 1.1,
                           ),
+                        ),
                       ],
                     ),
                   ),
-                  if (sessions[i]['actual'] == true)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.successLight,
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: const Text(
-                        'Esta sesion',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success,
+                  Row(
+                    children: [
+                      _RolTag(rol),
+                      if (sede != null) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            sede,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textTertiary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
+            // Botón perfil
+            _HeaderAction(
+              icon: Icons.person_outline_rounded,
+              onTap: () => GoRouter.of(context).go('/perfil'),
+            ),
           ],
-      ],
-    ),
-  );
-
-  IconData _icon(String? t) {
-    switch (t) {
-      case 'android':
-        return Icons.android_rounded;
-      case 'ios':
-        return Icons.phone_iphone_rounded;
-      default:
-        return Icons.computer_rounded;
-    }
+        ),
+      ),
+    );
   }
 }
 
-class _ErrCard extends StatelessWidget {
-  final String err;
-  final VoidCallback retry;
-  const _ErrCard({required this.err, required this.retry});
+class _RolTag extends StatelessWidget {
+  final String rol;
+  const _RolTag(this.rol);
+  @override
+  Widget build(BuildContext context) {
+    final color = AppColors.roleColor(rol);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        rol.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _HeaderAction({required this.icon, required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () {
+      HapticFeedback.lightImpact();
+      onTap();
+    },
+    child: Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: 20, color: AppColors.textSecondary),
+    ),
+  );
+}
+
+// ─── ADMIN / SUPERADMIN ───────────────────────────────────────────────────────
+
+class _AdminContent extends StatelessWidget {
+  final String rol;
+  final WidgetRef ref;
+  final AuthState auth;
+  const _AdminContent({
+    required this.rol,
+    required this.ref,
+    required this.auth,
+  });
 
   @override
-  Widget build(BuildContext context) => AppCard(
-    child: Column(
-      children: [
-        const Icon(Icons.wifi_off_rounded, color: AppColors.error, size: 40),
-        const SizedBox(height: 12),
-        const Text('Error al cargar datos', style: AppTextStyles.titleMedium),
-        const SizedBox(height: 8),
-        Text(err, style: AppTextStyles.bodySmall, textAlign: TextAlign.center),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          onPressed: retry,
-          icon: const Icon(Icons.refresh_rounded, size: 18),
-          label: const Text('Reintentar'),
+  Widget build(BuildContext context) {
+    final dash = ref.watch(dashboardProvider);
+
+    if (dash.isLoading)
+      return const SliverToBoxAdapter(child: DSSkeletonList(count: 6));
+    if (dash.error != null && dash.data == null) {
+      return SliverToBoxAdapter(
+        child: DSErrorState(
+          message: dash.error,
+          onRetry: () => ref.read(dashboardProvider.notifier).load(),
         ),
+      );
+    }
+
+    final data = dash.data;
+    final sedes = data?.sedes ?? [];
+    final users = data?.users ?? [];
+    final audit = data?.audit ?? [];
+
+    final sedesActivas = sedes.where((s) => s['activo'] == true).length;
+    final usersActivos = users.where((u) => u['activo'] == true).length;
+
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        // ── KPIs ──────────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Row(
+            children: [
+              Expanded(
+                child: DSStatCard(
+                  label: 'Sedes activas',
+                  value: '$sedesActivas',
+                  icon: Icons.store_rounded,
+                  iconColor: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: DSStatCard(
+                  label: 'Usuarios activos',
+                  value: '$usersActivos',
+                  icon: Icons.people_rounded,
+                  iconColor: AppColors.success,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
+        // ── Accesos rápidos ──────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: _QuickActions(auth: auth),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // ── Sedes recientes ───────────────────────────────────────────────
+        if (sedes.isNotEmpty) ...[
+          _SectionTitle(
+            'Sedes',
+            action: 'Ver todas',
+            onAction: auth.hasPermission('establecimientos:leer')
+                ? () => GoRouter.of(context).go('/sucursales')
+                : null,
+          ),
+          ...sedes.take(3).map((s) => _SedeRow(sede: s)),
+          const SizedBox(height: AppSpacing.md),
+        ],
+
+        // ── Actividad reciente ────────────────────────────────────────────
+        if (audit.isNotEmpty) ...[
+          _SectionTitle(
+            'Actividad reciente',
+            action: 'Ver todo',
+            onAction: auth.hasPermission('audit:leer')
+                ? () => GoRouter.of(context).go('/auditoria')
+                : null,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: DSCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: audit.take(5).toList().asMap().entries.map((e) {
+                  final i = e.key;
+                  final log = e.value as Map;
+                  return Column(
+                    children: [
+                      _AuditRow(log: log),
+                      if (i < (audit.take(5).length - 1))
+                        const Divider(height: 1, indent: 56),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
+// ─── CAJERO ──────────────────────────────────────────────────────────────────
+
+class _CajeroContent extends StatelessWidget {
+  final WidgetRef ref;
+  final AuthState auth;
+  const _CajeroContent({required this.ref, required this.auth});
+
+  @override
+  Widget build(BuildContext context) {
+    final cajaState = ref.watch(cajaProvider);
+    final actual = cajaState.actual;
+
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        // ── Estado de caja ────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: _CajaStatusCard(actual: actual, loading: cajaState.isLoading),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
+        // ── Accesos rápidos cajero ────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: _QuickActions(auth: auth),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // ── KPIs si hay caja abierta ──────────────────────────────────────
+        if (actual != null && actual.resumen != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Ventas neto',
+                    value: FormatUtils.currency(
+                      actual.resumen!.v2?.totalVentasNeto ?? 0,
+                    ),
+                    icon: Icons.receipt_rounded,
+                    iconColor: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Pendientes',
+                    value: '${actual.resumen!.ventasPendientes}',
+                    icon: Icons.pending_actions_rounded,
+                    iconColor: actual.resumen!.ventasPendientes > 0
+                        ? AppColors.warning
+                        : AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Efectivo esperado',
+                    value: FormatUtils.currency(
+                      actual.resumen!.efectivoEsperado,
+                    ),
+                    icon: Icons.payments_rounded,
+                    iconColor: AppColors.success,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Digital neto',
+                    value: FormatUtils.currency(
+                      actual.resumen!.v2?.totalDigitalNeto ?? 0,
+                    ),
+                    icon: Icons.phone_android_rounded,
+                    iconColor: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ]),
+    );
+  }
+}
+
+// ─── VENDEDORA ────────────────────────────────────────────────────────────────
+
+class _VendedoraContent extends StatelessWidget {
+  final WidgetRef ref;
+  final AuthState auth;
+  const _VendedoraContent({required this.ref, required this.auth});
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        // ── Acceso rápido: nueva venta ────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              GoRouter.of(context).go('/ventas');
+            },
+            child: Container(
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, Color(0xFF1D4ED8)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Text(
+                    'Nueva venta',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+
+        // ── Mis ventas rápido ─────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: _QuickActions(auth: auth),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // ── Estado vacío con guía ─────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: DSCard(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.storefront_rounded,
+                  size: 48,
+                  color: AppColors.primary.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'Registra ventas fácilmente',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Usa el botón "Nueva venta" o ve a la sección Ventas desde la barra inferior.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ─── Widgets auxiliares ───────────────────────────────────────────────────────
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final String? action;
+  final VoidCallback? onAction;
+  const _SectionTitle(this.title, {this.action, this.onAction});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.md,
+      0,
+      AppSpacing.md,
+      AppSpacing.xs,
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+        if (action != null && onAction != null)
+          GestureDetector(
+            onTap: onAction,
+            child: Text(
+              action!,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
       ],
     ),
   );
+}
+
+class _SedeRow extends StatelessWidget {
+  final Map sede;
+  const _SedeRow({required this.sede});
+  @override
+  Widget build(BuildContext context) {
+    final activo = sede['activo'] == true;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: DSCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primarySurface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.store_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    sede['nombre'] as String? ?? '—',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    sede['codigo'] as String? ?? '',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: (activo ? AppColors.success : AppColors.textTertiary)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                activo ? 'Activa' : 'Inactiva',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: activo ? AppColors.success : AppColors.textTertiary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AuditRow extends StatelessWidget {
+  final Map log;
+  const _AuditRow({required this.log});
+  @override
+  Widget build(BuildContext context) {
+    final accion = log['accion'] as String? ?? '';
+    final usuario = log['username'] as String? ?? '';
+    final ts = log['createdAt'] as String?;
+    DateTime? dt;
+    try {
+      dt = ts != null ? DateTime.parse(ts) : null;
+    } catch (_) {}
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primarySurface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.history_rounded,
+              color: AppColors.primary,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  accion,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  usuario,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (dt != null)
+            Text(
+              FormatUtils.timeAgo(dt),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textTertiary,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CajaStatusCard extends StatelessWidget {
+  final dynamic actual;
+  final bool loading;
+  const _CajaStatusCard({required this.actual, required this.loading});
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const DSSkeleton(height: 80, radius: 14);
+    final abierta = actual != null;
+    return DSCard(
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: (abierta ? AppColors.success : AppColors.textTertiary)
+                  .withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              abierta
+                  ? Icons.account_balance_wallet_rounded
+                  : Icons.wallet_rounded,
+              color: abierta ? AppColors.success : AppColors.textTertiary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  abierta ? 'Caja abierta' : 'Caja cerrada',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: abierta
+                        ? AppColors.success
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                if (abierta && actual.apertura != null)
+                  Text(
+                    'Apertura: ${FormatUtils.currency(actual.apertura!)}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  final AuthState auth;
+  const _QuickActions({required this.auth});
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = <_QA>[];
+
+    if (auth.hasPermission('ventas:leer') ||
+        auth.hasPermission('ventas:leer-propias'))
+      actions.add(
+        _QA(
+          'Ventas',
+          Icons.shopping_cart_rounded,
+          AppColors.primary,
+          '/ventas',
+        ),
+      );
+    if (auth.hasPermission('caja:leer'))
+      actions.add(
+        _QA(
+          'Caja',
+          Icons.account_balance_wallet_rounded,
+          AppColors.success,
+          '/caja',
+        ),
+      );
+    if (auth.hasPermission('productos:crear'))
+      actions.add(
+        _QA('Productos', Icons.liquor_rounded, AppColors.brand, '/productos'),
+      );
+    if (auth.hasPermission('inventario:leer'))
+      actions.add(
+        _QA(
+          'Inventario',
+          Icons.inventory_2_rounded,
+          AppColors.info,
+          '/inventario',
+        ),
+      );
+    if (auth.hasPermission('usuarios:leer'))
+      actions.add(
+        _QA('Usuarios', Icons.people_rounded, AppColors.warning, '/usuarios'),
+      );
+
+    if (actions.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      children: actions
+          .take(4)
+          .map(
+            (a) => Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: actions.indexOf(a) < actions.take(4).length - 1
+                      ? 8
+                      : 0,
+                ),
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    GoRouter.of(context).go(a.path);
+                  },
+                  child: Container(
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: a.color.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+                      border: Border.all(
+                        color: a.color.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(a.icon, color: a.color, size: 24),
+                        const SizedBox(height: 4),
+                        Text(
+                          a.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: a.color,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _QA {
+  final String label, path;
+  final IconData icon;
+  final Color color;
+  const _QA(this.label, this.icon, this.color, this.path);
 }

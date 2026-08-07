@@ -124,165 +124,208 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
+        maxHeight: MediaQuery.of(context).size.height * 0.82,
       ),
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        color: AppColors.backgroundAlt,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.borderLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Title
-            Text(
-              'Clasificar pago',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '${widget.venta.codigo} · ${FormatUtils.currency(widget.venta.total)}',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            // Estado selector
-            Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle + header
+          Container(
+            color: AppColors.background,
+            child: Column(
               children: [
-                _MethodChip(
-                  label: 'Efectivo',
-                  icon: Icons.payments_rounded,
-                  selected: _estado == 'EFECTIVO',
-                  onTap: () => setState(() => _estado = 'EFECTIVO'),
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 10),
-                _MethodChip(
-                  label: 'Billetera',
-                  icon: Icons.account_balance_wallet_rounded,
-                  selected: _estado == 'BILLETERA',
-                  onTap: () => setState(() => _estado = 'BILLETERA'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Clasificar pago',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            Text(
+                              '${widget.venta.codigo} · ${FormatUtils.currency(widget.venta.total)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                        color: AppColors.textTertiary,
+                      ),
+                    ],
+                  ),
                 ),
+                const Divider(height: 1, color: AppColors.border),
               ],
             ),
-            const SizedBox(height: 16),
-            // Billetera fields
-            if (_estado == 'BILLETERA') ...[
-              if (_loadingEtiquetas)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              else ...[
-                const Text(
-                  'Billetera *',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: _etiquetaId,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
-                  items: _etiquetas
-                      .map(
-                        (e) => DropdownMenuItem(
-                          value: e.id,
-                          child: Text(e.nombre),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Estado selector
+                  Row(
+                    children: [
+                      _MethodChip(
+                        label: 'Efectivo',
+                        icon: Icons.payments_rounded,
+                        selected: _estado == 'EFECTIVO',
+                        onTap: () => setState(() => _estado = 'EFECTIVO'),
+                      ),
+                      const SizedBox(width: 10),
+                      _MethodChip(
+                        label: 'Billetera',
+                        icon: Icons.account_balance_wallet_rounded,
+                        selected: _estado == 'BILLETERA',
+                        onTap: () => setState(() => _estado = 'BILLETERA'),
+                      ),
+                    ],
+                  ), // Row
+                  const SizedBox(height: 16),
+                  // Billetera fields
+                  if (_estado == 'BILLETERA') ...[
+                    if (_loadingEtiquetas)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                      .toList(),
-                  onChanged: (v) => setState(() => _etiquetaId = v),
-                ),
-                const SizedBox(height: 12),
-                if (_selectedEtiqueta?.requiereComprobante == true) ...[
-                  TextField(
-                    controller: _compCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Comprobante / voucher',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    else ...[
+                      const Text(
+                        'Billetera *',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<String>(
+                        value: _etiquetaId,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                        ),
+                        items: _etiquetas
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.id,
+                                child: Text(e.nombre),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() => _etiquetaId = v),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_selectedEtiqueta?.requiereComprobante == true) ...[
+                        TextField(
+                          controller: _compCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Comprobante / voucher',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      TextField(
+                        controller: _codOpCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Código de operación (opcional)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                  // Error
+                  if (_error != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.errorLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(fontSize: 12, color: AppColors.error),
                       ),
                     ),
+                  // Submit
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Confirmar',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
                 ],
-                TextField(
-                  controller: _codOpCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Código de operación (opcional)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ],
-            // Error
-            if (_error != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.errorLight,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _error!,
-                  style: TextStyle(fontSize: 12, color: AppColors.error),
-                ),
-              ),
-            // Submit
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Confirmar',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
