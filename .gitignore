@@ -12,6 +12,11 @@
 .swiftpm/
 migrate_working_dir/
 
+# AI agent skills (no deben ir al repo)
+.agents/
+.claude/
+skills-lock.json
+
 # IntelliJ related
 *.iml
 *.ipr
