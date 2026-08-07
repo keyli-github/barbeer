@@ -427,12 +427,13 @@ class _MorePanelState extends State<_MorePanel> {
   @override
   void initState() {
     super.initState();
+    // Todas las secciones inician CERRADAS — se abren al tocar
     _expanded = {
-      'OPERACIONES': true,
-      'INVENTARIO': true,
-      'PERSONAL': true,
-      'ADMINISTRACIÓN': true,
-      'OTROS': true,
+      'OPERACIONES': false,
+      'INVENTARIO': false,
+      'PERSONAL': false,
+      'ADMINISTRACIÓN': false,
+      'OTROS': false,
     };
   }
 
@@ -505,21 +506,25 @@ class _MorePanelState extends State<_MorePanel> {
             ),
             const Divider(height: 1, color: AppColors.border),
 
-            // ── Secciones ────────────────────────────────────────────────
+            // ── Secciones con animación ──────────────────────────────────
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: sections.map((sec) {
-                  final isOpen = _expanded[sec.title] ?? true;
+                  final isOpen = _expanded[sec.title] ?? false;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Encabezado de sección colapsable
+                      // Encabezado colapsable
                       InkWell(
-                        onTap: () =>
-                            setState(() => _expanded[sec.title] = !isOpen),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _expanded[sec.title] = !isOpen);
+                        },
+                        splashColor: Colors.transparent,
+                        highlightColor: AppColors.primarySurface,
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 10, 16, 6),
+                          padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
                           child: Row(
                             children: [
                               Expanded(
@@ -533,31 +538,44 @@ class _MorePanelState extends State<_MorePanel> {
                                   ),
                                 ),
                               ),
-                              Icon(
-                                isOpen
-                                    ? Icons.keyboard_arrow_up_rounded
-                                    : Icons.keyboard_arrow_down_rounded,
-                                size: 18,
-                                color: AppColors.textTertiary,
+                              // Flecha rotatoria animada
+                              AnimatedRotation(
+                                turns: isOpen ? 0.5 : 0,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutCubic,
+                                child: const Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  size: 18,
+                                  color: AppColors.textTertiary,
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      // Items de la sección
-                      if (isOpen)
-                        ...sec.items.map((m) {
-                          final active = widget.current.startsWith(m.path);
-                          return _PanelItem(
-                            module: m,
-                            active: active,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              widget.go(m.path);
-                            },
-                          );
-                        }),
-                      const SizedBox(height: 4),
+                      // Items con animación de altura
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                        child: isOpen
+                            ? Column(
+                                children: sec.items.map((m) {
+                                  final active = widget.current.startsWith(
+                                    m.path,
+                                  );
+                                  return _PanelItem(
+                                    module: m,
+                                    active: active,
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      widget.go(m.path);
+                                    },
+                                  );
+                                }).toList(),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(height: 2),
                     ],
                   );
                 }).toList(),

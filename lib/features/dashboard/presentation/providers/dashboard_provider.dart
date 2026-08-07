@@ -5,12 +5,21 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 
 class DashboardData {
   final List roles, sedes, audit, sessions, users;
+  // Datos para vendedora/cajero
+  final int misVentasHoy;
+  final double misTotalesHoy;
+  final int misVentasMes;
+  final double misTotalesMes;
   const DashboardData({
     this.roles = const [],
     this.sedes = const [],
     this.audit = const [],
     this.sessions = const [],
     this.users = const [],
+    this.misVentasHoy = 0,
+    this.misTotalesHoy = 0,
+    this.misVentasMes = 0,
+    this.misTotalesMes = 0,
   });
 }
 
@@ -54,6 +63,53 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       }
     }
 
+    // Ventas propias para vendedora/cajero
+    int misVentasHoy = 0;
+    double misTotalesHoy = 0;
+    int misVentasMes = 0;
+    double misTotalesMes = 0;
+
+    final canLeerPropias = _permissions.contains('ventas:leer-propias');
+    final canLeerTodas = _permissions.contains('ventas:leer');
+
+    if (canLeerPropias || canLeerTodas) {
+      try {
+        final endpoint = canLeerPropias
+            ? ApiConstants.misVentas
+            : ApiConstants.ventas;
+        final resp = await _api.get(
+          endpoint,
+          queryParameters: {'limite': 100, 'pagina': 1},
+        );
+        final body = resp.data;
+        if (body is Map) {
+          final ventas = List.from(body['data'] ?? []);
+          final now = DateTime.now();
+          final hoy = DateTime(now.year, now.month, now.day);
+          final mes = DateTime(now.year, now.month, 1);
+          for (final v in ventas) {
+            if (v is! Map) continue;
+            final total = (v['total'] as num?)?.toDouble() ?? 0;
+            final estado = v['estado'] as String? ?? '';
+            if (estado == 'ANULADA') continue;
+            DateTime? dt;
+            try {
+              dt = DateTime.parse(v['createdAt'] as String? ?? '');
+            } catch (_) {}
+            if (dt == null) continue;
+            if (!dt.isBefore(hoy)) {
+              misVentasHoy++;
+              misTotalesHoy += total;
+            }
+            if (!dt.isBefore(mes)) {
+              misVentasMes++;
+              misTotalesMes += total;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     final results = await Future.wait([
       get(ApiConstants.roles, {'pagina': 1, 'limite': 50}, 'roles:leer'),
       get(ApiConstants.establishments, {
@@ -79,6 +135,10 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         audit: results[2].data,
         sessions: results[3].data,
         users: results[4].data,
+        misVentasHoy: misVentasHoy,
+        misTotalesHoy: misTotalesHoy,
+        misVentasMes: misVentasMes,
+        misTotalesMes: misTotalesMes,
       ),
     );
   }

@@ -436,15 +436,15 @@ class _ProductoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen
+          // Imagen (los productos no tienen imageUrl aún — placeholder con inicial)
           Expanded(
-            flex: 5,
+            flex: 4,
             child: ClipRRect(
               borderRadius: BorderRadius.vertical(
                 top: Radius.circular(AppSpacing.radiusLG),
               ),
               child: DSProductImage(
-                imageUrl: producto.imageUrl as String?,
+                imageUrl: null,
                 productName: producto.nombre as String,
                 fit: BoxFit.cover,
                 width: double.infinity,
@@ -453,7 +453,7 @@ class _ProductoCard extends StatelessWidget {
           ),
           // Info
           Expanded(
-            flex: 4,
+            flex: 5,
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.xs),
               child: Column(

@@ -339,7 +339,9 @@ class _CajeroContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cajaState = ref.watch(cajaProvider);
+    final dash = ref.watch(dashboardProvider);
     final actual = cajaState.actual;
+    final data = dash.data;
 
     return SliverList(
       delegate: SliverChildListDelegate([
@@ -349,6 +351,36 @@ class _CajeroContent extends StatelessWidget {
           child: _CajaStatusCard(actual: actual, loading: cajaState.isLoading),
         ),
         const SizedBox(height: AppSpacing.sm),
+
+        // ── Stats de ventas del cajero ────────────────────────────────────
+        if (data != null &&
+            (data.misVentasHoy > 0 || data.misVentasMes > 0)) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Ventas hoy',
+                    value: '${data.misVentasHoy}',
+                    icon: Icons.receipt_rounded,
+                    iconColor: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Total hoy',
+                    value: FormatUtils.currency(data.misTotalesHoy),
+                    icon: Icons.payments_rounded,
+                    iconColor: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
 
         // ── Accesos rápidos cajero ────────────────────────────────────────
         Padding(
@@ -431,9 +463,72 @@ class _VendedoraContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dash = ref.watch(dashboardProvider);
+    final data = dash.data;
+
     return SliverList(
       delegate: SliverChildListDelegate([
-        // ── Acceso rápido: nueva venta ────────────────────────────────────
+        // ── Stats de mis ventas ──────────────────────────────────────────
+        if (dash.isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: DSSkeletonList(count: 2),
+          )
+        else if (data != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Ventas hoy',
+                    value: '${data.misVentasHoy}',
+                    icon: Icons.today_rounded,
+                    iconColor: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Total hoy',
+                    value: FormatUtils.currency(data.misTotalesHoy),
+                    icon: Icons.attach_money_rounded,
+                    iconColor: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Ventas del mes',
+                    value: '${data.misVentasMes}',
+                    icon: Icons.calendar_month_rounded,
+                    iconColor: AppColors.info,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: DSStatCard(
+                    label: 'Total del mes',
+                    value: FormatUtils.currency(data.misTotalesMes),
+                    icon: Icons.trending_up_rounded,
+                    iconColor: AppColors.brand,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        const SizedBox(height: AppSpacing.sm),
+
+        // ── Botón nueva venta ────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: GestureDetector(
@@ -442,7 +537,7 @@ class _VendedoraContent extends StatelessWidget {
               GoRouter.of(context).go('/ventas');
             },
             child: Container(
-              height: 64,
+              height: 56,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [AppColors.primary, Color(0xFF1D4ED8)],
@@ -462,8 +557,8 @@ class _VendedoraContent extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
@@ -471,14 +566,14 @@ class _VendedoraContent extends StatelessWidget {
                     child: const Icon(
                       Icons.add_rounded,
                       color: Colors.white,
-                      size: 22,
+                      size: 20,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   const Text(
                     'Nueva venta',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                       letterSpacing: -0.3,
@@ -491,47 +586,12 @@ class _VendedoraContent extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
 
-        // ── Mis ventas rápido ─────────────────────────────────────────────
+        // ── Accesos rápidos ──────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: _QuickActions(auth: auth),
         ),
         const SizedBox(height: AppSpacing.md),
-
-        // ── Estado vacío con guía ─────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          child: DSCard(
-            child: Column(
-              children: [
-                Icon(
-                  Icons.storefront_rounded,
-                  size: 48,
-                  color: AppColors.primary.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                const Text(
-                  'Registra ventas fácilmente',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Usa el botón "Nueva venta" o ve a la sección Ventas desde la barra inferior.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ]),
     );
   }

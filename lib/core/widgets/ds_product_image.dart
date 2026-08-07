@@ -71,26 +71,75 @@ class DSProductImage extends StatelessWidget {
   );
 
   Widget _placeholder() {
-    final initial = (productName?.isNotEmpty ?? false)
-        ? productName![0].toUpperCase()
-        : null;
+    final name = productName ?? '';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    // Color único por nombre del producto
+    final colors = [
+      const Color(0xFF3B82F6),
+      const Color(0xFF8B5CF6),
+      const Color(0xFF10B981),
+      const Color(0xFFEF4444),
+      const Color(0xFFF97316),
+      const Color(0xFF0EA5E9),
+      const Color(0xFFEC4899),
+      const Color(0xFF14B8A6),
+    ];
+    final color = name.isNotEmpty
+        ? colors[name.hashCode.abs() % colors.length]
+        : AppColors.primary;
+
     return Container(
-      color: AppColors.surfaceAlt,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.18),
+            color.withValues(alpha: 0.08),
+          ],
+        ),
+      ),
       child: Center(
-        child: initial != null
-            ? Text(
-                initial,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textTertiary,
-                ),
-              )
-            : const Icon(
-                Icons.liquor_rounded,
-                size: 28,
-                color: AppColors.textTertiary,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
               ),
+              child: Center(
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ),
+            ),
+            if (name.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w500,
+                    color: color.withValues(alpha: 0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

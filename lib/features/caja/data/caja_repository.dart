@@ -183,7 +183,8 @@ class CajaSesion {
           )
         : null,
     denominaciones: (json['denominaciones'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
         .toList(),
   );
 
@@ -301,10 +302,8 @@ class CajaRepository {
     final json = Map<String, dynamic>.from(response.data as Map);
     return CajaPage(
       data: (json['data'] as List? ?? const [])
-          .map(
-            (item) =>
-                CajaSesion.fromJson(Map<String, dynamic>.from(item as Map)),
-          )
+          .whereType<Map>()
+          .map((item) => CajaSesion.fromJson(Map<String, dynamic>.from(item)))
           .toList(),
       total: (json['total'] as num?)?.toInt() ?? 0,
       pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
