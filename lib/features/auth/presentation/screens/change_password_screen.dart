@@ -62,7 +62,27 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       backgroundColor: AppColors.background,
       appBar: widget.isForced
           ? null
-          : AppBar(title: const Text('Cambiar contrasena')),
+          : AppBar(
+              backgroundColor: AppColors.background,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 18,
+                  color: AppColors.textPrimary,
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: const Text(
+                'Cambiar contraseña',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
       body: SafeArea(
         child: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),

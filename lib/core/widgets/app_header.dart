@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import 'drawer_scope.dart';
 
 /// AppHeader unificado para toda la aplicación BarBeer
 ///
-/// Pantallas principales: logo BarBeer + subtítulo de rol + hamburger (si hay drawer)
-/// Subpantallas: flecha atrás + título + acciones
+/// - Pantallas principales (isMainScreen=true): logo BarBeer + hamburger si hay drawer
+/// - Subpantallas: flecha atrás + título + acciones
+///
+/// El hamburger detecta el drawer via [DrawerScope] (propagado desde ShellScreen),
+/// no via Scaffold.maybeOf — esto garantiza que funcione aunque la pantalla
+/// tenga su propio Scaffold interno (sin drawer).
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final String? subtitle;
@@ -16,7 +22,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final Color? backgroundColor;
   final bool showShadow;
   final bool centerTitle;
-  final bool isMainScreen; // true = muestra logo BarBeer en lugar del título
+  final bool isMainScreen;
 
   const AppHeader({
     super.key,
@@ -52,7 +58,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
         child: SizedBox(
           height: kToolbarHeight,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
             child: Row(
               children: [
                 // ── Leading ──────────────────────────────────────────────
@@ -60,14 +66,17 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
                 // ── Título ───────────────────────────────────────────────
                 Expanded(
-                  child: isMainScreen ? _buildBrandTitle() : _buildTitle(),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: isMainScreen ? _buildBrandTitle() : _buildTitle(),
+                  ),
                 ),
 
                 // ── Acciones ─────────────────────────────────────────────
                 if (actions != null)
                   ...actions!.map(
                     (a) => Padding(
-                      padding: const EdgeInsets.only(left: 4),
+                      padding: const EdgeInsets.only(left: 2),
                       child: a,
                     ),
                   ),
@@ -82,44 +91,32 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   Widget _buildLeading(BuildContext context) {
     if (leading != null) return leading!;
 
+    // Subpantalla → flecha atrás
     if (showBackButton) {
-      return IconButton(
-        icon: const Icon(
-          Icons.arrow_back_ios_new_rounded,
-          size: 18,
-          color: AppColors.textPrimary,
-        ),
-        onPressed: onBackTap ?? () => Navigator.of(context).pop(),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      return _HeaderBtn(
+        icon: Icons.arrow_back_ios_new_rounded,
+        onTap: onBackTap ?? () => Navigator.of(context).pop(),
       );
     }
 
-    // Hamburger — solo visible si el Scaffold tiene drawer
-    return Builder(
-      builder: (ctx) {
-        final scaffold = Scaffold.maybeOf(ctx);
-        final hasDrawer = scaffold?.hasDrawer ?? false;
-        if (!hasDrawer) return const SizedBox(width: 4);
-        return IconButton(
-          icon: const Icon(
-            Icons.menu_rounded,
-            size: 22,
-            color: AppColors.textPrimary,
-          ),
-          onPressed: () => scaffold!.openDrawer(),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-        );
-      },
-    );
+    // Pantalla principal → hamburger via DrawerScope
+    final scope = DrawerScope.maybeOf(context);
+    if (scope != null && scope.hasDrawer) {
+      return _HeaderBtn(
+        icon: Icons.menu_rounded,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          scope.openDrawer();
+        },
+      );
+    }
+
+    return const SizedBox(width: 8);
   }
 
-  // Logo "BarBeer" estilo referencia
   Widget _buildBrandTitle() {
     return Row(
       children: [
-        const SizedBox(width: 4),
         RichText(
           text: const TextSpan(
             children: [
@@ -166,7 +163,6 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  // Título normal para pantallas secundarias
   Widget _buildTitle() {
     if (subtitle != null) {
       return Column(
@@ -205,6 +201,30 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
         letterSpacing: -0.3,
       ),
       overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+// ─── Botón de header compacto (hamburger / flecha) ────────────────────────────
+
+class _HeaderBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _HeaderBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Icon(icon, size: 22, color: AppColors.textPrimary),
+        ),
+      ),
     );
   }
 }

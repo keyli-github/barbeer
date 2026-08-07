@@ -107,34 +107,37 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
               : RefreshIndicator(
                   color: AppColors.primary,
                   onRefresh: _refresh,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      0,
-                      AppSpacing.md,
-                      120,
-                    ),
-                    itemCount:
-                        ventas.length +
-                        (state.totalPaginas > state.pagina ? 1 : 0),
-                    itemBuilder: (_, i) {
-                      if (i == ventas.length) {
-                        return _LoadMoreButton(
-                          onTap: () => ref
-                              .read(ventasListProvider(_useMis).notifier)
-                              .load(pagina: state.pagina + 1),
+                  child: Container(
+                    color: AppColors.background,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 120),
+                      itemCount:
+                          ventas.length +
+                          (state.totalPaginas > state.pagina ? 1 : 0),
+                      separatorBuilder: (_, __) => const Divider(
+                        height: 1,
+                        indent: 71,
+                        color: AppColors.borderLight,
+                      ),
+                      itemBuilder: (_, i) {
+                        if (i == ventas.length) {
+                          return _LoadMoreButton(
+                            onTap: () => ref
+                                .read(ventasListProvider(_useMis).notifier)
+                                .load(pagina: state.pagina + 1),
+                          );
+                        }
+                        return _VentaCard(
+                          venta: ventas[i],
+                          canConciliar: canConciliarV,
+                          canAnular: canAnularV,
+                          onTap: () => _openDetail(ventas[i]),
+                          onConciliar: canConciliarV && ventas[i].isPendiente
+                              ? () => _openConciliar(ventas[i])
+                              : null,
                         );
-                      }
-                      return _VentaCard(
-                        venta: ventas[i],
-                        canConciliar: canConciliarV,
-                        canAnular: canAnularV,
-                        onTap: () => _openDetail(ventas[i]),
-                        onConciliar: canConciliarV && ventas[i].isPendiente
-                            ? () => _openConciliar(ventas[i])
-                            : null,
-                      );
-                    },
+                      },
+                    ),
                   ),
                 ),
         ),
@@ -280,7 +283,7 @@ class _KpiDiv extends StatelessWidget {
       Container(width: 1, height: 28, color: AppColors.border);
 }
 
-// ─── Venta card ───────────────────────────────────────────────────────────────
+// ─── Venta card — compacta estilo iOS ────────────────────────────────────────
 
 class _VentaCard extends StatelessWidget {
   final Venta venta;
@@ -298,142 +301,149 @@ class _VentaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = venta.isAnulada
+    final isAnulada = venta.isAnulada;
+    final isPendiente = venta.isPendiente;
+    final statusColor = isAnulada
         ? AppColors.error
-        : venta.isPendiente
+        : isPendiente
         ? AppColors.warning
         : AppColors.success;
-    final statusLabel = venta.isAnulada
-        ? 'ANULADA'
-        : venta.isPendiente
-        ? 'PENDIENTE'
-        : 'ACTIVA';
 
     DateTime? dt;
     try {
       dt = DateTime.parse(venta.createdAt);
     } catch (_) {}
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: DSCard(
-        onTap: onTap,
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 10,
+        ),
+        child: Row(
           children: [
-            Row(
-              children: [
-                // Miniaturas de productos
-                if (venta.items.isNotEmpty)
-                  SizedBox(
-                    height: 36,
-                    child: Stack(
-                      children: venta.items
-                          .take(3)
-                          .toList()
-                          .asMap()
-                          .entries
-                          .map((e) {
-                            return Positioned(
-                              left: e.key * 24.0,
-                              child: DSProductImageSquare(
-                                imageUrl: null,
-                                productName: e.value.productoNombre,
-                                size: 36,
-                                radius: 8,
-                              ),
-                            );
-                          })
-                          .toList(),
+            // Barra de color
+            Container(
+              width: 3,
+              height: 40,
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            // Imagen miniatura
+            DSProductImageSquare(
+              imageUrl: null,
+              productName: venta.items.isNotEmpty
+                  ? venta.items.first.productoNombre
+                  : null,
+              size: 40,
+              radius: 8,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    venta.codigo,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                SizedBox(
-                  width: venta.items.isNotEmpty
-                      ? AppSpacing.sm + venta.items.take(3).length * 24.0 - 24
-                      : 0,
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        venta.codigo,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
                       if (venta.vendedoraUsername != null)
-                        Text(
-                          venta.vendedoraUsername!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                    ],
+                        venta.vendedoraUsername!,
+                      if (dt != null) FormatUtils.timeAgo(dt),
+                    ].join(' · '),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Precio + badge
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  FormatUtils.currency(venta.total),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      FormatUtils.currency(venta.total),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
+                const SizedBox(height: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isAnulada
+                        ? 'ANULADA'
+                        : isPendiente
+                        ? 'PENDIENTE'
+                        : 'ACTIVA',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                      letterSpacing: 0.3,
                     ),
-                    const SizedBox(height: 4),
-                    DSStatusBadge(label: statusLabel, color: statusColor),
-                  ],
+                  ),
                 ),
               ],
             ),
-            if (dt != null || onConciliar != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  if (dt != null)
-                    Text(
-                      FormatUtils.dateTime(dt),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textTertiary,
-                      ),
+            const SizedBox(width: 6),
+            // Clasificar o chevron
+            if (onConciliar != null)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  onConciliar!();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Clasificar',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
                     ),
-                  const Spacer(),
-                  if (onConciliar != null)
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        onConciliar!();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primarySurface,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'Clasificar',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+                  ),
+                ),
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.textTertiary,
               ),
-            ],
           ],
         ),
       ),
@@ -445,9 +455,9 @@ class _LoadMoreButton extends StatelessWidget {
   final VoidCallback onTap;
   const _LoadMoreButton({required this.onTap});
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-    child: Center(
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: TextButton(
         onPressed: onTap,
         child: const Text(

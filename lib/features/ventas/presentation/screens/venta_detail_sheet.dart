@@ -4,13 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/widgets/ds_card.dart';
-import '../../../../core/widgets/ds_list_tile.dart';
 import '../../../../core/widgets/ds_product_image.dart';
-import '../../../../core/widgets/ds_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
+import '../../../../core/widgets/ds_states.dart';
 
 class VentaDetailSheet extends ConsumerStatefulWidget {
   final Venta venta;
@@ -31,8 +29,13 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Anular venta'),
-        content: Text('¿Anular la venta ${widget.venta.codigo}?'),
+        title: const Text(
+          'Anular venta',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          '¿Seguro que deseas anular la venta ${widget.venta.codigo}? Esta acción no se puede deshacer.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -41,7 +44,10 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Anular'),
+            child: const Text(
+              'Anular',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -73,44 +79,57 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final canAnular = canAnularVenta(auth) && !widget.venta.isAnulada;
-    final venta = widget.venta;
+    final v = widget.venta;
 
     DateTime? dt;
     try {
-      dt = DateTime.parse(venta.createdAt);
+      dt = DateTime.parse(v.createdAt);
     } catch (_) {}
 
-    final statusColor = venta.isAnulada
+    final isAnulada = v.isAnulada;
+    final isPendiente = v.isPendiente;
+    final statusColor = isAnulada
         ? AppColors.error
-        : venta.isPendiente
+        : isPendiente
         ? AppColors.warning
         : AppColors.success;
-    final statusLabel = venta.isAnulada
+    final statusLabel = isAnulada
         ? 'ANULADA'
-        : venta.isPendiente
+        : isPendiente
         ? 'PENDIENTE'
         : 'ACTIVA';
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
+        maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
       decoration: const BoxDecoration(
-        color: AppColors.background,
+        color: AppColors.backgroundAlt,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
-          // Handle
-          _SheetHandle(),
+          // ── Handle ─────────────────────────────────────────────────
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
 
-          // Header
-          Padding(
+          // ── Cabecera ───────────────────────────────────────────────
+          Container(
+            color: AppColors.background,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
-              AppSpacing.sm,
+              AppSpacing.xs,
               AppSpacing.md,
-              0,
+              AppSpacing.md,
             ),
             child: Row(
               children: [
@@ -118,118 +137,141 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Detalle de venta',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                      Text(
+                        v.codigo,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
                           color: AppColors.textPrimary,
                           letterSpacing: -0.3,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        'Información completa',
+                        dt != null ? FormatUtils.dateTime(dt) : '—',
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ),
-                DSStatusBadge(label: statusLabel, color: statusColor),
+                // Badge de estado grande
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
 
-          const SizedBox(height: AppSpacing.sm),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AppColors.border),
 
-          // Contenido scrollable
+          // ── Contenido scrollable ───────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.xl,
-              ),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Resumen ──────────────────────────────────────────
-                  DSCard(
-                    child: Column(
+                  // ── Total prominente ────────────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.md,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _InfoRow('Código', venta.codigo, monospace: true),
-                        const Divider(height: 16),
-                        _InfoRow('Sede', venta.sedeId),
-                        if (venta.vendedoraUsername != null) ...[
-                          const Divider(height: 16),
-                          _InfoRow('Vendedora', venta.vendedoraUsername!),
-                        ],
-                        const Divider(height: 16),
-                        _InfoRow(
-                          'Fecha',
-                          dt != null ? FormatUtils.dateTime(dt) : '—',
+                        const Text(
+                          'Total de la venta',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.primary,
+                          ),
                         ),
-                        const Divider(height: 16),
-                        _InfoRow(
-                          'Total',
-                          FormatUtils.currency(venta.total),
-                          valueStyle: const TextStyle(
-                            fontSize: 18,
+                        Text(
+                          FormatUtils.currency(v.total),
+                          style: const TextStyle(
+                            fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: AppColors.primary,
+                            letterSpacing: -0.5,
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  // ── Conciliación ─────────────────────────────────────
-                  if (venta.conciliacion != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    _SectionLabel('Clasificación de pago'),
-                    DSCard(
-                      child: Column(
-                        children: [
-                          _InfoRow(
-                            'Estado',
-                            estadoConciliacionLabel(venta.conciliacion!.estado),
-                          ),
-                          if (venta.conciliacion!.etiquetaNombre != null) ...[
-                            const Divider(height: 16),
-                            _InfoRow(
-                              'Billetera',
-                              venta.conciliacion!.etiquetaNombre!,
-                            ),
-                          ],
-                          if (venta.conciliacion!.comprobante != null) ...[
-                            const Divider(height: 16),
-                            _InfoRow(
-                              'Comprobante',
-                              venta.conciliacion!.comprobante!,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // ── Ítems ─────────────────────────────────────────────
                   const SizedBox(height: AppSpacing.md),
-                  _SectionLabel('Detalle de ítems'),
-                  DSCard(
+
+                  // ── Info general ────────────────────────────────────
+                  _SectionLabel('Información general'),
+                  _InfoCard(
+                    children: [
+                      _InfoRow('Sede', v.sedeId),
+                      if (v.vendedoraUsername != null) ...[
+                        const _Divider(),
+                        _InfoRow('Vendedora', v.vendedoraUsername!),
+                      ],
+                      const _Divider(),
+                      _InfoRow(
+                        'Sesión de caja',
+                        v.cajaSesionId.length > 8
+                            ? '...${v.cajaSesionId.substring(v.cajaSesionId.length - 8)}'
+                            : v.cajaSesionId,
+                        mono: true,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppSpacing.md),
+
+                  // ── Ítems de la venta ───────────────────────────────
+                  _SectionLabel('Productos (${v.items.length})'),
+                  _InfoCard(
                     padding: EdgeInsets.zero,
-                    child: Column(
-                      children: venta.items.asMap().entries.map((e) {
-                        final i = e.key;
+                    children: [
+                      ...v.items.asMap().entries.map((e) {
+                        final idx = e.key;
                         final item = e.value;
                         return Column(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(AppSpacing.md),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: 10,
+                              ),
                               child: Row(
                                 children: [
                                   DSProductImageSquare(
@@ -277,80 +319,81 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                                 ],
                               ),
                             ),
-                            if (i < venta.items.length - 1)
-                              const Divider(height: 1, indent: 72),
+                            if (idx < v.items.length - 1)
+                              const Divider(
+                                height: 1,
+                                indent: 72,
+                                color: AppColors.borderLight,
+                              ),
                           ],
                         );
-                      }).toList(),
-                    ),
+                      }),
+                    ],
                   ),
 
-                  // ── Total ─────────────────────────────────────────────
-                  const SizedBox(height: AppSpacing.xs),
-                  DSCard(
-                    backgroundColor: AppColors.primarySurface,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // ── Clasificación de pago ───────────────────────────
+                  if (v.conciliacion != null) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _SectionLabel('Método de pago'),
+                    _InfoCard(
                       children: [
-                        const Text(
-                          'Total',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        Text(
-                          FormatUtils.currency(venta.total),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Info técnica ─────────────────────────────────────
-                  const SizedBox(height: AppSpacing.md),
-                  _SectionLabel('Información técnica'),
-                  DSCard(
-                    child: Column(
-                      children: [
-                        _InfoRow('ID', venta.id, monospace: true),
-                        const Divider(height: 16),
                         _InfoRow(
-                          'Sesión de caja',
-                          venta.cajaSesionId,
-                          monospace: true,
+                          'Estado',
+                          estadoConciliacionLabel(v.conciliacion!.estado),
                         ),
+                        if (v.conciliacion!.etiquetaNombre != null) ...[
+                          const _Divider(),
+                          _InfoRow(
+                            'Billetera',
+                            v.conciliacion!.etiquetaNombre!,
+                          ),
+                        ],
+                        if (v.conciliacion!.codigoOperacion != null) ...[
+                          const _Divider(),
+                          _InfoRow(
+                            'Código op.',
+                            v.conciliacion!.codigoOperacion!,
+                          ),
+                        ],
+                        if (v.conciliacion!.comprobante != null) ...[
+                          const _Divider(),
+                          _InfoRow('Comprobante', v.conciliacion!.comprobante!),
+                        ],
                       ],
                     ),
-                  ),
+                  ],
 
-                  // ── Error anular ──────────────────────────────────────
+                  // ── Error y botón anular ────────────────────────────
                   if (_errorAnular != null) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
                         color: AppColors.errorLight,
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusMD,
-                        ),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        _errorAnular!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.error,
-                        ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            size: 16,
+                            color: AppColors.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorAnular!,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
 
-                  // ── Botón anular ──────────────────────────────────────
                   if (canAnular) ...[
                     const SizedBox(height: AppSpacing.md),
                     SizedBox(
@@ -360,26 +403,29 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                         onPressed: _anulando ? null : _anular,
                         icon: _anulando
                             ? const SizedBox(
-                                width: 18,
-                                height: 18,
+                                width: 16,
+                                height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
+                                  color: AppColors.error,
                                 ),
                               )
-                            : const Icon(Icons.cancel_outlined, size: 18),
-                        label: Text(_anulando ? 'Anulando...' : 'Anular venta'),
+                            : const Icon(Icons.block_rounded, size: 18),
+                        label: Text(
+                          _anulando ? 'Anulando...' : 'Anular esta venta',
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.error,
                           side: const BorderSide(color: AppColors.error),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusMD,
-                            ),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),
                     ),
                   ],
+
+                  const SizedBox(height: AppSpacing.xl),
                 ],
               ),
             ),
@@ -392,75 +438,85 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
 
 // ─── Widgets auxiliares ───────────────────────────────────────────────────────
 
-class _SheetHandle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Container(
-      margin: const EdgeInsets.only(top: 12, bottom: 4),
-      width: 36,
-      height: 4,
-      decoration: BoxDecoration(
-        color: AppColors.border,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    ),
-  );
-}
-
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+    padding: const EdgeInsets.only(bottom: 6),
     child: Text(
       text,
       style: const TextStyle(
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
-        letterSpacing: 0.2,
+        color: AppColors.textTertiary,
+        letterSpacing: 0.5,
+        textBaseline: TextBaseline.alphabetic,
       ),
+    ),
+  );
+}
+
+class _InfoCard extends StatelessWidget {
+  final List<Widget> children;
+  final EdgeInsetsGeometry? padding;
+  const _InfoCard({required this.children, this.padding});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: AppColors.background,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.border, width: 0.75),
+    ),
+    padding:
+        padding ??
+        const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
     ),
   );
 }
 
 class _InfoRow extends StatelessWidget {
   final String label, value;
-  final bool monospace;
-  final TextStyle? valueStyle;
-  const _InfoRow(
-    this.label,
-    this.value, {
-    this.monospace = false,
-    this.valueStyle,
-  });
+  final bool mono;
+  const _InfoRow(this.label, this.value, {this.mono = false});
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-      ),
-      const SizedBox(width: AppSpacing.sm),
-      Flexible(
-        child: Text(
-          value,
-          textAlign: TextAlign.right,
-          style:
-              valueStyle ??
-              TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontFamily: monospace ? 'monospace' : null,
-              ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
-      ),
-    ],
+        const SizedBox(width: AppSpacing.md),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+              fontFamily: mono ? 'monospace' : null,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
   );
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, color: AppColors.borderLight);
 }

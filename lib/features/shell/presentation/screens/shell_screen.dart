@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
+import '../../../../core/widgets/drawer_scope.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─── Modelos de navegación ────────────────────────────────────────────────────
@@ -166,6 +167,9 @@ const _baseNav = [
 
 // ─── Shell principal ──────────────────────────────────────────────────────────
 
+// GlobalKey para abrir el drawer desde cualquier parte del árbol
+final shellScaffoldKey = GlobalKey<ScaffoldState>();
+
 class ShellScreen extends ConsumerWidget {
   final Widget child;
   final String currentPath;
@@ -190,23 +194,28 @@ class ShellScreen extends ConsumerWidget {
         systemNavigationBarColor: Colors.white,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        drawer: showDrawer
-            ? _AppDrawer(
-                current: currentPath,
-                auth: auth,
-                go: (p) => context.go(p),
-                logout: () => ref.read(authProvider.notifier).logout(),
-              )
-            : null,
-        drawerEnableOpenDragGesture: showDrawer,
-        body: child,
-        bottomNavigationBar: _BottomNavBar(
-          current: currentPath,
-          go: (p) => context.go(p),
-          items: navItems,
-          showDrawer: showDrawer,
+      child: DrawerScope(
+        hasDrawer: showDrawer,
+        openDrawer: () => shellScaffoldKey.currentState?.openDrawer(),
+        child: Scaffold(
+          key: shellScaffoldKey,
+          backgroundColor: AppColors.background,
+          drawer: showDrawer
+              ? _AppDrawer(
+                  current: currentPath,
+                  auth: auth,
+                  go: (p) => context.go(p),
+                  logout: () => ref.read(authProvider.notifier).logout(),
+                )
+              : null,
+          drawerEnableOpenDragGesture: showDrawer,
+          body: child,
+          bottomNavigationBar: _BottomNavBar(
+            current: currentPath,
+            go: (p) => context.go(p),
+            items: navItems,
+            showDrawer: showDrawer,
+          ),
         ),
       ),
     );
