@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
-import 'drawer_scope.dart';
 
 /// AppHeader unificado para toda la aplicación BarBeer
 ///
@@ -99,18 +98,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
       );
     }
 
-    // Pantalla principal → hamburger via DrawerScope
-    final scope = DrawerScope.maybeOf(context);
-    if (scope != null && scope.hasDrawer) {
-      return _HeaderBtn(
-        icon: Icons.menu_rounded,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          scope.openDrawer();
-        },
-      );
-    }
-
+    // Pantallas principales → sin hamburger, solo espacio
     return const SizedBox(width: 8);
   }
 

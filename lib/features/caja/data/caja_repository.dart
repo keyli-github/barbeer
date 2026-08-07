@@ -158,7 +158,9 @@ class CajaSesion {
     cierreForzado: json['cierreForzado'] as bool? ?? false,
     motivoCierreForzado: json['motivoCierreForzado'] as String?,
     sedeId: json['sedeId'] as String? ?? '',
-    sede: (json['sede'] as Map?)?['nombre'] as String? ?? '',
+    sede: json['sede'] is Map
+        ? (json['sede'] as Map)['nombre'] as String? ?? ''
+        : json['sede'] as String? ?? '',
     montoApertura: (json['montoApertura'] as num?)?.toDouble() ?? 0,
     abiertaAt: DateTime.parse(json['abiertaAt'] as String),
     cerradaAt: _date(json['cerradaAt']),
@@ -172,8 +174,9 @@ class CajaSesion {
     saldoEsperadoCierre: (json['saldoEsperadoCierre'] as num?)?.toDouble(),
     diferenciaCierre: (json['diferenciaCierre'] as num?)?.toDouble(),
     observacionesCierre: json['observacionesCierre'] as String?,
-    usuarioApertura:
-        (json['usuarioApertura'] as Map?)?['username'] as String? ?? '',
+    usuarioApertura: json['usuarioApertura'] is Map
+        ? (json['usuarioApertura'] as Map)['username'] as String? ?? ''
+        : json['usuarioApertura'] as String? ?? '',
     resumen: json['resumen'] is Map
         ? CajaResumen.fromJson(
             Map<String, dynamic>.from(json['resumen'] as Map),
@@ -231,7 +234,9 @@ class CajaMovimiento {
     ventaId: json['ventaId'] as String?,
     referencia: json['referencia'] as String?,
     comprobante: json['comprobante'] as String?,
-    usuario: (json['usuario'] as Map?)?['username'] as String? ?? '',
+    usuario: json['usuario'] is Map
+        ? (json['usuario'] as Map)['username'] as String? ?? ''
+        : json['usuario'] as String? ?? '',
     createdAt: DateTime.parse(json['createdAt'] as String),
   );
 }
