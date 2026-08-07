@@ -9,8 +9,6 @@ import '../../../../core/utils/format_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -21,66 +19,94 @@ class DashboardScreen extends ConsumerWidget {
     final user = auth.user;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: Colors.white,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
-        child: CustomScrollView(
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            // ── Header fijo con logo y avatar ──
-            SliverToBoxAdapter(
-              child: _DashHeader(user: user, data: data),
-            ),
-
-            // ── Selector de sede ──
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  0,
-                  AppSpacing.md,
-                  AppSpacing.sm,
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 12,
+            bottom: 120,
+          ),
+          children: [
+            // ── Header BarBeer + Superadmin ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    const TextSpan(
+                      text: 'Bar',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const TextSpan(
+                      text: 'Beer',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.brand,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '\n${FormatUtils.roleName(user?.rol ?? '')}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.roleColor(user?.rol ?? ''),
+                        height: 1.8,
+                      ),
+                    ),
+                  ],
                 ),
-                child: _SedeCard(data: data, ref: ref, auth: auth),
               ),
             ),
 
-            // ── KPI Grid 2×2 ──
+            const SizedBox(height: 12),
+
+            // ── Sede selector compacto ────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _SedeSelector(data: data, ref: ref, auth: auth),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── KPIs 2×2 compactos ────────────────────────────────────────
             if (!data.loading)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                sliver: SliverToBoxAdapter(
-                  child: _KpiGrid(data: data, auth: auth, context: context),
-                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _CompactKpis(data: data, auth: auth, ctx: context),
               )
             else
-              SliverToBoxAdapter(child: _KpiSkeleton()),
+              _SkeletonKpis(),
 
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+            const SizedBox(height: 16),
 
-            // ── Gráfica de ventas ──
+            // ── Gráfica ventas con filtro ─────────────────────────────────
             if (!data.loading &&
                 (auth.hasPermission('ventas:leer') ||
                     auth.hasPermission('ventas:leer-propias')))
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  0,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                ),
-                sliver: SliverToBoxAdapter(child: _SalesChart(data: data)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _ChartSection(data: data),
               ),
 
-            // ── Actividad reciente ──
-            if (data.audit.isNotEmpty)
-              SliverToBoxAdapter(child: _RecentActivity(audit: data.audit)),
+            const SizedBox(height: 16),
 
-            // ── Accesos rápidos ──
-            SliverToBoxAdapter(child: _QuickAccess(auth: auth)),
+            // ── Actividad reciente (4 items + ver más) ────────────────────
+            if (data.audit.isNotEmpty) _ActivitySection(audit: data.audit),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            const SizedBox(height: 16),
+
+            // ── Accesos rápidos ───────────────────────────────────────────
+            _QuickRow(auth: auth),
           ],
         ),
       ),
@@ -88,249 +114,165 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────────
+// ─── Sede selector ────────────────────────────────────────────────────────────
 
-class _DashHeader extends StatelessWidget {
-  final dynamic user;
-  final DashboardData data;
-  const _DashHeader({required this.user, required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final un = user?.username ?? '';
-    final rol = user?.rol ?? '';
-    final top = MediaQuery.of(context).padding.top;
-
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.fromLTRB(AppSpacing.md, top + 12, AppSpacing.md, 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Logo BarBeer
-                RichText(
-                  text: const TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Bar',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      TextSpan(
-                        text: 'Beer',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.brand,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 2),
-                // Badge de rol naranja
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.roleColor(rol).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    FormatUtils.roleName(rol),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.roleColor(rol),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Avatar del usuario (foto o iniciales)
-          _UserAvatar(username: un),
-        ],
-      ),
-    );
-  }
-}
-
-class _UserAvatar extends StatelessWidget {
-  final String username;
-  const _UserAvatar({required this.username});
-  @override
-  Widget build(BuildContext context) {
-    final color = AppColors.avatarColor(username);
-    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
-    return GestureDetector(
-      onTap: () => GoRouter.of(context).go('/perfil'),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          shape: BoxShape.circle,
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
-        ),
-        child: Center(
-          child: Text(
-            initial,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Selector de sede ─────────────────────────────────────────────────────────
-
-class _SedeCard extends StatelessWidget {
+class _SedeSelector extends StatelessWidget {
   final DashboardData data;
   final WidgetRef ref;
   final AuthState auth;
-  const _SedeCard({required this.data, required this.ref, required this.auth});
+  const _SedeSelector({
+    required this.data,
+    required this.ref,
+    required this.auth,
+  });
 
-  bool get canSelectSede =>
+  bool get canSelect =>
       auth.user?.isSuperAdmin == true && data.sedes.isNotEmpty;
-
-  String get sedeName {
-    if (data.selectedSede != null) return data.selectedSede!.nombre;
-    if (auth.user?.sede != null) return auth.user!.sede!;
-    return 'Sin sede asignada';
-  }
-
-  String get sedeCode {
-    if (data.selectedSede != null) return data.selectedSede!.codigo;
-    return '';
-  }
-
-  bool get cajaAbierta => data.cajaActual?.isAbierta ?? false;
-
-  void _showSedePicker(BuildContext context) {
-    HapticFeedback.lightImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _SedePickerSheet(
-        sedes: data.sedes,
-        selectedId: data.selectedSedeId,
-        onSelect: (id) {
-          ref.read(dashboardProvider.notifier).selectSede(id);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
+    final nombre = data.selectedSede?.nombre ?? auth.user?.sede ?? 'Sin sede';
+    final abierto = data.cajaActual?.isAbierta ?? false;
+    final code = data.selectedSede?.codigo ?? '';
+
     return GestureDetector(
-      onTap: canSelectSede ? () => _showSedePicker(context) : null,
+      onTap: canSelect ? () => _pick(context) : null,
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 0.75),
-          boxShadow: AppShadows.card,
+          color: const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFECEDF0)),
         ),
         child: Row(
           children: [
             // Icono sede
             Container(
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.store_rounded,
                 color: AppColors.primary,
-                size: 24,
+                size: 20,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    sedeName,
+                    nombre,
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Container(
-                        width: 7,
-                        height: 7,
+                        width: 6,
+                        height: 6,
                         decoration: BoxDecoration(
-                          color: cajaAbierta
+                          color: abierto
                               ? AppColors.success
                               : AppColors.textTertiary,
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                       Text(
-                        cajaAbierta ? 'Abierto' : 'Cerrado',
+                        abierto ? 'Abierto' : 'Cerrado',
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: cajaAbierta
+                          fontSize: 11,
+                          color: abierto
                               ? AppColors.success
                               : AppColors.textTertiary,
                         ),
                       ),
-                      if (sedeCode.isNotEmpty) ...[
-                        const Text(
-                          ' • ',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
+                      if (code.isNotEmpty)
                         Text(
-                          sedeCode,
+                          ' • $code',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: AppColors.textTertiary,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],
               ),
             ),
-            if (canSelectSede)
+            if (canSelect)
               const Icon(
                 Icons.keyboard_arrow_down_rounded,
+                size: 20,
                 color: AppColors.textTertiary,
-                size: 22,
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _pick(BuildContext context) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Seleccionar sede',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            // Opción "Todas"
+            _SedeOpt(
+              name: 'Todas las sedes',
+              selected: data.selectedSedeId == null,
+              onTap: () {
+                ref.read(dashboardProvider.notifier).selectSede(null);
+                Navigator.pop(context);
+              },
+            ),
+            ...data.sedes.map(
+              (s) => _SedeOpt(
+                name: s.nombre,
+                code: s.codigo,
+                active: s.activo,
+                selected: data.selectedSedeId == s.id,
+                onTap: () {
+                  ref.read(dashboardProvider.notifier).selectSede(s.id);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -338,337 +280,218 @@ class _SedeCard extends StatelessWidget {
   }
 }
 
-// ─── Picker de sedes ──────────────────────────────────────────────────────────
-
-class _SedePickerSheet extends StatelessWidget {
-  final List<DashboardSede> sedes;
-  final String? selectedId;
-  final ValueChanged<String?> onSelect;
-  const _SedePickerSheet({
-    required this.sedes,
-    required this.selectedId,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 10, bottom: 8),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Seleccionar sede',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-          ),
-          const Divider(height: 1, color: AppColors.border),
-          // Opción "Todas"
-          _SedeOption(
-            name: 'Todas las sedes',
-            code: '',
-            active: true,
-            selected: selectedId == null,
-            onTap: () => onSelect(null),
-          ),
-          ...sedes.map(
-            (s) => _SedeOption(
-              name: s.nombre,
-              code: s.codigo,
-              active: s.activo,
-              selected: selectedId == s.id,
-              onTap: () => onSelect(s.id),
-            ),
-          ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-        ],
-      ),
-    );
-  }
-}
-
-class _SedeOption extends StatelessWidget {
-  final String name, code;
+class _SedeOpt extends StatelessWidget {
+  final String name;
+  final String? code;
   final bool active, selected;
   final VoidCallback onTap;
-  const _SedeOption({
+  const _SedeOpt({
     required this.name,
-    required this.code,
-    required this.active,
+    this.code,
+    this.active = true,
     required this.selected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if (code.isNotEmpty)
-                  Text(
-                    'ID $code',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-              ],
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+              ),
             ),
           ),
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: active ? AppColors.success : AppColors.textTertiary,
-              shape: BoxShape.circle,
+          if (code != null)
+            Text(
+              code!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textTertiary,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           if (selected)
-            const Icon(Icons.check_rounded, color: AppColors.primary, size: 20),
+            const Icon(Icons.check_rounded, size: 18, color: AppColors.primary),
         ],
       ),
     ),
   );
 }
 
-// ─── KPI Grid 2×2 ─────────────────────────────────────────────────────────────
+// ─── KPIs 2×2 compactos ───────────────────────────────────────────────────────
 
-class _KpiGrid extends StatelessWidget {
+class _CompactKpis extends StatelessWidget {
   final DashboardData data;
   final AuthState auth;
-  final BuildContext context;
-  const _KpiGrid({
+  final BuildContext ctx;
+  const _CompactKpis({
     required this.data,
     required this.auth,
-    required this.context,
+    required this.ctx,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cards = <_KpiCardData>[];
+    final items = <_K>[];
 
-    // Ventas del día — visible si puede leer ventas
     if (auth.hasPermission('ventas:leer') ||
         auth.hasPermission('ventas:leer-propias')) {
       final pct = data.variacionVsAyer;
-      cards.add(
-        _KpiCardData(
+      items.add(
+        _K(
+          icon: Icons.bar_chart_rounded,
+          iconColor: AppColors.primary,
           label: 'Ventas del día',
           value: FormatUtils.currency(data.ventasHoy),
           sub: pct != 0
-              ? '${pct >= 0 ? '↑' : '↓'} ${pct.abs().toStringAsFixed(1)}% vs ayer'
-              : '${data.ventasCountHoy} transacciones',
-          subPositive: pct >= 0,
-          icon: Icons.bar_chart_rounded,
-          iconColor: AppColors.primary,
-          iconBg: AppColors.primarySurface,
-          onTap: () => GoRouter.of(context).go('/ventas'),
+              ? '↑ ${pct.abs().toStringAsFixed(1)}% vs ayer'
+              : '${data.ventasCountHoy} ventas',
+          subOk: pct >= 0,
+          path: '/ventas',
         ),
       );
     }
-
-    // Caja activa
     if (auth.hasPermission('caja:leer')) {
-      cards.add(
-        _KpiCardData(
+      items.add(
+        _K(
+          icon: Icons.account_balance_wallet_rounded,
+          iconColor: const Color(0xFFFF9500),
           label: 'Caja activa',
           value: data.cajaActual?.isAbierta == true
               ? FormatUtils.currency(data.cajaActual!.montoApertura)
               : 'Cerrada',
           sub: data.cajaActual?.isAbierta == true
-              ? 'Apertura: ${FormatUtils.currency(data.cajaActual!.montoApertura)}'
-              : 'Sin turno abierto',
-          subPositive: data.cajaActual?.isAbierta == true,
-          icon: Icons.account_balance_wallet_rounded,
-          iconColor: const Color(0xFFFF9500),
-          iconBg: const Color(0xFFFFF3E0),
-          onTap: () => GoRouter.of(context).go('/caja'),
+              ? 'En ${data.cajaAperturas} apertura${data.cajaAperturas != 1 ? 's' : ''}'
+              : 'Sin turno',
+          subOk: data.cajaActual?.isAbierta == true,
+          path: '/caja',
         ),
       );
     }
-
-    // Stock bajo
     if (auth.hasPermission('inventario:leer')) {
-      cards.add(
-        _KpiCardData(
-          label: 'Stock bajo',
-          value: '${data.stockBajo}',
-          sub: data.stockBajo > 0 ? 'Ver productos' : 'Todo en orden',
-          subPositive: data.stockBajo == 0,
-          subAction: data.stockBajo > 0
-              ? () => GoRouter.of(context).go('/inventario')
-              : null,
+      items.add(
+        _K(
           icon: Icons.inventory_2_rounded,
           iconColor: data.stockBajo > 0 ? AppColors.error : AppColors.success,
-          iconBg: data.stockBajo > 0
-              ? AppColors.errorLight
-              : AppColors.successLight,
-          onTap: () => GoRouter.of(context).go('/inventario'),
+          label: 'Stock bajo',
+          value: '${data.stockBajo}',
+          sub: data.stockBajo > 0 ? 'Ver productos' : 'Todo OK',
+          subOk: data.stockBajo == 0,
+          path: '/inventario',
         ),
       );
     }
-
-    // Sedes activas
     if (auth.hasPermission('establecimientos:leer') && data.sedesTotal > 0) {
-      final pct = data.sedesTotal > 0
-          ? (data.sedesActivas / data.sedesTotal * 100).round()
-          : 0;
-      cards.add(
-        _KpiCardData(
-          label: 'Sedes activas',
-          value: '${data.sedesActivas} / ${data.sedesTotal}',
-          sub: '$pct% operativas',
-          subPositive: pct >= 80,
+      items.add(
+        _K(
           icon: Icons.store_rounded,
           iconColor: AppColors.success,
-          iconBg: AppColors.successLight,
-          onTap: () => GoRouter.of(context).go('/sucursales'),
+          label: 'Sedes activas',
+          value: '${data.sedesActivas} / ${data.sedesTotal}',
+          sub:
+              '${(data.sedesActivas / data.sedesTotal * 100).round()}% operativas',
+          subOk: true,
+          path: '/sucursales',
         ),
       );
     }
-
-    // Mis ventas del mes (vendedora/cajero sin los otros permisos)
-    if (cards.length < 2 &&
-        (auth.hasPermission('ventas:leer-propias') ||
-            auth.hasPermission('ventas:leer'))) {
-      cards.add(
-        _KpiCardData(
-          label: 'Total del mes',
-          value: FormatUtils.currency(data.misTotalesMes),
-          sub: '${data.misVentasMes} ventas',
-          subPositive: true,
+    // Vendedora/cajero: total mes
+    if (items.length < 4 && data.misVentasMes > 0) {
+      items.add(
+        _K(
           icon: Icons.calendar_month_rounded,
           iconColor: AppColors.info,
-          iconBg: AppColors.infoLight,
-          onTap: () => GoRouter.of(context).go('/ventas'),
+          label: 'Total mes',
+          value: FormatUtils.currency(data.misTotalesMes),
+          sub: '${data.misVentasMes} ventas',
+          subOk: true,
+          path: '/ventas',
         ),
       );
     }
 
-    if (cards.isEmpty) return const SizedBox.shrink();
-
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: AppSpacing.sm,
-      crossAxisSpacing: AppSpacing.sm,
-      childAspectRatio: 1.55,
-      children: cards.map((c) => _KpiCard(card: c)).toList(),
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: items
+          .take(4)
+          .map(
+            (k) => SizedBox(
+              width: (MediaQuery.of(context).size.width - 50) / 2,
+              child: _KpiTile(k: k, ctx: ctx),
+            ),
+          )
+          .toList(),
     );
   }
 }
 
-class _KpiCardData {
-  final String label, value, sub;
-  final bool subPositive;
-  final VoidCallback? subAction;
+class _K {
   final IconData icon;
-  final Color iconColor, iconBg;
-  final VoidCallback? onTap;
-  const _KpiCardData({
+  final Color iconColor;
+  final String label, value, sub, path;
+  final bool subOk;
+  const _K({
+    required this.icon,
+    required this.iconColor,
     required this.label,
     required this.value,
     required this.sub,
-    required this.subPositive,
-    this.subAction,
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    this.onTap,
+    required this.subOk,
+    required this.path,
   });
 }
 
-class _KpiCard extends StatelessWidget {
-  final _KpiCardData card;
-  const _KpiCard({required this.card});
-
+class _KpiTile extends StatelessWidget {
+  final _K k;
+  final BuildContext ctx;
+  const _KpiTile({required this.k, required this.ctx});
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: () {
       HapticFeedback.lightImpact();
-      card.onTap?.call();
+      GoRouter.of(ctx).go(k.path);
     },
     child: Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border, width: 0.75),
-        boxShadow: AppShadows.card,
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFECEDF0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: card.iconBg,
-                  borderRadius: BorderRadius.circular(9),
+              Icon(k.icon, size: 18, color: k.iconColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  k.label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Icon(card.icon, color: card.iconColor, size: 17),
-              ),
-              const Spacer(),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: AppColors.textTertiary,
               ),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 6),
           Text(
-            card.label,
+            k.value,
             style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            card.value,
-            style: const TextStyle(
-              fontSize: 15,
+              fontSize: 17,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
               letterSpacing: -0.3,
@@ -677,20 +500,16 @@ class _KpiCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
-          GestureDetector(
-            onTap: card.subAction,
-            child: Text(
-              card.sub,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w500,
-                color: card.subAction != null
-                    ? AppColors.primary
-                    : (card.subPositive ? AppColors.success : AppColors.error),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Text(
+            k.sub,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: k.sub.startsWith('Ver')
+                  ? AppColors.primary
+                  : (k.subOk ? AppColors.success : AppColors.error),
             ),
+            maxLines: 1,
           ),
         ],
       ),
@@ -698,37 +517,21 @@ class _KpiCard extends StatelessWidget {
   );
 }
 
-class _KpiSkeleton extends StatelessWidget {
+class _SkeletonKpis extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-    child: GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: AppSpacing.sm,
-      crossAxisSpacing: AppSpacing.sm,
-      childAspectRatio: 1.55,
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Wrap(
+      spacing: 10,
+      runSpacing: 10,
       children: List.generate(
         4,
         (_) => Container(
+          width: (MediaQuery.of(context).size.width - 50) / 2,
+          height: 80,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border, width: 0.75),
-          ),
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Bone(w: 32, h: 32, r: 9),
-              const Spacer(),
-              _Bone(w: 80, h: 10),
-              const SizedBox(height: 4),
-              _Bone(w: 100, h: 16),
-              const SizedBox(height: 4),
-              _Bone(w: 60, h: 10),
-            ],
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),
@@ -736,14 +539,13 @@ class _KpiSkeleton extends StatelessWidget {
   );
 }
 
-// ─── Gráfica ventas 7 días ────────────────────────────────────────────────────
+// ─── Gráfica con filtro de periodo ────────────────────────────────────────────
 
-class _SalesChart extends StatelessWidget {
+class _ChartSection extends StatelessWidget {
   final DashboardData data;
-  const _SalesChart({required this.data});
+  const _ChartSection({required this.data});
 
   static const _days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
   List<String> _labels() {
     final now = DateTime.now();
     return List.generate(7, (i) {
@@ -757,96 +559,111 @@ class _SalesChart extends StatelessWidget {
     final vals = data.ventasSemana;
     final maxVal = vals.fold(0.0, (m, v) => v > m ? v : m);
     final labels = _labels();
-    final pct = data.variacionSemana;
     final total = data.totalSemana;
+    final pct = data.variacionSemana;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border, width: 0.75),
-        boxShadow: AppShadows.card,
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFECEDF0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabecera
+          // Header
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Ventas últimos 7 días',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      FormatUtils.currency(total),
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    if (pct != 0)
-                      Row(
-                        children: [
-                          Icon(
-                            pct >= 0
-                                ? Icons.arrow_upward_rounded
-                                : Icons.arrow_downward_rounded,
-                            size: 12,
-                            color: pct >= 0
-                                ? AppColors.success
-                                : AppColors.error,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${pct.abs().toStringAsFixed(1)}% vs semana anterior',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: pct >= 0
-                                  ? AppColors.success
-                                  : AppColors.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
+              const Expanded(
+                child: Text(
+                  'Ventas últimos 7 días',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              // Selector de periodo (visual — solo 7D activo por ahora)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE0E2E6)),
+                ),
+                child: const Text(
+                  '7D',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: AppSpacing.md),
-
-          // Gráfica
+          const SizedBox(height: 4),
+          // Total
+          Text(
+            FormatUtils.currency(total),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          if (pct != 0)
+            Row(
+              children: [
+                Icon(
+                  pct >= 0
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
+                  size: 11,
+                  color: pct >= 0 ? AppColors.success : AppColors.error,
+                ),
+                Text(
+                  ' ${pct.abs().toStringAsFixed(1)}% vs semana anterior',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: pct >= 0 ? AppColors.success : AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 12),
+          // Barras
           SizedBox(
-            height: 140,
+            height: 110,
             child: BarChart(
               BarChartData(
-                maxY: maxVal == 0 ? 100 : maxVal * 1.25,
+                maxY: maxVal == 0 ? 100 : maxVal * 1.3,
                 minY: 0,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: maxVal == 0 ? 50 : maxVal * 1.25 / 3,
+                  horizontalInterval: maxVal == 0 ? 50 : maxVal * 1.3 / 3,
                   getDrawingHorizontalLine: (_) =>
-                      const FlLine(color: Color(0xFFF3F4F6), strokeWidth: 1),
+                      const FlLine(color: Color(0xFFECEDF0), strokeWidth: 0.7),
                 ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (v, _) => Text(
+                        v >= 1000
+                            ? '${(v / 1000).toStringAsFixed(0)}K'
+                            : v.toStringAsFixed(0),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
                   ),
                   topTitles: const AxisTitles(
                     sideTitles: SideTitles(showTitles: false),
@@ -860,17 +677,16 @@ class _SalesChart extends StatelessWidget {
                       getTitlesWidget: (v, _) {
                         final i = v.toInt();
                         if (i < 0 || i >= 7) return const SizedBox.shrink();
-                        final isToday = i == 6;
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             labels[i],
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isToday
-                                  ? FontWeight.w800
+                              fontSize: 10,
+                              fontWeight: i == 6
+                                  ? FontWeight.w700
                                   : FontWeight.w400,
-                              color: isToday
+                              color: i == 6
                                   ? AppColors.primary
                                   : AppColors.textTertiary,
                             ),
@@ -880,29 +696,29 @@ class _SalesChart extends StatelessWidget {
                     ),
                   ),
                 ),
-                barGroups: List.generate(7, (i) {
-                  final isToday = i == 6;
-                  return BarChartGroupData(
+                barGroups: List.generate(
+                  7,
+                  (i) => BarChartGroupData(
                     x: i,
                     barRods: [
                       BarChartRodData(
                         toY: vals[i],
-                        color: isToday
+                        color: i == 6
                             ? AppColors.primary
-                            : AppColors.primary.withValues(alpha: 0.25),
-                        width: 28,
+                            : AppColors.primary.withValues(alpha: 0.22),
+                        width: 24,
                         borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(7),
+                          top: Radius.circular(6),
                         ),
                         backDrawRodData: BackgroundBarChartRodData(
                           show: true,
-                          toY: maxVal == 0 ? 100 : maxVal * 1.25,
-                          color: const Color(0xFFF5F6FA),
+                          toY: maxVal == 0 ? 100 : maxVal * 1.3,
+                          color: const Color(0xFFF0F1F3),
                         ),
                       ),
                     ],
-                  );
-                }),
+                  ),
+                ),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipColor: (_) => AppColors.textPrimary,
@@ -917,7 +733,7 @@ class _SalesChart extends StatelessWidget {
                   ),
                 ),
               ),
-              duration: const Duration(milliseconds: 500),
+              duration: const Duration(milliseconds: 400),
               curve: Curves.easeOutCubic,
             ),
           ),
@@ -927,171 +743,132 @@ class _SalesChart extends StatelessWidget {
   }
 }
 
-// ─── Actividad reciente ───────────────────────────────────────────────────────
+// ─── Actividad reciente (4 items max + ver más) ───────────────────────────────
 
-class _RecentActivity extends StatelessWidget {
+class _ActivitySection extends StatelessWidget {
   final List<Map<String, dynamic>> audit;
-  const _RecentActivity({required this.audit});
-
-  static IconData _icon(String accion) {
-    if (accion.contains('COMPRA')) return Icons.local_shipping_rounded;
-    if (accion.contains('STOCK') || accion.contains('INVENTARIO'))
-      return Icons.warning_amber_rounded;
-    if (accion.contains('CAJA') || accion.contains('APERTURA'))
-      return Icons.account_balance_wallet_rounded;
-    if (accion.contains('VENTA')) return Icons.shopping_cart_rounded;
-    if (accion.contains('USUARIO')) return Icons.person_rounded;
-    return Icons.history_rounded;
-  }
-
-  static Color _color(String accion) {
-    if (accion.contains('ELIMINAR') || accion.contains('CRITICO'))
-      return AppColors.error;
-    if (accion.contains('STOCK') || accion.contains('ALERTA'))
-      return AppColors.warning;
-    if (accion.contains('CREAR') || accion.contains('APERTURA'))
-      return AppColors.success;
-    return AppColors.primary;
-  }
+  const _ActivitySection({required this.audit});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Actividad reciente',
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Actividad reciente',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (audit.length > 4)
+              GestureDetector(
+                onTap: () => GoRouter.of(context).go('/auditoria'),
+                child: const Text(
+                  'Ver todo',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.3,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
                   ),
                 ),
               ),
-              if (context.findAncestorWidgetOfExactType<ConsumerWidget>() !=
-                  null)
-                GestureDetector(
-                  onTap: () => GoRouter.of(context).go('/auditoria'),
-                  child: const Text(
-                    'Ver todo',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...audit.take(4).map((log) {
+          final accion = log['accion'] as String? ?? '';
+          final user = log['username'] as String? ?? '';
+          final ts = log['createdAt'] as String?;
+          DateTime? dt;
+          try {
+            dt = ts != null ? DateTime.parse(ts) : null;
+          } catch (_) {}
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceAlt,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    _actIcon(accion),
+                    size: 15,
+                    color: _actColor(accion),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border, width: 0.75),
-              boxShadow: AppShadows.card,
-            ),
-            child: Column(
-              children: audit.take(5).toList().asMap().entries.map((e) {
-                final i = e.key;
-                final log = e.value;
-                final accion = log['accion'] as String? ?? '';
-                final user = log['username'] as String? ?? '';
-                final ts = log['createdAt'] as String?;
-                DateTime? dt;
-                try {
-                  dt = ts != null ? DateTime.parse(ts) : null;
-                } catch (_) {}
-                final color = _color(accion);
-
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: 12,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        accion,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(_icon(accion), color: color, size: 18),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  accion,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  user,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textTertiary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (dt != null)
-                            Text(
-                              FormatUtils.timeAgo(dt),
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                        ],
+                      Text(
+                        user,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textTertiary,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                if (dt != null)
+                  Text(
+                    FormatUtils.timeAgo(dt),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
                     ),
-                    if (i < (audit.take(5).length - 1))
-                      const Divider(
-                        height: 1,
-                        indent: 64,
-                        color: AppColors.borderLight,
-                      ),
-                  ],
-                );
-              }).toList(),
+                  ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          );
+        }),
+      ],
+    ),
+  );
+
+  static IconData _actIcon(String a) {
+    if (a.contains('COMPRA')) return Icons.local_shipping_rounded;
+    if (a.contains('STOCK')) return Icons.warning_rounded;
+    if (a.contains('CAJA')) return Icons.account_balance_wallet_rounded;
+    if (a.contains('VENTA')) return Icons.shopping_cart_rounded;
+    return Icons.history_rounded;
+  }
+
+  static Color _actColor(String a) {
+    if (a.contains('ELIMINAR')) return AppColors.error;
+    if (a.contains('STOCK')) return AppColors.warning;
+    if (a.contains('CREAR')) return AppColors.success;
+    return AppColors.primary;
   }
 }
 
 // ─── Accesos rápidos ──────────────────────────────────────────────────────────
 
-class _QuickAccess extends StatelessWidget {
+class _QuickRow extends StatelessWidget {
   final AuthState auth;
-  const _QuickAccess({required this.auth});
-
+  const _QuickRow({required this.auth});
   @override
   Widget build(BuildContext context) {
     final items = <_QA>[];
@@ -1127,87 +904,54 @@ class _QuickAccess extends StatelessWidget {
           '/caja',
         ),
       );
-    if (auth.hasPermission('kardex:leer'))
-      items.add(
-        _QA('Kardex', Icons.swap_vert_rounded, AppColors.info, '/kardex'),
-      );
-    if (auth.hasPermission('compras:leer'))
-      items.add(
-        _QA(
-          'Compras',
-          Icons.local_shipping_rounded,
-          AppColors.warning,
-          '/compras',
-        ),
-      );
-
     if (items.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Accesos rápidos',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
-              letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 10),
           Row(
             children: items
-                .take(5)
+                .take(4)
                 .map(
                   (a) => Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        right: items.indexOf(a) < items.take(5).length - 1
-                            ? 10
-                            : 0,
-                      ),
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          GoRouter.of(context).go(a.path);
-                        },
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: a.color.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: a.color.withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Icon(a.icon, color: a.color, size: 24),
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        GoRouter.of(context).go(a.path);
+                      },
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: a.color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              a.label,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Icon(a.icon, color: a.color, size: 22),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            a.label,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
                             ),
-                          ],
-                        ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1225,21 +969,4 @@ class _QA {
   final IconData icon;
   final Color color;
   const _QA(this.label, this.icon, this.color, this.path);
-}
-
-// ─── Widget auxiliar ──────────────────────────────────────────────────────────
-
-class _Bone extends StatelessWidget {
-  final double w, h;
-  final double r;
-  const _Bone({required this.w, required this.h, this.r = 6});
-  @override
-  Widget build(BuildContext context) => Container(
-    width: w,
-    height: h,
-    decoration: BoxDecoration(
-      color: const Color(0xFFEEEFF1),
-      borderRadius: BorderRadius.circular(r),
-    ),
-  );
 }
