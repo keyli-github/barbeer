@@ -179,14 +179,6 @@ class _Header extends StatelessWidget {
         children: [
           Row(
             children: [
-              Builder(
-                builder: (ctx) => IconButton(
-                  tooltip: 'Abrir menú',
-                  icon: const Icon(Icons.menu_rounded),
-                  color: AppColors.textPrimary,
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
-                ),
-              ),
               Container(
                 width: 40,
                 height: 40,

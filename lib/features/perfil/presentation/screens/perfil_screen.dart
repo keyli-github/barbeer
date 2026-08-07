@@ -45,15 +45,7 @@ class PerfilScreen extends ConsumerWidget {
               backgroundColor: AppColors.background,
               elevation: 0,
               scrolledUnderElevation: 0,
-              leading: Builder(
-                builder: (ctx) => IconButton(
-                  icon: const Icon(
-                    Icons.menu_rounded,
-                    color: AppColors.textPrimary,
-                  ),
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
-                ),
-              ),
+              automaticallyImplyLeading: false,
               title: const Text('Mi perfil', style: AppTextStyles.appBarTitle),
             ),
             SliverPadding(

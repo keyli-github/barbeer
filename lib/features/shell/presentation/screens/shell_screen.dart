@@ -359,15 +359,57 @@ class _NavBarItem extends StatelessWidget {
   );
 }
 
+// ─── Secciones del panel "Ver más" ───────────────────────────────────────────
+
+class _Section {
+  final String title;
+  final List<_Module> items;
+  const _Section({required this.title, required this.items});
+}
+
+List<_Section> _buildSections(List<_Module> modules) {
+  final paths = modules.map((m) => m.path).toSet();
+
+  List<_Module> from(List<String> ps) => _allModules
+      .where((m) => ps.contains(m.path) && paths.contains(m.path))
+      .toList();
+
+  final op = from(['/ventas', '/caja']);
+  final inv = from(['/productos', '/inventario', '/kardex', '/compras']);
+  final pers = from(['/asistencia']);
+  final admin = from([
+    '/etiquetas',
+    '/usuarios',
+    '/sucursales',
+    '/roles',
+    '/permisos',
+    '/auditoria',
+  ]);
+  final classified = {
+    ...op,
+    ...inv,
+    ...pers,
+    ...admin,
+  }.map((m) => m.path).toSet();
+  final other = modules.where((m) => !classified.contains(m.path)).toList();
+
+  return [
+    if (op.isNotEmpty) _Section(title: 'OPERACIONES', items: op),
+    if (inv.isNotEmpty) _Section(title: 'INVENTARIO', items: inv),
+    if (pers.isNotEmpty) _Section(title: 'PERSONAL', items: pers),
+    if (admin.isNotEmpty) _Section(title: 'ADMINISTRACIÓN', items: admin),
+    if (other.isNotEmpty) _Section(title: 'OTROS', items: other),
+  ];
+}
+
 // ─── Panel derecho "Ver más" ──────────────────────────────────────────────────
 
-class _MorePanel extends StatelessWidget {
+class _MorePanel extends StatefulWidget {
   final List<_Module> modules;
   final String current;
   final AuthState auth;
   final ValueChanged<String> go;
   final VoidCallback logout;
-
   const _MorePanel({
     required this.modules,
     required this.current,
@@ -375,12 +417,31 @@ class _MorePanel extends StatelessWidget {
     required this.go,
     required this.logout,
   });
+  @override
+  State<_MorePanel> createState() => _MorePanelState();
+}
+
+class _MorePanelState extends State<_MorePanel> {
+  late Map<String, bool> _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = {
+      'OPERACIONES': true,
+      'INVENTARIO': true,
+      'PERSONAL': true,
+      'ADMINISTRACIÓN': true,
+      'OTROS': true,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    final user = auth.user;
+    final user = widget.auth.user;
     final un = user?.username ?? '';
     final rol = user?.rol ?? '';
+    final sections = _buildSections(widget.modules);
 
     return Drawer(
       backgroundColor: AppColors.background,
@@ -393,33 +454,36 @@ class _MorePanel extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // ── Cabecera usuario ─────────────────────────────────────────
+            // ── Cabecera ────────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
               child: Row(
                 children: [
-                  // Avatar
-                  _Avatar(username: un),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  RichText(
+                    text: const TextSpan(
                       children: [
-                        Text(
-                          un,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+                        TextSpan(
+                          text: 'Bar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
                             color: AppColors.textPrimary,
+                            letterSpacing: -0.3,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 3),
-                        _RoleBadge(rol),
+                        TextSpan(
+                          text: 'Beer',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.brand,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  // Botón cerrar panel
+                  const Spacer(),
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
@@ -441,61 +505,60 @@ class _MorePanel extends StatelessWidget {
             ),
             const Divider(height: 1, color: AppColors.border),
 
-            // ── Grid de módulos ──────────────────────────────────────────
+            // ── Secciones ────────────────────────────────────────────────
             Expanded(
-              child: GridView.count(
-                crossAxisCount: 3,
-                padding: const EdgeInsets.all(16),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.0,
-                children: modules.map((m) {
-                  final active = current.startsWith(m.path);
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      go(m.path);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: active
-                            ? AppColors.primarySurface
-                            : AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(14),
-                        border: active
-                            ? Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.3),
-                                width: 1.5,
-                              )
-                            : null,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            active ? m.activeIcon : m.icon,
-                            size: 26,
-                            color: active
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: sections.map((sec) {
+                  final isOpen = _expanded[sec.title] ?? true;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Encabezado de sección colapsable
+                      InkWell(
+                        onTap: () =>
+                            setState(() => _expanded[sec.title] = !isOpen),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 10, 16, 6),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  sec.title,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textTertiary,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                isOpen
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.keyboard_arrow_down_rounded,
+                                size: 18,
+                                color: AppColors.textTertiary,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            m.label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: active
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      // Items de la sección
+                      if (isOpen)
+                        ...sec.items.map((m) {
+                          final active = widget.current.startsWith(m.path);
+                          return _PanelItem(
+                            module: m,
+                            active: active,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              widget.go(m.path);
+                            },
+                          );
+                        }),
+                      const SizedBox(height: 4),
+                    ],
                   );
                 }).toList(),
               ),
@@ -503,17 +566,34 @@ class _MorePanel extends StatelessWidget {
 
             const Divider(height: 1, color: AppColors.border),
 
-            // ── Cerrar sesión ────────────────────────────────────────────
-            InkWell(
-              onTap: logout,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
-                child: Row(
-                  children: [
-                    Container(
+            // ── Usuario + Logout ─────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  _Avatar(username: un),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          un,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        _RoleBadge(rol),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: widget.logout,
+                    child: Container(
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
@@ -526,17 +606,8 @@ class _MorePanel extends StatelessWidget {
                         size: 18,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Cerrar sesión',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -545,6 +616,57 @@ class _MorePanel extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PanelItem extends StatelessWidget {
+  final _Module module;
+  final bool active;
+  final VoidCallback onTap;
+  const _PanelItem({
+    required this.module,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+    child: Material(
+      color: active ? AppColors.primarySurface : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 2,
+                height: 16,
+                margin: const EdgeInsets.only(right: 10),
+                color: active ? AppColors.primary : Colors.transparent,
+              ),
+              Icon(
+                active ? module.activeIcon : module.icon,
+                size: 20,
+                color: active ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                module.label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  color: active ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 // ─── Widgets auxiliares ───────────────────────────────────────────────────────
