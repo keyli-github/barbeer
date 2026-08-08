@@ -112,30 +112,20 @@ class SucursalesScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: canCreate
+          ? FloatingActionButton(
+              heroTag: 'sucursales_fab',
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () => _showForm(context, ref, null),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(sucursalesProvider.notifier).load(),
         child: Column(
           children: [
-            if (canCreate)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: () => _showForm(context, ref, null),
-                    icon: Icon(Icons.add_rounded, size: 18),
-                    label: Text('Nueva'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             Expanded(
               child: state.isLoading
                   ? AppLoadingIndicator()

@@ -144,110 +144,98 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            if (canManage)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: _openCreate,
-                    icon: const Icon(Icons.add_rounded),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+      floatingActionButton: canManage
+          ? FloatingActionButton(
+              heroTag: 'etiquetas_fab',
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: _openCreate,
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+      body: Column(
+        children: [
+          // Info banner
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primarySurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.primaryBorder),
+              ),
+              child: Text(
+                'Solo billeteras digitales autorizadas. '
+                'No deben representar tarjetas, retiros ni depósitos.',
+                style: TextStyle(fontSize: 11, color: AppColors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Content
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 40,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(_error!, style: TextStyle(color: AppColors.error)),
+                        const SizedBox(height: 12),
+                        TextButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _etiquetas.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 48,
+                          color: AppColors.textTertiary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No hay billeteras configuradas',
+                          style: TextStyle(color: AppColors.textTertiary),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                      itemCount: _etiquetas.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final et = _etiquetas[i];
+                        return EtiquetaTile(
+                          etiqueta: et,
+                          canEdit: canManage,
+                          onEdit: () => _openEdit(et),
+                          onToggle: () => _toggleEstado(et),
+                        );
+                      },
                     ),
                   ),
-                ),
-              ),
-            // Info banner
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.primaryBorder),
-                ),
-                child: Text(
-                  'Solo billeteras digitales autorizadas. '
-                  'No deben representar tarjetas, retiros ni depósitos.',
-                  style: TextStyle(fontSize: 11, color: AppColors.primary),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Content
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: AppColors.error,
-                            size: 40,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _error!,
-                            style: TextStyle(color: AppColors.error),
-                          ),
-                          const SizedBox(height: 12),
-                          TextButton.icon(
-                            onPressed: _load,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Reintentar'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _etiquetas.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.account_balance_wallet_outlined,
-                            size: 48,
-                            color: AppColors.textTertiary,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No hay billeteras configuradas',
-                            style: TextStyle(color: AppColors.textTertiary),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                        itemCount: _etiquetas.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) {
-                          final et = _etiquetas[i];
-                          return EtiquetaTile(
-                            etiqueta: et,
-                            canEdit: canManage,
-                            onEdit: () => _openEdit(et),
-                            onToggle: () => _toggleEstado(et),
-                          );
-                        },
-                      ),
-                    ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

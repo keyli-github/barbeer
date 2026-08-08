@@ -165,7 +165,10 @@ class CajaSesion {
         ? (json['sede'] as Map)['nombre'] as String? ?? ''
         : json['sede'] as String? ?? '',
     montoApertura: (json['montoApertura'] as num?)?.toDouble() ?? 0,
-    abiertaAt: DateTime.parse(json['abiertaAt'] as String),
+    // abiertaAt puede ser null en sesiones muy antiguas — fallback a epoch
+    abiertaAt: json['abiertaAt'] is String
+        ? DateTime.tryParse(json['abiertaAt'] as String) ?? DateTime(2020)
+        : DateTime(2020),
     cerradaAt: _date(json['cerradaAt']),
     precuadreAt: _date(json['precuadreAt']),
     montoDeclaradoPrecuadre: (json['montoDeclaradoPrecuadre'] as num?)
@@ -243,7 +246,9 @@ class CajaMovimiento {
     usuario: json['usuario'] is Map
         ? (json['usuario'] as Map)['username'] as String? ?? ''
         : json['usuario'] as String? ?? '',
-    createdAt: DateTime.parse(json['createdAt'] as String),
+    createdAt: json['createdAt'] is String
+        ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime(2020)
+        : DateTime(2020),
   );
 }
 

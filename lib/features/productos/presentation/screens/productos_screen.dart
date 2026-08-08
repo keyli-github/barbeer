@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -270,38 +271,41 @@ class ProductosScreen extends ConsumerWidget {
     final canDelete = ref
         .read(authProvider)
         .hasPermission('productos:eliminar');
-    Navigator.push(
+    // rootNavigator: true → se muestra ENCIMA del Shell (sin bottom nav)
+    AppNav.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => _ProductDetailScreen(
-          product: product,
-          canEdit: canEdit,
-          canDelete: canDelete,
-          onEdit: () => _showForm(context, ref, product),
-          onToggle: () async {
-            final repo = ref.read(_repoProvider);
-            await repo.toggle(product.id, !product.activo);
-            ref.read(_productosNotifier.notifier).load();
-          },
-          onDelete: () async {
-            final repo = ref.read(_repoProvider);
-            await repo.delete(product.id);
-            ref.read(_productosNotifier.notifier).load();
-          },
+      _ProductDetailScreen(
+        product: product,
+        canEdit: canEdit,
+        canDelete: canDelete,
+        onEdit: () => AppNav.push(
+          context,
+          _ProductFormScreen(
+            product: product,
+            cats: ref.read(_categoriasProvider).value ?? [],
+            onSaved: () => ref.read(_productosNotifier.notifier).load(),
+            repo: ref.read(_repoProvider),
+          ),
         ),
+        onToggle: () async {
+          await ref.read(_repoProvider).toggle(product.id, !product.activo);
+          ref.read(_productosNotifier.notifier).load();
+        },
+        onDelete: () async {
+          await ref.read(_repoProvider).delete(product.id);
+          ref.read(_productosNotifier.notifier).load();
+        },
       ),
     );
   }
 
   void _showForm(BuildContext context, WidgetRef ref, Producto? product) {
-    final cats = ref.read(_categoriasProvider).value ?? [];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _ProductForm(
+    // Crear nuevo producto → subpantalla completa
+    AppNav.push(
+      context,
+      _ProductFormScreen(
         product: product,
-        categorias: cats,
+        cats: ref.read(_categoriasProvider).value ?? [],
         onSaved: () => ref.read(_productosNotifier.notifier).load(),
         repo: ref.read(_repoProvider),
       ),
@@ -1094,23 +1098,25 @@ class _InfoRow extends StatelessWidget {
 
 // ─── Formulario ───────────────────────────────────────────────────────────────
 
-class _ProductForm extends StatefulWidget {
+// ─── Subpantalla: Formulario de Producto ─────────────────────────────────────
+
+class _ProductFormScreen extends StatefulWidget {
   final Producto? product;
-  final List<Categoria> categorias;
+  final List<Categoria> cats;
   final VoidCallback onSaved;
   final ProductosRepository repo;
-  const _ProductForm({
+  const _ProductFormScreen({
     this.product,
-    required this.categorias,
+    required this.cats,
     required this.onSaved,
     required this.repo,
   });
 
   @override
-  State<_ProductForm> createState() => _ProductFormState();
+  State<_ProductFormScreen> createState() => _ProductFormState();
 }
 
-class _ProductFormState extends State<_ProductForm> {
+class _ProductFormState extends State<_ProductFormScreen> {
   final _codigoCtrl = TextEditingController();
   final _nombreCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
@@ -1135,8 +1141,8 @@ class _ProductFormState extends State<_ProductForm> {
       _categoriaId = p.categoriaId;
       _posEnabled = p.disponiblePos;
       _activo = p.activo;
-    } else if (widget.categorias.isNotEmpty) {
-      _categoriaId = widget.categorias.first.id;
+    } else if (widget.cats.isNotEmpty) {
+      _categoriaId = widget.cats.first.id;
     }
   }
 
@@ -1171,7 +1177,6 @@ class _ProductFormState extends State<_ProductForm> {
       setState(() => _error = 'Completa todos los campos obligatorios.');
       return;
     }
-
     setState(() {
       _saving = true;
       _error = null;
@@ -1222,196 +1227,167 @@ class _ProductFormState extends State<_ProductForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: widget.product == null ? 'Nuevo producto' : 'Editar producto',
+        actions: [
+          if (!_saving)
+            TextButton(
+              onPressed: _submit,
+              child: const Text(
+                'Guardar',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
-              children: [
-                Text(
-                  widget.product == null ? 'Nuevo producto' : 'Editar producto',
-                  style: AppTextStyles.headlineMedium,
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 80,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.product == null) ...[
+              AppTextField(
+                label: 'Código *',
+                hint: 'Ej. CKT001',
+                controller: _codigoCtrl,
+              ),
+              const SizedBox(height: 14),
+            ],
+            AppTextField(
+              label: 'Nombre *',
+              hint: 'Nombre del producto',
+              controller: _nombreCtrl,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Descripción',
+              hint: 'Opcional',
+              controller: _descCtrl,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Categoría *',
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            DropdownButtonFormField<String>(
+              value: _categoriaId.isEmpty ? null : _categoriaId,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+              hint: const Text('Seleccionar categoría'),
+              items: widget.cats
+                  .map(
+                    (c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _categoriaId = v ?? ''),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: AppTextField(
+                    label: 'Precio venta (S/) *',
+                    hint: '0.00',
+                    controller: _ventaCtrl,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppTextField(
+                    label: 'Costo (S/) *',
+                    hint: '0.00',
+                    controller: _costoCtrl,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
               ],
             ),
-          ),
-          const Divider(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundAlt,
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  if (widget.product == null)
-                    AppTextField(
-                      label: 'Código *',
-                      hint: 'Ej. CKT001',
-                      controller: _codigoCtrl,
-                    ),
-                  if (widget.product == null) const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Nombre *',
-                    hint: 'Nombre del producto',
-                    controller: _nombreCtrl,
+                  const Text(
+                    'Margen estimado: ',
+                    style: AppTextStyles.bodySmall,
                   ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Descripción',
-                    hint: 'Opcional',
-                    controller: _descCtrl,
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 14),
                   Text(
-                    'Categoría *',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      fontWeight: FontWeight.w500,
+                    '${_margin.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: _margin >= 40
+                          ? AppColors.success
+                          : _margin >= 20
+                          ? AppColors.warning
+                          : AppColors.error,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  DropdownButtonFormField<String>(
-                    value: _categoriaId.isEmpty ? null : _categoriaId,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                    ),
-                    hint: const Text('Seleccionar categoría'),
-                    items: widget.categorias
-                        .map(
-                          (c) => DropdownMenuItem(
-                            value: c.id,
-                            child: Text(c.nombre),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _categoriaId = v ?? ''),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppTextField(
-                          label: 'Precio venta (S/) *',
-                          hint: '0.00',
-                          controller: _ventaCtrl,
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AppTextField(
-                          label: 'Costo (S/) *',
-                          hint: '0.00',
-                          controller: _costoCtrl,
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundAlt,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Margen estimado: ',
-                          style: AppTextStyles.bodySmall,
-                        ),
-                        Text(
-                          '${_margin.toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: _margin >= 40
-                                ? AppColors.success
-                                : _margin >= 20
-                                ? AppColors.warning
-                                : AppColors.error,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Unidad (Ej. botella, kg)',
-                    hint: 'un',
-                    controller: _unidadCtrl,
-                  ),
-                  const SizedBox(height: 12),
-                  _SwitchRow(
-                    label: 'Disponible para venta',
-                    value: _posEnabled,
-                    onChanged: (v) => setState(() => _posEnabled = v),
-                  ),
-                  _SwitchRow(
-                    label: 'Producto activo',
-                    value: _activo,
-                    onChanged: (v) => setState(() => _activo = v),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: AppColors.error,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  PrimaryButton(
-                    text: widget.product == null
-                        ? 'Crear producto'
-                        : 'Guardar cambios',
-                    onPressed: _saving ? null : _submit,
-                    isLoading: _saving,
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Unidad (Ej. botella, kg)',
+              hint: 'un',
+              controller: _unidadCtrl,
+            ),
+            const SizedBox(height: 12),
+            _SwitchRow(
+              label: 'Disponible para venta',
+              value: _posEnabled,
+              onChanged: (v) => setState(() => _posEnabled = v),
+            ),
+            _SwitchRow(
+              label: 'Producto activo',
+              value: _activo,
+              onChanged: (v) => setState(() => _activo = v),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 24),
+            PrimaryButton(
+              text: widget.product == null
+                  ? 'Crear producto'
+                  : 'Guardar cambios',
+              onPressed: _saving ? null : _submit,
+              isLoading: _saving,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1426,7 +1402,6 @@ class _SwitchRow extends StatelessWidget {
     required this.value,
     required this.onChanged,
   });
-
   @override
   Widget build(BuildContext context) => Row(
     children: [

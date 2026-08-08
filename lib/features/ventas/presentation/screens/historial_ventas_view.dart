@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/widgets/ds_card.dart';
 import '../../../../core/widgets/ds_inputs.dart';
 import '../../../../core/widgets/ds_list_tile.dart';
-import '../../../../core/widgets/ds_states.dart';
 import '../../../../core/widgets/ds_product_image.dart';
+import '../../../../core/widgets/ds_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
-import 'conciliar_venta_sheet.dart';
-import 'venta_detail_sheet.dart';
+import 'conciliar_venta_screen.dart';
+import 'venta_detail_screen.dart';
 
 class HistorialVentasView extends ConsumerStatefulWidget {
   const HistorialVentasView({super.key});
@@ -44,19 +44,13 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
   Future<void> _refresh() =>
       ref.read(ventasListProvider(_useMis).notifier).refresh();
 
-  void _openDetail(Venta v) => showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => VentaDetailSheet(venta: v, onChanged: _refresh),
-  );
+  // Subpantalla completa de detalle — usa rootNavigator para ocultar Shell
+  void _openDetail(Venta v) =>
+      AppNav.push(context, VentaDetailScreen(venta: v, onChanged: _refresh));
 
-  void _openConciliar(Venta v) => showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => ConciliarVentaSheet(venta: v, onDone: _refresh),
-  );
+  // Conciliar también como subpantalla
+  void _openConciliar(Venta v) =>
+      AppNav.push(context, ConciliarVentaScreen(venta: v, onDone: _refresh));
 
   @override
   Widget build(BuildContext context) {

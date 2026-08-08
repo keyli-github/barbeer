@@ -169,11 +169,15 @@ class CajaBilleteraCard extends StatelessWidget {
           ),
           const Divider(height: 1),
           ...porBilletera.map((b) {
-            final nombre =
-                (b['conciliacion'] as Map?)?['etiqueta']?['nombre']
-                    as String? ??
-                b['conciliacionId'] as String? ??
-                'Sin etiqueta';
+            // 'conciliacion' puede venir como Map o como String — guard defensivo
+            final conc = b['conciliacion'];
+            final nombre = conc is Map
+                ? (conc['etiqueta'] is Map
+                      ? conc['etiqueta']['nombre'] as String? ?? 'Sin etiqueta'
+                      : conc['etiqueta'] as String? ?? 'Sin etiqueta')
+                : b['nombre'] as String? ??
+                      b['conciliacionId'] as String? ??
+                      'Sin etiqueta';
             final total = (b['total'] as num?)?.toDouble() ?? 0;
             final cantidad = (b['cantidad'] as num?)?.toInt() ?? 0;
             return ListTile(
@@ -224,9 +228,13 @@ class CajaVendedoraTable extends StatelessWidget {
       title: 'Ventas por vendedora',
       headers: const ['Vendedora', 'Ventas', 'Total'],
       rows: porVendedora
+          .where((v) => v is Map)
           .map(
             (v) => [
-              v['username'] as String? ?? '',
+              v['username'] as String? ??
+                  (v['vendedora'] is Map
+                      ? (v['vendedora'] as Map)['username'] as String? ?? ''
+                      : ''),
               '${v['cantidadVentas'] ?? 0}',
               _money((v['totalVentas'] as num?)?.toDouble() ?? 0),
             ],

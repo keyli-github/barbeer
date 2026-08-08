@@ -148,122 +148,102 @@ class UsuariosScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(usuariosProvider.notifier).load(),
-          child: Column(
-            children: [
-              if (auth.hasPermission('usuarios:crear'))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      onPressed: () => _showCreateModal(context, ref, state),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Nuevo'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
+      floatingActionButton: auth.hasPermission('usuarios:crear')
+          ? FloatingActionButton(
+              heroTag: 'usuarios_fab',
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () => _showCreateModal(context, ref, state),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(usuariosProvider.notifier).load(),
+        child: Column(
+          children: [
+            // Content
+            Expanded(
+              child: state.isLoading
+                  ? const AppLoading()
+                  : state.error != null
+                  ? AppErrorState(
+                      message: state.error!,
+                      onRetry: () => ref.read(usuariosProvider.notifier).load(),
+                    )
+                  : state.users.isEmpty
+                  ? const AppEmptyState(
+                      icon: Icons.people_outline_rounded,
+                      title: 'Sin usuarios',
+                      description: 'No hay usuarios registrados',
+                    )
+                  : ListView(
+                      children: [
+                        // Stats
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _StatChip(
+                                  label: 'Total',
+                                  value: '${state.total}',
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatChip(
+                                  label: 'Activos',
+                                  value:
+                                      '${state.users.where((u) => u['activo'] == true).length}',
+                                  color: AppColors.success,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatChip(
+                                  label: 'Inactivos',
+                                  value:
+                                      '${state.users.where((u) => u['activo'] != true).length}',
+                                  color: AppColors.textTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Content
-              Expanded(
-                child: state.isLoading
-                    ? const AppLoading()
-                    : state.error != null
-                    ? AppErrorState(
-                        message: state.error!,
-                        onRetry: () =>
-                            ref.read(usuariosProvider.notifier).load(),
-                      )
-                    : state.users.isEmpty
-                    ? const AppEmptyState(
-                        icon: Icons.people_outline_rounded,
-                        title: 'Sin usuarios',
-                        description: 'No hay usuarios registrados',
-                      )
-                    : ListView(
-                        children: [
-                          // Stats
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _StatChip(
-                                    label: 'Total',
-                                    value: '${state.total}',
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _StatChip(
-                                    label: 'Activos',
-                                    value:
-                                        '${state.users.where((u) => u['activo'] == true).length}',
-                                    color: AppColors.success,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _StatChip(
-                                    label: 'Inactivos',
-                                    value:
-                                        '${state.users.where((u) => u['activo'] != true).length}',
-                                    color: AppColors.textTertiary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // User list
-                          for (final user in state.users)
-                            _UserTile(
-                              user: user,
-                              auth: auth,
-                              onTap: () => _showDetail(
-                                context,
-                                ref,
-                                user['id'] as String,
-                              ),
-                              onEdit: () =>
-                                  _showEditModal(context, ref, user, state),
-                              onDeactivate: () =>
-                                  _deactivate(context, ref, user),
-                              onReactivate: () => ref
-                                  .read(usuariosProvider.notifier)
-                                  .reactivateUser(user['id'] as String),
-                              onResetPassword: () => _resetPassword(
-                                context,
-                                ref,
-                                user['id'] as String,
-                              ),
-                            ),
-                          // Pagination
-                          AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: (p) => ref
+                        // User list
+                        for (final user in state.users)
+                          _UserTile(
+                            user: user,
+                            auth: auth,
+                            onTap: () =>
+                                _showDetail(context, ref, user['id'] as String),
+                            onEdit: () =>
+                                _showEditModal(context, ref, user, state),
+                            onDeactivate: () => _deactivate(context, ref, user),
+                            onReactivate: () => ref
                                 .read(usuariosProvider.notifier)
-                                .load(page: p),
+                                .reactivateUser(user['id'] as String),
+                            onResetPassword: () => _resetPassword(
+                              context,
+                              ref,
+                              user['id'] as String,
+                            ),
                           ),
-                          const SizedBox(height: 80),
-                        ],
-                      ),
-              ),
-            ],
-          ),
+                        // Pagination
+                        AppPagination(
+                          page: state.page,
+                          totalPages: state.totalPages,
+                          total: state.total,
+                          onPageChange: (p) =>
+                              ref.read(usuariosProvider.notifier).load(page: p),
+                        ),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );

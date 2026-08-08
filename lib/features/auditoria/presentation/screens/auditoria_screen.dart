@@ -123,26 +123,14 @@ class AuditoriaScreen extends ConsumerWidget {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.history_rounded,
-                        color: AppColors.primary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Auditoria',
-                          style: AppTextStyles.headlineLarge,
-                        ),
-                      ),
                       Text(
                         '${state.total} registros',
                         style: AppTextStyles.bodySmall,
                       ),
-                      const SizedBox(width: 8),
+                      const Spacer(),
                       IconButton(
                         icon: const Icon(
                           Icons.filter_list_rounded,

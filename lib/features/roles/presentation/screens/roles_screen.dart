@@ -132,85 +132,61 @@ class RolesScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(rolesProvider.notifier).load(),
-          child: Column(
-            children: [
-              Container(
-                color: AppColors.background,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.admin_panel_settings_rounded,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Roles', style: AppTextStyles.headlineLarge),
-                    ),
-                    if (isSuperAdmin)
-                      FilledButton.icon(
-                        onPressed: () => _showCreateModal(context, ref),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Nuevo rol'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: state.isLoading
-                    ? const AppLoading()
-                    : state.error != null
-                    ? AppErrorState(
-                        message: state.error!,
-                        onRetry: () => ref.read(rolesProvider.notifier).load(),
-                      )
-                    : state.roles.isEmpty
-                    ? const AppEmptyState(
-                        icon: Icons.admin_panel_settings_outlined,
-                        title: 'Sin roles',
-                      )
-                    : ListView(
-                        children: [
-                          const SizedBox(height: 8),
-                          for (final role in state.roles)
-                            _RoleTile(
-                              role: role,
-                              isSuperAdmin: isSuperAdmin,
-                              onEdit: () => _showEditModal(context, ref, role),
-                              onDelete: () => _deleteRole(context, ref, role),
-                              onAssignPerms: () => _showPermissionsModal(
-                                context,
-                                ref,
-                                role,
-                                state,
-                              ),
+      floatingActionButton: isSuperAdmin
+          ? FloatingActionButton(
+              heroTag: 'roles_fab',
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () => _showCreateModal(context, ref),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(rolesProvider.notifier).load(),
+        child: Column(
+          children: [
+            Expanded(
+              child: state.isLoading
+                  ? const AppLoading()
+                  : state.error != null
+                  ? AppErrorState(
+                      message: state.error!,
+                      onRetry: () => ref.read(rolesProvider.notifier).load(),
+                    )
+                  : state.roles.isEmpty
+                  ? const AppEmptyState(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'Sin roles',
+                    )
+                  : ListView(
+                      children: [
+                        const SizedBox(height: 8),
+                        for (final role in state.roles)
+                          _RoleTile(
+                            role: role,
+                            isSuperAdmin: isSuperAdmin,
+                            onEdit: () => _showEditModal(context, ref, role),
+                            onDelete: () => _deleteRole(context, ref, role),
+                            onAssignPerms: () => _showPermissionsModal(
+                              context,
+                              ref,
+                              role,
+                              state,
                             ),
-                          AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: (p) =>
-                                ref.read(rolesProvider.notifier).load(page: p),
                           ),
-                          const SizedBox(height: 80),
-                        ],
-                      ),
-              ),
-            ],
-          ),
+                        AppPagination(
+                          page: state.page,
+                          totalPages: state.totalPages,
+                          total: state.total,
+                          onPageChange: (p) =>
+                              ref.read(rolesProvider.notifier).load(page: p),
+                        ),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );
