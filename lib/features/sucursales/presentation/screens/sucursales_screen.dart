@@ -116,7 +116,7 @@ class SucursalesScreen extends ConsumerWidget {
       floatingActionButton: canCreate
           ? FloatingActionButton(
               heroTag: 'sucursales_fab',
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
               onPressed: () => _showForm(context, ref, null),
               child: const Icon(Icons.add_rounded),
@@ -210,10 +210,19 @@ class SucursalesScreen extends ConsumerWidget {
   ) async {
     final sede = await ref.read(sucursalesProvider.notifier).getSede(id);
     if (sede == null || !context.mounted) return;
-    await AppBottomSheet.show(
-      context: context,
-      title: 'Detalle de sucursal',
-      child: _SedeDetail(sede: sede),
+    AppNav.push(
+      context,
+      _SedeDetailScreen(
+        sede: sede,
+        canEdit: ref
+            .read(authProvider)
+            .hasPermission('establecimientos:editar'),
+        canDelete: ref
+            .read(authProvider)
+            .hasPermission('establecimientos:eliminar'),
+        onEdit: () => _showForm(context, ref, sede),
+        onDelete: () => _deleteSede(context, ref, sede),
+      ),
     );
   }
 
@@ -426,6 +435,205 @@ class _InfoChip extends StatelessWidget {
         Icon(icon, size: 12, color: AppColors.textTertiary),
         const SizedBox(width: 4),
         Text(label, style: AppTextStyles.labelSmall),
+      ],
+    ),
+  );
+}
+
+// ─── Subpantalla: Detalle de Sucursal ────────────────────────────────────────
+
+class _SedeDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> sede;
+  final bool canEdit, canDelete;
+  final VoidCallback onEdit, onDelete;
+
+  const _SedeDetailScreen({
+    required this.sede,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final nombre = sede['nombre'] as String? ?? '';
+    final activo = sede['activo'] as bool? ?? false;
+    final dir = sede['direccion'] as String? ?? '';
+    final tel = sede['telefono'] as String? ?? '';
+    final ruc = sede['ruc'] as String? ?? '';
+    final codigo = sede['codigo'] as String? ?? '';
+    final users = (sede['_count'] as Map?)?['usuarios'] as int? ?? 0;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundAlt,
+      appBar: SubPageAppBar(
+        title: 'Detalle de sucursal',
+        actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              color: AppColors.textSecondary,
+              onPressed: () {
+                Navigator.pop(context);
+                onEdit();
+              },
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        child: Column(
+          children: [
+            // Card principal
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFEEEFF2)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySurface,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.store_rounded,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    nombre,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (codigo.isNotEmpty)
+                    Text(
+                      'Código: $codigo',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          (activo ? AppColors.success : AppColors.textTertiary)
+                              .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      activo ? 'Activa' : 'Inactiva',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: activo
+                            ? AppColors.success
+                            : AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFEEEFF2)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                children: [
+                  if (dir.isNotEmpty) ...[
+                    _SRow('Dirección', dir),
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  ],
+                  if (tel.isNotEmpty) ...[
+                    _SRow('Teléfono', tel),
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  ],
+                  if (ruc.isNotEmpty) ...[
+                    _SRow('RUC', ruc),
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  ],
+                  _SRow('Usuarios', '$users'),
+                ],
+              ),
+            ),
+            if (canDelete) ...[
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    onDelete();
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Eliminar sucursal'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SRow extends StatelessWidget {
+  final String label, value;
+  const _SRow(this.label, this.value);
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 11),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     ),
   );

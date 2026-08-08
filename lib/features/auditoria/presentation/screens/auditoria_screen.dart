@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
@@ -313,11 +314,7 @@ class AuditoriaScreen extends ConsumerWidget {
   }
 
   void _showDetail(BuildContext context, Map<String, dynamic> log) {
-    AppBottomSheet.show(
-      context: context,
-      title: 'Detalle del evento',
-      child: _LogDetail(log: log),
-    );
+    AppNav.push(context, _LogDetailScreen(log: log));
   }
 }
 
@@ -402,6 +399,148 @@ class _LogTile extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── Subpantalla: Detalle del evento de auditoría ────────────────────────────
+
+class _LogDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> log;
+  const _LogDetailScreen({required this.log});
+
+  @override
+  Widget build(BuildContext context) {
+    final action = log['accion'] as String? ?? '';
+    final username = log['usuario'] is Map
+        ? log['usuario']['username'] as String? ?? 'Sistema'
+        : 'Sistema';
+    final entidad = log['entidad'] as String? ?? '';
+    final entidadId = log['entidadId'] as String? ?? '';
+    final ip = log['ip'] as String? ?? '';
+    final ua = log['userAgent'] as String? ?? '';
+    final sedeId = log['sedeId'] as String? ?? '';
+    final fecha = log['createdAt'] as String? ?? '';
+    final detalle = log['detalle'];
+
+    DateTime? dt;
+    try {
+      dt = DateTime.parse(fecha).toLocal();
+    } catch (_) {}
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundAlt,
+      appBar: SubPageAppBar(
+        title: 'Detalle del evento',
+        subtitle: dt != null ? FormatUtils.dateTime(dt) : null,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        child: Column(
+          children: [
+            // Badge acción
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFEEEFF2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AuditActionBadge(action: action),
+                  const SizedBox(height: 10),
+                  _ARow('Usuario', username),
+                  if (entidad.isNotEmpty) _ARow('Entidad', entidad),
+                  if (entidadId.isNotEmpty)
+                    _ARow('ID Entidad', entidadId, mono: true),
+                  if (ip.isNotEmpty) _ARow('IP', ip),
+                  if (sedeId.isNotEmpty) _ARow('Sede', sedeId),
+                  if (ua.isNotEmpty) _ARow('User-Agent', ua),
+                ],
+              ),
+            ),
+            if (detalle != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFEEEFF2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Detalle',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundAlt,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SelectableText(
+                        detalle.toString(),
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ARow extends StatelessWidget {
+  final String label, value;
+  final bool mono;
+  const _ARow(this.label, this.value, {this.mono = false});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textPrimary,
+              fontFamily: mono ? 'monospace' : null,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _LogDetail extends StatelessWidget {

@@ -259,7 +259,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
               listenable: _tabs,
               builder: (_, __) => FloatingActionButton(
                 heroTag: 'compras_fab',
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppColors.brand,
                 foregroundColor: Colors.white,
                 onPressed: _tabs.index == 0
                     ? () => _showNuevaOrden(context)

@@ -138,7 +138,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
       floatingActionButton: canManage
           ? FloatingActionButton(
               heroTag: 'etiquetas_fab',
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
               onPressed: _openCreate,
               child: const Icon(Icons.add_rounded),

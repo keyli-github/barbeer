@@ -152,7 +152,7 @@ class UsuariosScreen extends ConsumerWidget {
       floatingActionButton: auth.hasPermission('usuarios:crear')
           ? FloatingActionButton(
               heroTag: 'usuarios_fab',
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
               onPressed: () => _showCreateModal(context, ref, state),
               child: const Icon(Icons.add_rounded),
@@ -257,10 +257,31 @@ class UsuariosScreen extends ConsumerWidget {
   ) async {
     final user = await ref.read(usuariosProvider.notifier).getUser(id);
     if (user == null || !context.mounted) return;
-    await AppBottomSheet.show(
-      context: context,
-      title: 'Detalle de usuario',
-      child: _UserDetail(user: user),
+    final state = ref.read(usuariosProvider);
+    AppNav.push(
+      context,
+      _UserDetailScreen(
+        user: user,
+        roles: state.roles,
+        sedes: state.sedes,
+        isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
+        onEdit: () => _showEditModal(context, ref, user, state),
+        onDeactivate: () => _deactivate(context, ref, user),
+        onResetPassword: (uid) async {
+          try {
+            await ref.read(usuariosProvider.notifier).resetPassword(uid);
+            if (context.mounted)
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Contraseña reseteada')),
+              );
+          } catch (e) {
+            if (context.mounted)
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('Error: $e')));
+          }
+        },
+      ),
     );
   }
 
@@ -583,6 +604,248 @@ class _ActionsMenu extends StatelessWidget {
 }
 
 // ─── User Detail ──────────────────────────────────────────────────────────────
+
+// ─── Subpantalla: Detalle de Usuario ────────────────────────────────────────
+
+class _UserDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final List<Map<String, dynamic>> roles, sedes;
+  final bool isSuperAdmin;
+  final VoidCallback onEdit, onDeactivate;
+  final void Function(String) onResetPassword;
+
+  const _UserDetailScreen({
+    required this.user,
+    required this.roles,
+    required this.sedes,
+    required this.isSuperAdmin,
+    required this.onEdit,
+    required this.onDeactivate,
+    required this.onResetPassword,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activo = user['activo'] as bool? ?? false;
+    final username = user['username'] as String? ?? '';
+    final rol = user['rol'] is Map
+        ? user['rol']['nombre'] as String? ?? ''
+        : user['rol'] as String? ?? '';
+    final sede = user['sede'] is Map
+        ? user['sede']['nombre'] as String? ?? 'Sin sede'
+        : user['sedeId'] as String? ?? 'Sin sede';
+    final mustChange = user['mustChangePassword'] as bool? ?? false;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundAlt,
+      appBar: SubPageAppBar(
+        title: 'Detalle de usuario',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 20),
+            color: AppColors.textSecondary,
+            onPressed: () {
+              Navigator.pop(context);
+              onEdit();
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        child: Column(
+          children: [
+            // Avatar + nombre
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFEEEFF2)),
+              ),
+              child: Column(
+                children: [
+                  // Avatar grande
+                  Builder(
+                    builder: (_) {
+                      final color = AppColors.avatarColor(username);
+                      final initial = username.isNotEmpty
+                          ? username[0].toUpperCase()
+                          : '?';
+                      return Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: color.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            initial,
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    username,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _Badge(rol, AppColors.roleColor(rol.toUpperCase())),
+                      const SizedBox(width: 8),
+                      _Badge(
+                        activo ? 'Activo' : 'Inactivo',
+                        activo ? AppColors.success : AppColors.textTertiary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Detalles
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFEEEFF2)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                children: [
+                  _DetailRow('Sede', sede),
+                  const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  _DetailRow(
+                    'Cambio de contraseña',
+                    mustChange ? 'Requerido' : 'No requerido',
+                  ),
+                  const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  _DetailRow('ID', user['id'] as String? ?? '', mono: true),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Acciones
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: onResetPassword.call.bind(
+                  user['id'] as String? ?? '',
+                ),
+                icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                label: const Text('Restablecer contraseña'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primaryBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (activo)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    onDeactivate();
+                  },
+                  icon: const Icon(Icons.person_off_outlined, size: 18),
+                  label: const Text('Desactivar usuario'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+extension on void Function(String) {
+  void Function() bind(String arg) =>
+      () => this(arg);
+}
+
+class _Badge extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _Badge(this.text, this.color);
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+    ),
+  );
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label, value;
+  final bool mono;
+  const _DetailRow(this.label, this.value, {this.mono = false});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+              fontFamily: mono ? 'monospace' : null,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 class _UserDetail extends StatelessWidget {
   final Map<String, dynamic> user;

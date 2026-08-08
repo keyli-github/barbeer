@@ -136,7 +136,7 @@ class RolesScreen extends ConsumerWidget {
       floatingActionButton: isSuperAdmin
           ? FloatingActionButton(
               heroTag: 'roles_fab',
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
               onPressed: () => _showCreateModal(context, ref),
               child: const Icon(Icons.add_rounded),

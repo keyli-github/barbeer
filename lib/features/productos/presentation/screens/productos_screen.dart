@@ -163,7 +163,7 @@ class ProductosScreen extends ConsumerWidget {
       floatingActionButton: canCreate
           ? FloatingActionButton(
               heroTag: 'prod_fab',
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
               onPressed: () => _showForm(context, ref, null),
               child: const Icon(Icons.add_rounded),
