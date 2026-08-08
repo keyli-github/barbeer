@@ -374,7 +374,7 @@ class _FiltersSectionState extends State<_FiltersSection> {
                 vertical: AppSpacing.sm,
               ),
               filled: true,
-              fillColor: AppColors.backgroundAlt,
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(
                   spacing.AppSpacing.radiusMD,

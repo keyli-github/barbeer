@@ -169,11 +169,11 @@ class _SplashState extends ConsumerState<_SplashScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Logo real
+          // Logo real — más grande
           Image.asset(
             'assets/images/LOGO_GENERAL.png',
-            width: 120,
-            height: 120,
+            width: 160,
+            height: 160,
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => Container(
               width: 96,

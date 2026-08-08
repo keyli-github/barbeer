@@ -121,11 +121,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Widget _buildBrand() => Column(
     children: [
-      // Logo real LOGO_GENERAL.png
+      // Logo real LOGO_GENERAL.png — grande
       Image.asset(
         'assets/images/LOGO_GENERAL.png',
-        width: 120,
-        height: 120,
+        width: 150,
+        height: 150,
         fit: BoxFit.contain,
         errorBuilder: (_, __, ___) => Container(
           width: 96,

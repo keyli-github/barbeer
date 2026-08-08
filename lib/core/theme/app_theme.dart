@@ -20,7 +20,7 @@ class AppTheme {
       onError: Colors.white,
     ),
     scaffoldBackgroundColor: AppColors.background,
-    canvasColor: AppColors.background,
+    canvasColor: Colors.white, // Dropdown popup background blanco
     fontFamily: 'Roboto',
     textTheme: const TextTheme(
       displayLarge: AppTextStyles.displayLarge,
@@ -71,7 +71,7 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.backgroundAlt,
+      fillColor: Colors.white, // blanco, no grisáceo
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -83,7 +83,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.brand, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -97,11 +97,22 @@ class AppTheme {
       labelStyle: AppTextStyles.bodyMedium,
       errorStyle: TextStyle(fontSize: 12, color: AppColors.error),
     ),
+    // DropdownButton menú — blanco limpio
+    dropdownMenuTheme: DropdownMenuThemeData(
+      menuStyle: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(Colors.white),
+        surfaceTintColor: WidgetStatePropertyAll(Colors.white),
+        elevation: WidgetStatePropertyAll(4),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.brand, // naranja por defecto
         foregroundColor: Colors.white,
-        disabledBackgroundColor: Color(0x802563EB),
+        disabledBackgroundColor: AppColors.brand.withOpacity(0.5),
         elevation: 0,
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -129,6 +140,13 @@ class AppTheme {
         ),
         padding: EdgeInsets.symmetric(vertical: 14),
       ),
+    ),
+    // Popup menu blanco para los selects expandidos
+    popupMenuTheme: PopupMenuThemeData(
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: AppColors.backgroundAlt,

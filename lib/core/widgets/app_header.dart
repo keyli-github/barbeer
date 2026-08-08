@@ -110,14 +110,14 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
 
                 // ── Actions + Logo ──
                 if (actions != null) ...actions!,
-                // Logo derecha — solo en pantallas principales
+                // Logo derecha — más grande y visible
                 if (!showBackButton)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: Image.asset(
                       'assets/images/LOGO_GENERAL.png',
-                      height: 44,
-                      width: 44,
+                      height: 52,
+                      width: 52,
                       fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                     ),
