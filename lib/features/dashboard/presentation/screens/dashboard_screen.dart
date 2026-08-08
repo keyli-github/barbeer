@@ -538,7 +538,9 @@ class _ChartState extends ConsumerState<_Chart> {
         ? data.ventasSemanaAnterior
         : data.chartPrevTotal;
     final pct = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : 0.0;
-    final maxVal = vals.fold(0.0, (m, v) => v > m ? v : m);
+    final safeVals = vals.isEmpty ? List<double>.filled(7, 0) : vals;
+    final safeLabels = labels.isEmpty ? _defaultLabels() : labels;
+    final maxVal = safeVals.fold(0.0, (m, v) => v > m ? v : m);
     final loading = data.chartLoading;
 
     return Container(
@@ -664,11 +666,12 @@ class _ChartState extends ConsumerState<_Chart> {
                       showTitles: true,
                       getTitlesWidget: (v, _) {
                         final i = v.toInt();
-                        if (i < 0 || i >= 7) return const SizedBox.shrink();
+                        if (i < 0 || i >= safeLabels.length)
+                          return const SizedBox.shrink();
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            labels[i],
+                            safeLabels[i],
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: i == 6
@@ -685,16 +688,21 @@ class _ChartState extends ConsumerState<_Chart> {
                   ),
                 ),
                 barGroups: List.generate(
-                  7,
+                  safeVals.length,
                   (i) => BarChartGroupData(
                     x: i,
                     barRods: [
                       BarChartRodData(
-                        toY: vals[i],
-                        color: i == 6
+                        toY: safeVals[i],
+                        // Última barra siempre más oscura (hoy o período más reciente)
+                        color: i == safeVals.length - 1
                             ? AppColors.primary
                             : AppColors.primary.withValues(alpha: 0.25),
-                        width: 24,
+                        width: safeVals.length <= 7
+                            ? 24
+                            : safeVals.length <= 12
+                            ? 18
+                            : 14,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(6),
                         ),

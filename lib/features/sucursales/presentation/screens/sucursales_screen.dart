@@ -117,47 +117,25 @@ class SucursalesScreen extends ConsumerWidget {
         onRefresh: () => ref.read(sucursalesProvider.notifier).load(),
         child: Column(
           children: [
-            Padding(
-              padding: EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Icon(Icons.store_rounded, color: AppColors.primary, size: 24),
-                  SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sucursales',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          '${state.total} sedes',
-                          style: AppTextStyles.labelSmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (canCreate)
-                    FilledButton.icon(
-                      onPressed: () => _showForm(context, ref, null),
-                      icon: Icon(Icons.add_rounded, size: 18),
-                      label: Text('Nueva'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
+            if (canCreate)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => _showForm(context, ref, null),
+                    icon: Icon(Icons.add_rounded, size: 18),
+                    label: Text('Nueva'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
-            ),
             Expanded(
               child: state.isLoading
                   ? AppLoadingIndicator()

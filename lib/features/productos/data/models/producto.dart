@@ -3,6 +3,7 @@ class Producto {
   final String codigo;
   final String nombre;
   final String? descripcion;
+  final String? presentacion;
   final String categoriaId;
   final String categoria;
   final String unidad;
@@ -11,6 +12,8 @@ class Producto {
   final bool disponiblePos;
   final bool activo;
   final double margin;
+  final int? stockDisponible;
+  final String? imageUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -19,6 +22,7 @@ class Producto {
     required this.codigo,
     required this.nombre,
     this.descripcion,
+    this.presentacion,
     required this.categoriaId,
     required this.categoria,
     required this.unidad,
@@ -27,6 +31,8 @@ class Producto {
     required this.disponiblePos,
     required this.activo,
     required this.margin,
+    this.stockDisponible,
+    this.imageUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -36,14 +42,19 @@ class Producto {
     codigo: json['codigo'] as String? ?? '',
     nombre: json['nombre'] as String? ?? '',
     descripcion: json['descripcion'] as String?,
+    presentacion: json['presentacion'] as String?,
     categoriaId: json['categoriaId'] as String? ?? '',
-    categoria: json['categoria'] as String? ?? '',
+    categoria: json['categoria'] is Map
+        ? ((json['categoria'] as Map)['nombre'] as String? ?? '')
+        : json['categoria'] as String? ?? '',
     unidad: json['unidad'] as String? ?? 'unidad',
     precioVenta: (json['precioVenta'] as num?)?.toDouble() ?? 0,
     precioCosto: (json['precioCosto'] as num?)?.toDouble() ?? 0,
     disponiblePos: json['disponiblePos'] as bool? ?? false,
     activo: json['activo'] as bool? ?? false,
     margin: (json['margin'] as num?)?.toDouble() ?? 0,
+    stockDisponible: (json['stockDisponible'] as num?)?.toInt(),
+    imageUrl: json['imageUrl'] as String?,
     createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
     updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
   );

@@ -158,6 +158,16 @@ class ProductosScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // FAB para crear producto
+      floatingActionButton: canCreate
+          ? FloatingActionButton(
+              heroTag: 'prod_fab',
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () => _showForm(context, ref, null),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
       body: Column(
         children: [
           // ─── Filtros ────────────────────────────────────────
@@ -174,17 +184,17 @@ class ProductosScreen extends ConsumerWidget {
               selected: state.categoriaFilter,
               onSelect: notifier.setCategoria,
             ),
-            loading: () => SizedBox(height: 40),
-            error: (_, __) => SizedBox.shrink(),
+            loading: () => const SizedBox(height: 40),
+            error: (_, __) => const SizedBox.shrink(),
           ),
           // ─── KPIs ───────────────────────────────────────────
           if (state.resumen != null && !state.loading)
             _KpiRow(resumen: state.resumen!),
-          SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.xs),
           // ─── Grid de productos ──────────────────────────────
           Expanded(
             child: AnimatedSwitcher(
-              duration: Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 220),
               child: state.loading
                   ? AppLoadingIndicator(key: ValueKey('loading'))
                   : state.error != null
@@ -226,7 +236,8 @@ class ProductosScreen extends ConsumerWidget {
                           product: state.items[i],
                           canEdit: canEdit,
                           canDelete: canDelete,
-                          onEdit: () => _showForm(context, ref, state.items[i]),
+                          onEdit: () =>
+                              _showProductDetail(context, ref, state.items[i]),
                           onToggle: () => notifier.toggleActivo(state.items[i]),
                           onDelete: () async {
                             final ok = await ConfirmationDialog.show(
@@ -246,6 +257,38 @@ class ProductosScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showProductDetail(
+    BuildContext context,
+    WidgetRef ref,
+    Producto product,
+  ) {
+    final canEdit = ref.read(authProvider).hasPermission('productos:editar');
+    final canDelete = ref
+        .read(authProvider)
+        .hasPermission('productos:eliminar');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ProductDetailScreen(
+          product: product,
+          canEdit: canEdit,
+          canDelete: canDelete,
+          onEdit: () => _showForm(context, ref, product),
+          onToggle: () async {
+            final repo = ref.read(_repoProvider);
+            await repo.toggle(product.id, !product.activo);
+            ref.read(_productosNotifier.notifier).load();
+          },
+          onDelete: () async {
+            final repo = ref.read(_repoProvider);
+            await repo.delete(product.id);
+            ref.read(_productosNotifier.notifier).load();
+          },
+        ),
       ),
     );
   }
@@ -543,7 +586,7 @@ class _KpiChip extends StatelessWidget {
   );
 }
 
-// ─── Product Card (Grid) ──────────────────────────────────────────────────────
+// ─── Product Card — compacto, sin overflow ────────────────────────────────────
 
 class _ProductCard extends StatelessWidget {
   final Producto product;
@@ -571,119 +614,482 @@ class _ProductCard extends StatelessWidget {
       onTap: onEdit,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
-          border: Border.all(color: AppColors.border, width: 1),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFEEEFF2)),
           boxShadow: AppShadows.card,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen del producto
-            AspectRatio(
-              aspectRatio: 1,
-              child: ClipRRect(
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(spacing.AppSpacing.radiusMD),
-                ),
+            // ─ Imagen cuadrada
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(11),
+              ),
+              child: AspectRatio(
+                aspectRatio: 1.1,
                 child: DSProductImage(
-                  imageUrl: null, // TODO: Agregar campo de imagen al modelo
+                  imageUrl: product.imageUrl,
+                  productName: product.nombre,
                   fit: BoxFit.cover,
+                  width: double.infinity,
                 ),
               ),
             ),
-            // Información del producto
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.all(AppSpacing.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Nombre
-                    Text(
-                      product.nombre,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+            // ─ Info compacta
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    product.nombre,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.2,
                     ),
-                    SizedBox(height: spacing.AppSpacing.xxs),
-                    // Código
-                    Text(
-                      product.codigo,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textTertiary,
-                      ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    product.codigo,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
                     ),
-                    Spacer(),
-                    // Precio y margen
-                    Row(
-                      children: [
-                        Text(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
                           'S/ ${product.precioVenta.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                             color: AppColors.primary,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        Spacer(),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: marginColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(
-                              spacing.AppSpacing.radiusXS,
-                            ),
-                          ),
-                          child: Text(
-                            '${product.margin.toStringAsFixed(0)}%',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: marginColor,
-                            ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: marginColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${product.margin.toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: marginColor,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  // Estado inactivo
+                  if (!product.activo) ...[
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.textTertiary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Inactivo',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
-            // Badge de estado
-            if (!product.activo)
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: spacing.AppSpacing.xxs),
-                decoration: BoxDecoration(
-                  color: AppColors.textTertiary.withOpacity(0.1),
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(spacing.AppSpacing.radiusMD),
-                  ),
-                ),
-                child: Text(
-                  'Inactivo',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
+}
+
+// ─── Subpantalla: Detalle de Producto ────────────────────────────────────────
+
+class _ProductDetailScreen extends StatelessWidget {
+  final Producto product;
+  final bool canEdit, canDelete;
+  final VoidCallback onEdit, onToggle, onDelete;
+
+  const _ProductDetailScreen({
+    required this.product,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final marginColor = product.margin >= 40
+        ? AppColors.success
+        : product.margin >= 20
+        ? AppColors.warning
+        : AppColors.error;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 18,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Detalle de producto',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(
+                Icons.settings_outlined,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
+              onPressed: onEdit,
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ─ Imagen + info principal
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: DSProductImage(
+                    imageUrl: product.imageUrl,
+                    productName: product.nombre,
+                    width: 120,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Badge activo
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: product.activo
+                              ? AppColors.successLight
+                              : AppColors.errorLight,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: product.activo
+                                    ? AppColors.success
+                                    : AppColors.error,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              product.activo ? 'Activo' : 'Inactivo',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: product.activo
+                                    ? AppColors.success
+                                    : AppColors.error,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        product.nombre,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        product.categoria,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'SKU: ${product.codigo}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'S/ ${product.precioVenta.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      Text(
+                        'Margen: ${product.margin.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: marginColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // ─ Acciones rápidas
+            if (canEdit)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onEdit();
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Editar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primaryBorder),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onToggle();
+                      },
+                      icon: Icon(
+                        product.activo
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 16,
+                      ),
+                      label: Text(product.activo ? 'Desactivar' : 'Activar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        side: BorderSide(color: AppColors.border),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            if (canDelete) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Eliminar producto'),
+                        content: Text('¿Eliminar ${product.nombre}?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                            ),
+                            child: const Text('Eliminar'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok == true) {
+                      Navigator.pop(context);
+                      onDelete();
+                    }
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text('Eliminar producto'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                  ),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // ─ Info general
+            _InfoSection('Información general', [
+              _InfoRow('Categoría', product.categoria),
+              if (product.presentacion != null)
+                _InfoRow('Presentación', product.presentacion!),
+              _InfoRow('Unidad', product.unidad),
+              _InfoRow(
+                'Costo unitario',
+                'S/ ${product.precioCosto.toStringAsFixed(2)}',
+              ),
+              if (product.stockDisponible != null)
+                _InfoRow('Stock disponible', '${product.stockDisponible}'),
+            ]),
+
+            if (product.descripcion?.isNotEmpty == true) ...[
+              const SizedBox(height: 16),
+              _InfoSection('Descripción', [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    product.descripcion!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoSection extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  const _InfoSection(this.title, this.children);
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFEEEFF2)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          children: children
+              .expand(
+                (w) => [
+                  w,
+                  if (w != children.last)
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                ],
+              )
+              .toList(),
+        ),
+      ),
+    ],
+  );
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label, value;
+  const _InfoRow(this.label, this.value);
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ─── Formulario ───────────────────────────────────────────────────────────────

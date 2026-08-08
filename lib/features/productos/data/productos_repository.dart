@@ -2,8 +2,9 @@ import '../../../core/network/api_client.dart';
 import '../../categorias/data/categorias_repository.dart';
 
 class Producto {
-  final String id, codigo, nombre, categoria, categoriaId, unidad;
-  final String? descripcion;
+  final String id, codigo, nombre, categoriaId, unidad;
+  final String categoria;
+  final String? descripcion, presentacion, imageUrl;
   final double precioVenta, precioCosto;
   final bool disponiblePos, activo;
   final double margin;
@@ -17,6 +18,8 @@ class Producto {
     required this.categoriaId,
     required this.unidad,
     this.descripcion,
+    this.presentacion,
+    this.imageUrl,
     required this.precioVenta,
     required this.precioCosto,
     required this.disponiblePos,
@@ -29,10 +32,15 @@ class Producto {
     id: j['id'] as String? ?? '',
     codigo: j['codigo'] as String? ?? '',
     nombre: j['nombre'] as String? ?? '',
-    categoria: j['categoria'] as String? ?? '',
+    // categoria puede llegar como String o como Map{nombre:...}
+    categoria: j['categoria'] is Map
+        ? ((j['categoria'] as Map)['nombre'] as String? ?? '')
+        : j['categoria'] as String? ?? '',
     categoriaId: j['categoriaId'] as String? ?? '',
     unidad: j['unidad'] as String? ?? 'un',
     descripcion: j['descripcion'] as String?,
+    presentacion: j['presentacion'] as String?,
+    imageUrl: j['imageUrl'] as String?,
     precioVenta: (j['precioVenta'] as num?)?.toDouble() ?? 0,
     precioCosto: (j['precioCosto'] as num?)?.toDouble() ?? 0,
     disponiblePos: j['disponiblePos'] as bool? ?? false,
@@ -149,6 +157,11 @@ class ProductosRepository {
   }
 
   Future<void> delete(String id) => _api.delete('/productos/$id');
+
+  Future<Producto> toggle(String id, bool activo) async {
+    final r = await _api.patch('/productos/$id', data: {'activo': activo});
+    return Producto.fromJson(Map<String, dynamic>.from(r.data as Map));
+  }
 
   Future<List<Categoria>> categorias({String? activo = 'true'}) async {
     final r = await _api.get(

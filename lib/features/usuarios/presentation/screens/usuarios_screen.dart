@@ -155,40 +155,25 @@ class UsuariosScreen extends ConsumerWidget {
           onRefresh: () => ref.read(usuariosProvider.notifier).load(),
           child: Column(
             children: [
-              // Header
-              Container(
-                color: AppColors.background,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.people_rounded,
-                      color: AppColors.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Usuarios',
-                        style: AppTextStyles.headlineLarge,
-                      ),
-                    ),
-                    if (auth.hasPermission('usuarios:crear'))
-                      FilledButton.icon(
-                        onPressed: () => _showCreateModal(context, ref, state),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Nuevo'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
+              if (auth.hasPermission('usuarios:crear'))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: () => _showCreateModal(context, ref, state),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Nuevo'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
                         ),
                       ),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
 
               // Content
               Expanded(
