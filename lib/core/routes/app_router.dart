@@ -164,39 +164,65 @@ class _SplashState extends ConsumerState<_SplashScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF2F5FA),
+    backgroundColor: Colors.white,
     body: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+          // Logo real
+          Image.asset(
+            'assets/images/LOGO_GENERAL.png',
+            width: 120,
+            height: 120,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(24),
               ),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.local_bar_rounded,
-              color: Colors.white,
-              size: 40,
+              child: const Icon(
+                Icons.local_bar_rounded,
+                color: Color(0xFFF97316),
+                size: 48,
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'Bar Beer',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF2563EB),
+          const SizedBox(height: 20),
+          // BarBeer con el mismo estilo del header
+          RichText(
+            text: const TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Bar',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                TextSpan(
+                  text: 'Beer',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFF97316),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 32),
-          const CircularProgressIndicator(
-            color: Color(0xFF2563EB),
-            strokeWidth: 2.5,
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              color: Color(0xFFF97316),
+              strokeWidth: 2.5,
+            ),
           ),
         ],
       ),

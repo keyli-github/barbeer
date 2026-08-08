@@ -71,6 +71,10 @@ class AppButton extends StatelessWidget {
       default:
         btn = ElevatedButton(
           onPressed: isLoading ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.brand, // naranja
+            foregroundColor: Colors.white,
+          ),
           child: child,
         );
     }

@@ -265,7 +265,7 @@ class CarritoVentaSheet extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: submitting ? null : onConfirm,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: AppColors.brand,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

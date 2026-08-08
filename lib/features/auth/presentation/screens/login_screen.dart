@@ -121,42 +121,56 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Widget _buildBrand() => Column(
     children: [
-      // Logo con sombra suave
-      Container(
-        width: 96,
-        height: 96,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
-          boxShadow: AppShadows.card,
-          border: Border.all(color: AppColors.border, width: 1),
-        ),
-        padding: EdgeInsets.all(AppSpacing.md),
-        child: Image.asset(
-          'assets/images/barbeerLogo.png',
-          fit: BoxFit.contain,
+      // Logo real LOGO_GENERAL.png
+      Image.asset(
+        'assets/images/LOGO_GENERAL.png',
+        width: 120,
+        height: 120,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: AppColors.brandSurface,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
+          ),
+          child: const Icon(
+            Icons.local_bar_rounded,
+            color: AppColors.brand,
+            size: 48,
+          ),
         ),
       ),
-      SizedBox(height: AppSpacing.lg),
-      // Título
-      Text(
-        'Bar Beer',
-        style: TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textPrimary,
-          letterSpacing: -0.5,
+      SizedBox(height: AppSpacing.md),
+      // BarBeer con el mismo estilo del header
+      RichText(
+        text: const TextSpan(
+          children: [
+            TextSpan(
+              text: 'Bar',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+            TextSpan(
+              text: 'Beer',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: AppColors.brand,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
         ),
       ),
       SizedBox(height: AppSpacing.xxs),
-      // Subtítulo
       Text(
         'Sistema de gestión',
-        style: TextStyle(
-          fontSize: 15,
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w400,
-        ),
+        style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
       ),
     ],
   );

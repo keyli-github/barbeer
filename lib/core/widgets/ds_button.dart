@@ -186,9 +186,9 @@ class DSButton extends StatelessWidget {
   Color _bg() {
     switch (variant) {
       case DSButtonVariant.primary:
-        return AppColors.primary;
+        return AppColors.brand; // naranja
       case DSButtonVariant.secondary:
-        return AppColors.primarySurface;
+        return AppColors.brandSurface;
       case DSButtonVariant.danger:
         return AppColors.error;
       default:
@@ -201,7 +201,7 @@ class DSButton extends StatelessWidget {
       case DSButtonVariant.primary:
         return Colors.white;
       case DSButtonVariant.secondary:
-        return AppColors.primary;
+        return AppColors.brand;
       case DSButtonVariant.danger:
         return Colors.white;
       case DSButtonVariant.ghost:

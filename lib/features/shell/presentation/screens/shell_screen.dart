@@ -478,56 +478,29 @@ class _MorePanelState extends State<_MorePanel> {
       child: SafeArea(
         child: Column(
           children: [
-            // ── Cabecera ────────────────────────────────────────────────
+            // ── Solo botón de cierre (sin logo) ─────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
-              child: Row(
-                children: [
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Bar',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'Beer',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.brand,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                      ],
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.textTertiary,
                     ),
                   ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-            const Divider(height: 1, color: AppColors.border),
 
             // ── Secciones con animación ──────────────────────────────────
             Expanded(

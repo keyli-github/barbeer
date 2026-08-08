@@ -418,7 +418,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                     icon: const Icon(Icons.payment_rounded, size: 18),
                     label: const Text('Clasificar pago'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppColors.brand,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
