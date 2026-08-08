@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -268,30 +269,13 @@ class UsuariosScreen extends ConsumerWidget {
     WidgetRef ref,
     UsuariosState state,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _UserForm(
+    AppNav.push(
+      context,
+      _UserForm(
         roles: state.roles,
         sedes: state.sedes,
         isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
-        onSave: (data) async {
-          try {
-            await ref.read(usuariosProvider.notifier).createUser(data);
-            if (context.mounted) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Usuario creado exitosamente')),
-              );
-            }
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-          }
-        },
+        onSave: (data) => ref.read(usuariosProvider.notifier).createUser(data),
       ),
     );
   }
@@ -302,33 +286,16 @@ class UsuariosScreen extends ConsumerWidget {
     Map<String, dynamic> user,
     UsuariosState state,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _UserEditForm(
+    AppNav.push(
+      context,
+      _UserEditForm(
         user: user,
         roles: state.roles,
         sedes: state.sedes,
         isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
-        onSave: (data) async {
-          try {
-            await ref
-                .read(usuariosProvider.notifier)
-                .updateUser(user['id'] as String, data);
-            if (context.mounted) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Usuario actualizado')),
-              );
-            }
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-          }
-        },
+        onSave: (data) => ref
+            .read(usuariosProvider.notifier)
+            .updateUser(user['id'] as String, data),
       ),
     );
   }
@@ -697,123 +664,84 @@ class _UserFormState extends State<_UserForm> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Container(
-      padding: EdgeInsets.only(bottom: bottom),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: const SubPageAppBar(title: 'Nuevo usuario'),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                label: 'Usuario',
+                hint: 'Nombre de usuario',
+                controller: _userCtrl,
+                prefixIcon: Icons.person_outline_rounded,
+                textInputAction: TextInputAction.next,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Requerido' : null,
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Row(
-              children: [
-                const Text(
-                  'Nuevo usuario',
-                  style: AppTextStyles.headlineMedium,
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppTextField(
-                      label: 'Usuario',
-                      hint: 'Nombre de usuario',
-                      controller: _userCtrl,
-                      prefixIcon: Icons.person_outline_rounded,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Requerido' : null,
-                    ),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                      label: 'Contrasena temporal',
-                      hint: 'Minimo 12 caracteres',
-                      controller: _passCtrl,
-                      prefixIcon: Icons.lock_outline_rounded,
-                      obscureText: true,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Requerido';
-                        if (v.length < 12) return 'Minimo 12 caracteres';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    _label('Rol'),
-                    DropdownButtonFormField<String>(
-                      value: _rolId,
-                      hint: const Text('Seleccionar rol'),
-                      items: widget.roles
-                          .map(
-                            (r) => DropdownMenuItem(
-                              value: r['id'] as String,
-                              child: Text(r['nombre'] as String? ?? ''),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _rolId = v),
-                      validator: (v) => v == null ? 'Requerido' : null,
-                    ),
-                    if (widget.isSuperAdmin) ...[
-                      const SizedBox(height: 14),
-                      _label('Sede'),
-                      DropdownButtonFormField<String>(
-                        value: _sedeId,
-                        hint: const Text('Seleccionar sede (opcional)'),
-                        items: [
-                          const DropdownMenuItem(
-                            value: null,
-                            child: Text('Sin sede'),
-                          ),
-                          ...widget.sedes.map(
-                            (s) => DropdownMenuItem(
-                              value: s['id'] as String,
-                              child: Text(s['nombre'] as String? ?? ''),
-                            ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => _sedeId = v),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Contrasena temporal',
+                hint: 'Minimo 12 caracteres',
+                controller: _passCtrl,
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: true,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Requerido';
+                  if (v.length < 12) return 'Minimo 12 caracteres';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              _label('Rol'),
+              DropdownButtonFormField<String>(
+                value: _rolId,
+                hint: const Text('Seleccionar rol'),
+                items: widget.roles
+                    .map(
+                      (r) => DropdownMenuItem(
+                        value: r['id'] as String,
+                        child: Text(r['nombre'] as String? ?? ''),
                       ),
-                    ],
-                    const SizedBox(height: 24),
-                    PrimaryButton(
-                      label: 'Crear usuario',
-                      isLoading: _loading,
-                      onPressed: _submit,
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _rolId = v),
+                validator: (v) => v == null ? 'Requerido' : null,
+              ),
+              if (widget.isSuperAdmin) ...[
+                const SizedBox(height: 14),
+                _label('Sede'),
+                DropdownButtonFormField<String>(
+                  value: _sedeId,
+                  hint: const Text('Seleccionar sede (opcional)'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Sin sede'),
+                    ),
+                    ...widget.sedes.map(
+                      (s) => DropdownMenuItem(
+                        value: s['id'] as String,
+                        child: Text(s['nombre'] as String? ?? ''),
+                      ),
                     ),
                   ],
+                  onChanged: (v) => setState(() => _sedeId = v),
                 ),
+              ],
+              const SizedBox(height: 24),
+              PrimaryButton(
+                label: 'Crear usuario',
+                isLoading: _loading,
+                onPressed: _submit,
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -839,6 +767,17 @@ class _UserFormState extends State<_UserForm> {
         'rolId': _rolId,
         if (_sedeId != null) 'sedeId': _sedeId,
       });
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Usuario creado exitosamente')),
+        );
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -874,93 +813,52 @@ class _UserEditFormState extends State<_UserEditForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: const SubPageAppBar(title: 'Editar usuario'),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _label('Rol'),
+            DropdownButtonFormField<String>(
+              value: _rolId,
+              items: widget.roles
+                  .map(
+                    (r) => DropdownMenuItem(
+                      value: r['id'] as String,
+                      child: Text(r['nombre'] as String? ?? ''),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => setState(() => _rolId = v),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Row(
-              children: [
-                const Text(
-                  'Editar usuario',
-                  style: AppTextStyles.headlineMedium,
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _label('Rol'),
-                DropdownButtonFormField<String>(
-                  value: _rolId,
-                  items: widget.roles
-                      .map(
-                        (r) => DropdownMenuItem(
-                          value: r['id'] as String,
-                          child: Text(r['nombre'] as String? ?? ''),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => _rolId = v),
-                ),
-                if (widget.isSuperAdmin) ...[
-                  const SizedBox(height: 14),
-                  _label('Sede'),
-                  DropdownButtonFormField<String>(
-                    value: _sedeId,
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('Sin sede'),
-                      ),
-                      ...widget.sedes.map(
-                        (s) => DropdownMenuItem(
-                          value: s['id'] as String,
-                          child: Text(s['nombre'] as String? ?? ''),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _sedeId = v),
+            if (widget.isSuperAdmin) ...[
+              const SizedBox(height: 14),
+              _label('Sede'),
+              DropdownButtonFormField<String>(
+                value: _sedeId,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Sin sede')),
+                  ...widget.sedes.map(
+                    (s) => DropdownMenuItem(
+                      value: s['id'] as String,
+                      child: Text(s['nombre'] as String? ?? ''),
+                    ),
                   ),
                 ],
-                const SizedBox(height: 24),
-                PrimaryButton(
-                  label: 'Guardar cambios',
-                  isLoading: _loading,
-                  onPressed: _submit,
-                ),
-              ],
+                onChanged: (v) => setState(() => _sedeId = v),
+              ),
+            ],
+            const SizedBox(height: 24),
+            PrimaryButton(
+              label: 'Guardar cambios',
+              isLoading: _loading,
+              onPressed: _submit,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -983,6 +881,17 @@ class _UserEditFormState extends State<_UserEditForm> {
       if (_rolId != null) data['rolId'] = _rolId;
       if (_sedeId != null) data['sedeId'] = _sedeId;
       await widget.onSave(data);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Usuario actualizado')));
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

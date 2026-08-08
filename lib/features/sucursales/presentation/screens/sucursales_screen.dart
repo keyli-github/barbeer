@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -221,36 +222,17 @@ class SucursalesScreen extends ConsumerWidget {
     WidgetRef ref,
     Map<String, dynamic>? sede,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _SedeForm(
+    AppNav.push(
+      context,
+      _SedeForm(
         sede: sede,
         onSave: (data) async {
-          try {
-            if (sede == null) {
-              await ref.read(sucursalesProvider.notifier).createSede(data);
-            } else {
-              await ref
-                  .read(sucursalesProvider.notifier)
-                  .updateSede(sede['id'] as String, data);
-            }
-            if (context.mounted) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    sede == null ? 'Sucursal creada' : 'Sucursal actualizada',
-                  ),
-                ),
-              );
-            }
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
+          if (sede == null) {
+            await ref.read(sucursalesProvider.notifier).createSede(data);
+          } else {
+            await ref
+                .read(sucursalesProvider.notifier)
+                .updateSede(sede['id'] as String, data);
           }
         },
       ),
@@ -536,123 +518,82 @@ class _SedeFormState extends State<_SedeForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: SubPageAppBar(
+      title: widget.sede == null ? 'Nueva sucursal' : 'Editar sucursal',
     ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppTextField(
+              label: 'Nombre',
+              hint: 'Nombre de la sucursal',
+              controller: _nameCtrl,
+              prefixIcon: Icons.store_rounded,
+              textInputAction: TextInputAction.next,
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Requerido' : null,
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Row(
-            children: [
-              Text(
-                widget.sede == null ? 'Nueva sucursal' : 'Editar sucursal',
-                style: AppTextStyles.headlineMedium,
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        ),
-        const Divider(),
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Direccion',
+              hint: 'Direccion fisica (opcional)',
+              controller: _dirCtrl,
+              prefixIcon: Icons.location_on_rounded,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Telefono',
+              hint: 'Telefono de contacto (opcional)',
+              controller: _telCtrl,
+              prefixIcon: Icons.phone_rounded,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'RUC',
+              hint: '11 digitos (opcional)',
+              controller: _rucCtrl,
+              prefixIcon: Icons.receipt_rounded,
+              keyboardType: TextInputType.number,
+              maxLength: 11,
+              validator: (v) {
+                if (v == null || v.isEmpty) return null;
+                if (!RegExp(r'^\d{11}$').hasMatch(v))
+                  return 'El RUC debe tener 11 digitos';
+                return null;
+              },
+            ),
+            if (widget.sede != null) ...[
+              const SizedBox(height: 14),
+              Row(
                 children: [
-                  AppTextField(
-                    label: 'Nombre',
-                    hint: 'Nombre de la sucursal',
-                    controller: _nameCtrl,
-                    prefixIcon: Icons.store_rounded,
-                    textInputAction: TextInputAction.next,
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Requerido' : null,
+                  const Expanded(
+                    child: Text('Activa', style: AppTextStyles.bodyMedium),
                   ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Direccion',
-                    hint: 'Direccion fisica (opcional)',
-                    controller: _dirCtrl,
-                    prefixIcon: Icons.location_on_rounded,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Telefono',
-                    hint: 'Telefono de contacto (opcional)',
-                    controller: _telCtrl,
-                    prefixIcon: Icons.phone_rounded,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'RUC',
-                    hint: '11 digitos (opcional)',
-                    controller: _rucCtrl,
-                    prefixIcon: Icons.receipt_rounded,
-                    keyboardType: TextInputType.number,
-                    maxLength: 11,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return null;
-                      if (!RegExp(r'^\d{11}$').hasMatch(v))
-                        return 'El RUC debe tener 11 digitos';
-                      return null;
-                    },
-                  ),
-                  if (widget.sede != null) ...[
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Activa',
-                            style: AppTextStyles.bodyMedium,
-                          ),
-                        ),
-                        Switch(
-                          value: _activo,
-                          onChanged: (v) => setState(() => _activo = v),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  PrimaryButton(
-                    label: widget.sede == null
-                        ? 'Crear sucursal'
-                        : 'Guardar cambios',
-                    isLoading: _loading,
-                    onPressed: _submit,
+                  Switch(
+                    value: _activo,
+                    onChanged: (v) => setState(() => _activo = v),
                   ),
                 ],
               ),
+            ],
+            const SizedBox(height: 24),
+            PrimaryButton(
+              label: widget.sede == null ? 'Crear sucursal' : 'Guardar cambios',
+              isLoading: _loading,
+              onPressed: _submit,
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 
@@ -666,6 +607,21 @@ class _SedeFormState extends State<_SedeForm> {
       if (_rucCtrl.text.isNotEmpty) data['ruc'] = _rucCtrl.text;
       if (widget.sede != null) data['activo'] = _activo;
       await widget.onSave(data);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.sede == null ? 'Sucursal creada' : 'Sucursal actualizada',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

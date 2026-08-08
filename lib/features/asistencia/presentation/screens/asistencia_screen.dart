@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -404,11 +405,9 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     _AsistenciaNotifier notifier,
     bool isEdit,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _RegistrarSheet(
+    AppNav.push(
+      context,
+      _RegistrarSheet(
         emp: emp,
         isEdit: isEdit,
         onSaved: (estado, turno, notas) async {
@@ -880,142 +879,95 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: widget.isEdit ? 'Editar asistencia' : 'Registrar asistencia',
+        subtitle: widget.emp.username,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          children: [
+            Text(
+              'Estado',
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.isEdit
-                            ? 'Editar asistencia'
-                            : 'Registrar asistencia',
-                        style: AppTextStyles.headlineMedium,
+                for (final e in [
+                  ('PRESENTE', 'Presente'),
+                  ('TARDANZA', 'Tardanza'),
+                  ('AUSENTE', 'Ausente'),
+                  ('DIA_LIBRE', 'Día libre'),
+                ])
+                  GestureDetector(
+                    onTap: () => setState(() => _estado = e.$1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
                       ),
-                      Text(widget.emp.username, style: AppTextStyles.bodySmall),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              children: [
-                Text(
-                  'Estado',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final e in [
-                      ('PRESENTE', 'Presente'),
-                      ('TARDANZA', 'Tardanza'),
-                      ('AUSENTE', 'Ausente'),
-                      ('DIA_LIBRE', 'Día libre'),
-                    ])
-                      GestureDetector(
-                        onTap: () => setState(() => _estado = e.$1),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _estado == e.$1
-                                ? AppColors.primarySurface
-                                : AppColors.backgroundAlt,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                            border: Border.all(
-                              color: _estado == e.$1
-                                  ? AppColors.primaryBorder
-                                  : AppColors.border,
-                            ),
-                          ),
-                          child: Text(
-                            e.$2,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _estado == e.$1
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: _estado == e.$1
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
+                      decoration: BoxDecoration(
+                        color: _estado == e.$1
+                            ? AppColors.primarySurface
+                            : AppColors.backgroundAlt,
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        border: Border.all(
+                          color: _estado == e.$1
+                              ? AppColors.primaryBorder
+                              : AppColors.border,
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                AppTextField(
-                  label: 'Turno',
-                  hint: 'Ej. Apertura, Tarde',
-                  controller: _turnoCtrl,
-                ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Notas',
-                  hint: 'Opcional',
-                  controller: _notasCtrl,
-                  maxLines: 2,
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
+                      child: Text(
+                        e.$2,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: _estado == e.$1
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: _estado == e.$1
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 16),
-                PrimaryButton(
-                  label: widget.isEdit ? 'Guardar cambios' : 'Registrar',
-                  onPressed: _saving ? null : _submit,
-                  isLoading: _saving,
-                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Turno',
+              hint: 'Ej. Apertura, Tarde',
+              controller: _turnoCtrl,
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              label: 'Notas',
+              hint: 'Opcional',
+              controller: _notasCtrl,
+              maxLines: 2,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 16),
+            PrimaryButton(
+              label: widget.isEdit ? 'Guardar cambios' : 'Registrar',
+              onPressed: _saving ? null : _submit,
+              isLoading: _saving,
+            ),
+          ],
+        ),
       ),
     );
   }

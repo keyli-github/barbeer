@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -17,12 +18,8 @@ import '../providers/categorias_provider.dart';
 class CategoriasSheet extends ConsumerWidget {
   const CategoriasSheet({super.key});
 
-  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (_) => const CategoriasSheet(),
-  );
+  static Future<void> show(BuildContext context) =>
+      AppNav.push<void>(context, const CategoriasSheet());
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,85 +27,47 @@ class CategoriasSheet extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final canCreate = auth.hasPermission('categorias:crear');
 
-    return Container(
-      height: MediaQuery.sizeOf(context).height * .92,
-      decoration: const BoxDecoration(
-        color: AppColors.backgroundAlt,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+    return Scaffold(
+      backgroundColor: AppColors.backgroundAlt,
+      appBar: SubPageAppBar(
+        title: 'Categorias',
+        subtitle: 'Organiza el catalogo global',
+        actions: [
+          if (canCreate)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton.icon(
+                onPressed: () => _showForm(context, ref),
+                icon: const Icon(Icons.add_rounded, size: 17),
+                label: const Text('Nueva'),
+              ),
+            ),
+        ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Container(
-              decoration: const BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(AppRadius.xl),
+      body: Column(
+        children: [
+          Container(
+            color: AppColors.surface,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: AppSearchBar(
+                    hint: 'Buscar categoria...',
+                    onChanged: ref.read(categoriasProvider.notifier).search,
+                  ),
                 ),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 8),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Categorias',
-                                style: AppTextStyles.headlineMedium,
-                              ),
-                              Text(
-                                'Organiza el catalogo global',
-                                style: AppTextStyles.labelSmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (canCreate)
-                          FilledButton.icon(
-                            onPressed: () => _showForm(context, ref),
-                            icon: const Icon(Icons.add_rounded, size: 17),
-                            label: const Text('Nueva'),
-                          ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: AppSearchBar(
-                      hint: 'Buscar categoria...',
-                      onChanged: ref.read(categoriasProvider.notifier).search,
-                    ),
-                  ),
-                  _CategoryFilters(state: state),
-                ],
-              ),
+                _CategoryFilters(state: state),
+              ],
             ),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: _body(context, ref, state, auth),
-              ),
+          ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: _body(context, ref, state, auth),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -286,11 +245,9 @@ class CategoriasSheet extends ConsumerWidget {
     WidgetRef ref, {
     Categoria? categoria,
   }) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _CategoriaForm(
+    await AppNav.push<void>(
+      context,
+      _CategoriaForm(
         categoria: categoria,
         onSave:
             ({required nombre, required descripcion, required activo}) async {
@@ -420,88 +377,56 @@ class _CategoriaFormState extends State<_CategoriaForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: SubPageAppBar(
+      title: widget.categoria == null ? 'Nueva categoria' : 'Editar categoria',
     ),
-    child: SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppTextField(
+              label: 'Nombre',
+              controller: _nombre,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.sentences,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Ingresa un nombre'
+                  : null,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Descripcion',
+              hint: 'Opcional',
+              controller: _descripcion,
+              maxLength: 300,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Categoria activa',
+                style: AppTextStyles.bodyMedium,
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.categoria == null
-                          ? 'Nueva categoria'
-                          : 'Editar categoria',
-                      style: AppTextStyles.headlineMedium,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                label: 'Nombre',
-                controller: _nombre,
-                maxLength: 80,
-                textCapitalization: TextCapitalization.sentences,
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Ingresa un nombre'
-                    : null,
-              ),
-              const SizedBox(height: 14),
-              AppTextField(
-                label: 'Descripcion',
-                hint: 'Opcional',
-                controller: _descripcion,
-                maxLength: 300,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Categoria activa',
-                  style: AppTextStyles.bodyMedium,
-                ),
-                value: _activo,
-                onChanged: (value) => setState(() => _activo = value),
-              ),
-              const SizedBox(height: 16),
-              PrimaryButton(
-                label: widget.categoria == null
-                    ? 'Crear categoria'
-                    : 'Guardar cambios',
-                isLoading: _saving,
-                onPressed: _submit,
-              ),
-            ],
-          ),
+              value: _activo,
+              onChanged: (value) => setState(() => _activo = value),
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(
+              label: widget.categoria == null
+                  ? 'Crear categoria'
+                  : 'Guardar cambios',
+              isLoading: _saving,
+              onPressed: _submit,
+            ),
+          ],
         ),
       ),
     ),

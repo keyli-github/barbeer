@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -193,27 +194,10 @@ class RolesScreen extends ConsumerWidget {
   }
 
   void _showCreateModal(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _RoleForm(
-        onSave: (data) async {
-          try {
-            await ref.read(rolesProvider.notifier).createRole(data);
-            if (context.mounted) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Rol creado')));
-            }
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-          }
-        },
+    AppNav.push(
+      context,
+      _RoleForm(
+        onSave: (data) => ref.read(rolesProvider.notifier).createRole(data),
       ),
     );
   }
@@ -223,30 +207,13 @@ class RolesScreen extends ConsumerWidget {
     WidgetRef ref,
     Map<String, dynamic> role,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _RoleEditForm(
+    AppNav.push(
+      context,
+      _RoleEditForm(
         role: role,
-        onSave: (data) async {
-          try {
-            await ref
-                .read(rolesProvider.notifier)
-                .updateRole(role['id'] as String, data);
-            if (context.mounted) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Rol actualizado')));
-            }
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-          }
-        },
+        onSave: (data) => ref
+            .read(rolesProvider.notifier)
+            .updateRole(role['id'] as String, data),
       ),
     );
   }
@@ -286,31 +253,14 @@ class RolesScreen extends ConsumerWidget {
     Map<String, dynamic> role,
     RolesState state,
   ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _PermissionsAssign(
+    AppNav.push(
+      context,
+      _PermissionsAssign(
         role: role,
         allPermisos: state.allPermisos,
-        onSave: (ids) async {
-          try {
-            await ref
-                .read(rolesProvider.notifier)
-                .assignPermissions(role['id'] as String, ids);
-            if (context.mounted) {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Permisos actualizados')),
-              );
-            }
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-          }
-        },
+        onSave: (ids) => ref
+            .read(rolesProvider.notifier)
+            .assignPermissions(role['id'] as String, ids),
       ),
     );
   }
@@ -531,112 +481,79 @@ class _RoleFormState extends State<_RoleForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: const SubPageAppBar(title: 'Nuevo rol'),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppTextField(
+              label: 'Nombre',
+              hint: 'NOMBRE_ROL',
+              controller: _nameCtrl,
+              prefixIcon: Icons.label_rounded,
+              textCapitalization: TextCapitalization.characters,
+              onChanged: (v) {
+                _nameCtrl.value = _nameCtrl.value.copyWith(
+                  text: v.toUpperCase(),
+                  selection: TextSelection.collapsed(offset: v.length),
+                );
+              },
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Requerido' : null,
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Row(
-            children: [
-              const Text('Nuevo rol', style: AppTextStyles.headlineMedium),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Descripcion',
+              hint: 'Descripcion del rol (opcional)',
+              controller: _descCtrl,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Nivel (1-99)',
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
               ),
-            ],
-          ),
-        ),
-        const Divider(),
-        SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            const SizedBox(height: 6),
+            Row(
               children: [
-                AppTextField(
-                  label: 'Nombre',
-                  hint: 'NOMBRE_ROL',
-                  controller: _nameCtrl,
-                  prefixIcon: Icons.label_rounded,
-                  textCapitalization: TextCapitalization.characters,
-                  onChanged: (v) {
-                    _nameCtrl.value = _nameCtrl.value.copyWith(
-                      text: v.toUpperCase(),
-                      selection: TextSelection.collapsed(offset: v.length),
-                    );
-                  },
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 14),
-                AppTextField(
-                  label: 'Descripcion',
-                  hint: 'Descripcion del rol (opcional)',
-                  controller: _descCtrl,
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Nivel (1-99)',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                Expanded(
+                  child: Slider(
+                    value: _nivel.toDouble(),
+                    min: 1,
+                    max: 99,
+                    onChanged: (v) => setState(() => _nivel = v.toInt()),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Slider(
-                        value: _nivel.toDouble(),
-                        min: 1,
-                        max: 99,
-                        onChanged: (v) => setState(() => _nivel = v.toInt()),
+                SizedBox(
+                  width: 50,
+                  child: Center(
+                    child: Text(
+                      '$_nivel',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: AppColors.primary,
                       ),
                     ),
-                    SizedBox(
-                      width: 50,
-                      child: Center(
-                        child: Text(
-                          '$_nivel',
-                          style: AppTextStyles.titleMedium.copyWith(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                PrimaryButton(
-                  label: 'Crear rol',
-                  isLoading: _loading,
-                  onPressed: _submit,
+                  ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 24),
+            PrimaryButton(
+              label: 'Crear rol',
+              isLoading: _loading,
+              onPressed: _submit,
+            ),
+          ],
         ),
-      ],
+      ),
     ),
   );
 
@@ -649,6 +566,17 @@ class _RoleFormState extends State<_RoleForm> {
         'descripcion': _descCtrl.text,
         'nivel': _nivel,
       });
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Rol creado')));
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -685,104 +613,71 @@ class _RoleEditFormState extends State<_RoleEditForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: const SubPageAppBar(title: 'Editar rol'),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppTextField(
+            label: 'Descripcion',
+            hint: 'Descripcion del rol',
+            controller: _descCtrl,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Nivel (1-99)',
+            style: AppTextStyles.bodySmall.copyWith(
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Row(
+          const SizedBox(height: 6),
+          Row(
             children: [
-              const Text('Editar rol', style: AppTextStyles.headlineMedium),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-        ),
-        const Divider(),
-        SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppTextField(
-                label: 'Descripcion',
-                hint: 'Descripcion del rol',
-                controller: _descCtrl,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Nivel (1-99)',
-                style: AppTextStyles.bodySmall.copyWith(
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Slider(
+                  value: _nivel.toDouble(),
+                  min: 1,
+                  max: 99,
+                  onChanged: (v) => setState(() => _nivel = v.toInt()),
                 ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Slider(
-                      value: _nivel.toDouble(),
-                      min: 1,
-                      max: 99,
-                      onChanged: (v) => setState(() => _nivel = v.toInt()),
+              SizedBox(
+                width: 50,
+                child: Center(
+                  child: Text(
+                    '$_nivel',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.primary,
                     ),
                   ),
-                  SizedBox(
-                    width: 50,
-                    child: Center(
-                      child: Text(
-                        '$_nivel',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text('Activo', style: AppTextStyles.bodyMedium),
-                  ),
-                  Switch(
-                    value: _activo,
-                    onChanged: (v) => setState(() => _activo = v),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              PrimaryButton(
-                label: 'Guardar cambios',
-                isLoading: _loading,
-                onPressed: _submit,
+                ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Activo', style: AppTextStyles.bodyMedium),
+              ),
+              Switch(
+                value: _activo,
+                onChanged: (v) => setState(() => _activo = v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          PrimaryButton(
+            label: 'Guardar cambios',
+            isLoading: _loading,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     ),
   );
 
@@ -794,6 +689,17 @@ class _RoleEditFormState extends State<_RoleEditForm> {
         'nivel': _nivel,
         'activo': _activo,
       });
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Rol actualizado')));
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -838,117 +744,90 @@ class _PermissionsAssignState extends State<_PermissionsAssign> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: MediaQuery.of(context).size.height * 0.88,
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-    ),
-    child: Column(
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: SubPageAppBar(title: 'Permisos: ${widget.role['nombre']}'),
+    body: ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
+        for (final mod in _grouped.entries) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                PermissionModuleBadge(module: mod.key),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => setState(() {
+                    final ids = mod.value
+                        .map((p) => p['id'] as String? ?? '')
+                        .toSet();
+                    if (ids.every(_selected.contains)) {
+                      _selected.removeAll(ids);
+                    } else {
+                      _selected.addAll(ids);
+                    }
+                  }),
+                  child: Text(
+                    _grouped[mod.key]!.every((p) => _selected.contains(p['id']))
+                        ? 'Deseleccionar todo'
+                        : 'Seleccionar todo',
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Permisos: ${widget.role['nombre']}',
-                  style: AppTextStyles.headlineMedium,
-                ),
+          for (final perm in mod.value)
+            CheckboxListTile(
+              dense: true,
+              value: _selected.contains(perm['id']),
+              onChanged: (v) => setState(() {
+                if (v == true)
+                  _selected.add(perm['id'] as String? ?? '');
+                else
+                  _selected.remove(perm['id']);
+              }),
+              title: Text(
+                perm['nombre'] as String? ?? '',
+                style: AppTextStyles.bodyMedium,
               ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
+              subtitle: Text(
+                perm['descripcion'] as String? ?? '',
+                style: AppTextStyles.labelSmall,
               ),
-            ],
-          ),
-        ),
-        const Divider(),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              for (final mod in _grouped.entries) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      PermissionModuleBadge(module: mod.key),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () => setState(() {
-                          final ids = mod.value
-                              .map((p) => p['id'] as String? ?? '')
-                              .toSet();
-                          if (ids.every(_selected.contains)) {
-                            _selected.removeAll(ids);
-                          } else {
-                            _selected.addAll(ids);
-                          }
-                        }),
-                        child: Text(
-                          _grouped[mod.key]!.every(
-                                (p) => _selected.contains(p['id']),
-                              )
-                              ? 'Deseleccionar todo'
-                              : 'Seleccionar todo',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                for (final perm in mod.value)
-                  CheckboxListTile(
-                    dense: true,
-                    value: _selected.contains(perm['id']),
-                    onChanged: (v) => setState(() {
-                      if (v == true)
-                        _selected.add(perm['id'] as String? ?? '');
-                      else
-                        _selected.remove(perm['id']);
-                    }),
-                    title: Text(
-                      perm['nombre'] as String? ?? '',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                    subtitle: Text(
-                      perm['descripcion'] as String? ?? '',
-                      style: AppTextStyles.labelSmall,
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                const Divider(),
-              ],
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: PrimaryButton(
-            label: 'Guardar permisos (${_selected.length})',
-            isLoading: _loading,
-            onPressed: () async {
-              setState(() => _loading = true);
-              try {
-                await widget.onSave(_selected.toList());
-              } finally {
-                if (mounted) setState(() => _loading = false);
-              }
-            },
-          ),
-        ),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          const Divider(),
+        ],
       ],
+    ),
+    bottomNavigationBar: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: PrimaryButton(
+          label: 'Guardar permisos (${_selected.length})',
+          isLoading: _loading,
+          onPressed: () async {
+            setState(() => _loading = true);
+            try {
+              await widget.onSave(_selected.toList());
+              if (mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Permisos actualizados')),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                setState(() => _loading = false);
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+        ),
+      ),
     ),
   );
 }

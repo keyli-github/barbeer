@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -201,11 +202,9 @@ class InventarioScreen extends ConsumerWidget {
   }
 
   void _showAdjust(BuildContext context, WidgetRef ref, InventarioItem item) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _AdjustSheet(
+    AppNav.push(
+      context,
+      _AdjustSheet(
         item: item,
         onSaved: () => ref.read(_invProvider.notifier).load(),
         repo: ref.read(_invRepoProvider),
@@ -650,173 +649,120 @@ class _AdjustSheetState extends State<_AdjustSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: 'Ajuste de stock',
+        subtitle: '${widget.item.producto} · Stock: ${widget.item.stock}',
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          children: [
+            Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ajuste de stock',
-                        style: AppTextStyles.headlineMedium,
-                      ),
-                      Text(
-                        '${widget.item.producto} · Stock: ${widget.item.stock}',
-                        style: AppTextStyles.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    for (final t in [
-                      ('ENTRADA', 'Entrada'),
-                      ('SALIDA', 'Salida'),
-                      ('AJUSTE', 'Conteo'),
-                    ])
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: t.$1 == 'AJUSTE' ? 0 : 8,
+                for (final t in [
+                  ('ENTRADA', 'Entrada'),
+                  ('SALIDA', 'Salida'),
+                  ('AJUSTE', 'Conteo'),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: t.$1 == 'AJUSTE' ? 0 : 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() {
+                          _tipo = t.$1;
+                          _error = null;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _tipo == t.$1
+                                ? AppColors.primarySurface
+                                : AppColors.backgroundAlt,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _tipo == t.$1
+                                  ? AppColors.primaryBorder
+                                  : AppColors.border,
+                            ),
                           ),
-                          child: GestureDetector(
-                            onTap: () => setState(() {
-                              _tipo = t.$1;
-                              _error = null;
-                            }),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              decoration: BoxDecoration(
-                                color: _tipo == t.$1
-                                    ? AppColors.primarySurface
-                                    : AppColors.backgroundAlt,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _tipo == t.$1
-                                      ? AppColors.primaryBorder
-                                      : AppColors.border,
-                                ),
-                              ),
-                              child: Text(
-                                t.$2,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: _tipo == t.$1
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: _tipo == t.$1
-                                      ? AppColors.primary
-                                      : AppColors.textSecondary,
-                                ),
-                              ),
+                          child: Text(
+                            t.$2,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: _tipo == t.$1
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: _tipo == t.$1
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _cantCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '0',
-                    hintStyle: const TextStyle(
-                      fontSize: 28,
-                      color: AppColors.textDisabled,
-                    ),
-                    labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _refCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Referencia (opcional)',
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
                     ),
                   ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _confirm,
-                    child: _saving
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Confirmar ajuste'),
-                  ),
-                ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _cantCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+              decoration: InputDecoration(
+                hintText: '0',
+                hintStyle: const TextStyle(
+                  fontSize: 28,
+                  color: AppColors.textDisabled,
+                ),
+                labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _refCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Referencia (opcional)',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _confirm,
+                child: _saving
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Confirmar ajuste'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -105,22 +106,14 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showDetail(BuildContext context, String id) async {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) =>
-          _DetailSheet(future: ref.read(cajaProvider.notifier).detalle(id)),
+    AppNav.push(
+      context,
+      _DetailSheet(future: ref.read(cajaProvider.notifier).detalle(id)),
     );
   }
 
   Future<void> _showOpening(BuildContext context) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _OpeningSheet(),
-    );
+    final saved = await AppNav.push<bool>(context, const _OpeningSheet());
     if (saved == true && mounted) _success('Caja abierta correctamente');
   }
 
@@ -599,42 +592,48 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => _SheetFrame(
-    title: 'Apertura de caja',
-    subtitle: 'Conteo obligatorio de las 10 denominaciones PEN',
-    child: Column(
-      children: [
-        GridView.count(
-          crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 2.5,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          children: [
-            for (final value in cajaDenominaciones)
-              TextFormField(
-                controller: _controllers[value],
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'S/ ${_denomination(value)}',
-                  hintText: '0',
-                  prefixIcon: const Icon(Icons.payments_outlined, size: 18),
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: SubPageAppBar(
+      title: 'Apertura de caja',
+      subtitle: 'Conteo obligatorio de las 10 denominaciones PEN',
+    ),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          GridView.count(
+            crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: 2.5,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            children: [
+              for (final value in cajaDenominaciones)
+                TextFormField(
+                  controller: _controllers[value],
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'S/ ${_denomination(value)}',
+                    hintText: '0',
+                    prefixIcon: const Icon(Icons.payments_outlined, size: 18),
+                  ),
                 ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _TotalBand(label: 'Total de apertura', value: _total),
-        const SizedBox(height: 18),
-        PrimaryButton(
-          label: 'Abrir caja',
-          icon: Icons.lock_open_rounded,
-          isLoading: _loading,
-          onPressed: _submit,
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          _TotalBand(label: 'Total de apertura', value: _total),
+          const SizedBox(height: 18),
+          PrimaryButton(
+            label: 'Abrir caja',
+            icon: Icons.lock_open_rounded,
+            isLoading: _loading,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     ),
   );
 
@@ -665,83 +664,93 @@ class _DetailSheet extends StatelessWidget {
   const _DetailSheet({required this.future});
 
   @override
-  Widget build(BuildContext context) => _SheetFrame(
-    title: 'Detalle de caja',
-    subtitle: 'Resumen y arqueos registrados por el servidor',
-    child: FutureBuilder<CajaSesion>(
-      future: future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _InlineSkeleton();
-        }
-        if (snapshot.hasError) {
-          return AppErrorState(message: snapshot.error.toString());
-        }
-        final session = snapshot.data!;
-        final values = <String, String>{
-          'Sede': session.sede,
-          'Estado': session.estado,
-          'Apertura': _money(session.montoApertura),
-          'Abierta por': session.usuarioApertura,
-          'Fecha de apertura': _dateTime(session.abiertaAt),
-          if (session.resumen != null)
-            'Saldo esperado': _money(session.resumen!.efectivoEsperado),
-          if (session.montoDeclaradoPrecuadre != null)
-            'Precuadre declarado': _money(session.montoDeclaradoPrecuadre!),
-          if (session.diferenciaPrecuadre != null)
-            'Diferencia precuadre': _money(session.diferenciaPrecuadre!),
-          if (session.montoDeclaradoCierre != null)
-            'Cierre declarado': _money(session.montoDeclaradoCierre!),
-          if (session.diferenciaCierre != null)
-            'Diferencia cierre': _money(session.diferenciaCierre!),
-          if (session.cerradaAt != null)
-            'Fecha de cierre': _dateTime(session.cerradaAt!),
-          if (session.observacionesCierre?.isNotEmpty ?? false)
-            'Observaciones': session.observacionesCierre!,
-        };
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final entry in values.entries) ...[
-              _DetailRow(label: entry.key, value: entry.value),
-              const Divider(height: 18),
-            ],
-            const SizedBox(height: 8),
-            const Text('Conteo de apertura', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: session.denominaciones
-                  .map(
-                    (item) => _ReadOnlyChip(
-                      label:
-                          'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
-                    ),
-                  )
-                  .toList(),
-            ),
-            if (session.resumen?.v2?.porBilletera.isNotEmpty ?? false) ...[
-              const SizedBox(height: 16),
-              CajaBilleteraCard(
-                porBilletera: session.resumen!.v2!.porBilletera,
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: SubPageAppBar(
+      title: 'Detalle de caja',
+      subtitle: 'Resumen y arqueos registrados por el servidor',
+    ),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: FutureBuilder<CajaSesion>(
+        future: future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const _InlineSkeleton();
+          }
+          if (snapshot.hasError) {
+            return AppErrorState(message: snapshot.error.toString());
+          }
+          final session = snapshot.data!;
+          final values = <String, String>{
+            'Sede': session.sede,
+            'Estado': session.estado,
+            'Apertura': _money(session.montoApertura),
+            'Abierta por': session.usuarioApertura,
+            'Fecha de apertura': _dateTime(session.abiertaAt),
+            if (session.resumen != null)
+              'Saldo esperado': _money(session.resumen!.efectivoEsperado),
+            if (session.montoDeclaradoPrecuadre != null)
+              'Precuadre declarado': _money(session.montoDeclaradoPrecuadre!),
+            if (session.diferenciaPrecuadre != null)
+              'Diferencia precuadre': _money(session.diferenciaPrecuadre!),
+            if (session.montoDeclaradoCierre != null)
+              'Cierre declarado': _money(session.montoDeclaradoCierre!),
+            if (session.diferenciaCierre != null)
+              'Diferencia cierre': _money(session.diferenciaCierre!),
+            if (session.cerradaAt != null)
+              'Fecha de cierre': _dateTime(session.cerradaAt!),
+            if (session.observacionesCierre?.isNotEmpty ?? false)
+              'Observaciones': session.observacionesCierre!,
+          };
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final entry in values.entries) ...[
+                _DetailRow(label: entry.key, value: entry.value),
+                const Divider(height: 18),
+              ],
+              const SizedBox(height: 8),
+              const Text(
+                'Conteo de apertura',
+                style: AppTextStyles.titleMedium,
               ),
-            ],
-            if (session.resumen?.v2?.porVendedora.isNotEmpty ?? false) ...[
-              const SizedBox(height: 16),
-              CajaVendedoraTable(
-                porVendedora: session.resumen!.v2!.porVendedora,
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: session.denominaciones
+                    .map(
+                      (item) => _ReadOnlyChip(
+                        label:
+                            'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
+                      ),
+                    )
+                    .toList(),
               ),
+              if (session.resumen?.v2?.porBilletera.isNotEmpty ?? false) ...[
+                const SizedBox(height: 16),
+                CajaBilleteraCard(
+                  porBilletera: session.resumen!.v2!.porBilletera,
+                ),
+              ],
+              if (session.resumen?.v2?.porVendedora.isNotEmpty ?? false) ...[
+                const SizedBox(height: 16),
+                CajaVendedoraTable(
+                  porVendedora: session.resumen!.v2!.porVendedora,
+                ),
+              ],
+              if (session.resumen?.v2?.resumenProductos.isNotEmpty ??
+                  false) ...[
+                const SizedBox(height: 16),
+                CajaProductosTable(
+                  resumenProductos: session.resumen!.v2!.resumenProductos,
+                ),
+              ],
             ],
-            if (session.resumen?.v2?.resumenProductos.isNotEmpty ?? false) ...[
-              const SizedBox(height: 16),
-              CajaProductosTable(
-                resumenProductos: session.resumen!.v2!.resumenProductos,
-              ),
-            ],
-          ],
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 }

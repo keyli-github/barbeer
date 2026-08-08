@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
@@ -271,11 +272,9 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showNuevaOrden(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _NuevaOrdenSheet(
+    AppNav.push(
+      context,
+      _NuevaOrdenScreen(
         repo: ref.read(_comprasRepoProvider),
         onCreated: () => ref.read(_ordenesProvider.notifier).load(),
       ),
@@ -283,11 +282,9 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showNuevoProveedor(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _ProveedorSheet(
+    AppNav.push(
+      context,
+      _ProveedorScreen(
         repo: ref.read(_comprasRepoProvider),
         onSaved: () => ref.read(_provsProvider.notifier).load(),
       ),
@@ -295,11 +292,9 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showEditProveedor(BuildContext context, Proveedor p) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _ProveedorSheet(
+    AppNav.push(
+      context,
+      _ProveedorScreen(
         proveedor: p,
         repo: ref.read(_comprasRepoProvider),
         onSaved: () => ref.read(_provsProvider.notifier).load(),
@@ -308,11 +303,9 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showDetalle(BuildContext context, String id) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _DetalleSheet(
+    AppNav.push(
+      context,
+      _DetalleOrdenScreen(
         id: id,
         repo: ref.read(_comprasRepoProvider),
         canEdit: ref.read(authProvider).hasPermission('compras:editar'),
@@ -691,23 +684,24 @@ class _ProvTile extends StatelessWidget {
 
 // ─── Detalle sheet ────────────────────────────────────────────────────────────
 
-class _DetalleSheet extends StatefulWidget {
+// ─── Subpantalla: Detalle de Orden ───────────────────────────────────────────
+
+class _DetalleOrdenScreen extends StatefulWidget {
   final String id;
   final ComprasRepository repo;
   final bool canEdit;
   final VoidCallback onChanged;
-  const _DetalleSheet({
+  const _DetalleOrdenScreen({
     required this.id,
     required this.repo,
     required this.canEdit,
     required this.onChanged,
   });
-
   @override
-  State<_DetalleSheet> createState() => _DetalleSheetState();
+  State<_DetalleOrdenScreen> createState() => _DetalleOrdenScreenState();
 }
 
-class _DetalleSheetState extends State<_DetalleSheet> {
+class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
   Compra? _compra;
   bool _loading = true;
   String? _error;
@@ -737,9 +731,7 @@ class _DetalleSheetState extends State<_DetalleSheet> {
   }
 
   Future<void> _cambiar(String estado) async {
-    setState(() {
-      _acting = true;
-    });
+    setState(() => _acting = true);
     try {
       await widget.repo.cambiarEstado(widget.id, estado);
       widget.onChanged();
@@ -768,204 +760,167 @@ class _DetalleSheetState extends State<_DetalleSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _compra?.orden ?? 'Detalle de orden',
-                    style: AppTextStyles.headlineMedium,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: _compra?.orden ?? 'Detalle de orden',
+        subtitle: _compra != null
+            ? '${_compra!.proveedor} · ${_compra!.fecha}'
+            : null,
+        actions: _compra != null
+            ? [
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
                   ),
-                ),
-                if (_compra != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(_compra!.estado).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
+                  decoration: BoxDecoration(
+                    color: _statusColor(
                       _compra!.estado,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _statusColor(_compra!.estado),
-                      ),
+                    ).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _compra!.estado,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _statusColor(_compra!.estado),
                     ),
                   ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
                 ),
-              ],
-            ),
-          ),
-          const Divider(),
-          Expanded(
-            child: _loading
-                ? const AppLoading()
-                : _error != null
-                ? AppErrorState(message: _error!, onRetry: _load)
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_compra!.proveedor} · ${_compra!.fecha}',
-                          style: AppTextStyles.bodySmall,
-                        ),
-                        const SizedBox(height: 16),
-                        Text('Artículos', style: AppTextStyles.titleMedium),
-                        const SizedBox(height: 8),
-                        for (final item in _compra!.items ?? [])
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
+              ]
+            : null,
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? AppErrorState(message: _error!, onRetry: _load)
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Artículos (${_compra!.articulos})',
+                    style: AppTextStyles.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  ...?_compra!.items?.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.producto,
-                                        style: AppTextStyles.bodyMedium
-                                            .copyWith(
-                                              color: AppColors.textPrimary,
-                                            ),
-                                      ),
-                                      Text(
-                                        '${item.codigo} · ×${item.cantidad}',
-                                        style: AppTextStyles.labelSmall,
-                                      ),
-                                    ],
-                                  ),
-                                ),
                                 Text(
-                                  'S/ ${item.subtotal.toStringAsFixed(2)}',
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    fontWeight: FontWeight.w600,
+                                  item.producto,
+                                  style: AppTextStyles.bodyMedium.copyWith(
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
+                                Text(
+                                  '${item.codigo} · ×${item.cantidad}',
+                                  style: AppTextStyles.labelSmall,
+                                ),
                               ],
                             ),
                           ),
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Total',
-                              style: AppTextStyles.titleMedium,
-                            ),
-                            Text(
-                              'S/ ${_compra!.total.toStringAsFixed(2)}',
-                              style: AppTextStyles.titleMedium.copyWith(
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 8),
                           Text(
-                            _error!,
-                            style: const TextStyle(
-                              color: AppColors.error,
-                              fontSize: 13,
+                            'S/ ${item.subtotal.toStringAsFixed(2)}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
-                        if (widget.canEdit) ...[
-                          const SizedBox(height: 20),
-                          if (_compra!.estado == 'PENDIENTE') ...[
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: AppButton(
-                                    label: 'Marcar enviada',
-                                    onPressed: _acting
-                                        ? null
-                                        : () => _cambiar('ENVIADA'),
-                                    variant: AppButtonVariant.outline,
-                                    isFullWidth: true,
-                                    height: 44,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: AppButton(
-                                    label: 'Cancelar',
-                                    onPressed: _acting
-                                        ? null
-                                        : () => _cambiar('CANCELADA'),
-                                    variant: AppButtonVariant.danger,
-                                    isFullWidth: true,
-                                    height: 44,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (_compra!.estado == 'ENVIADA') ...[
-                            AppButton(
-                              label: 'Marcar recibida',
-                              onPressed: _acting
-                                  ? null
-                                  : () => _cambiar('RECIBIDA'),
-                              isFullWidth: true,
-                              isLoading: _acting,
-                            ),
-                          ],
-                        ],
-                      ],
+                      ),
                     ),
                   ),
-          ),
-        ],
-      ),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total', style: AppTextStyles.titleMedium),
+                      Text(
+                        'S/ ${_compra!.total.toStringAsFixed(2)}',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                  if (widget.canEdit) ...[
+                    const SizedBox(height: 24),
+                    if (_compra!.estado == 'PENDIENTE')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppButton(
+                              label: 'Marcar enviada',
+                              onPressed: _acting
+                                  ? null
+                                  : () => _cambiar('ENVIADA'),
+                              variant: AppButtonVariant.outline,
+                              isFullWidth: true,
+                              height: 48,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: AppButton(
+                              label: 'Cancelar',
+                              onPressed: _acting
+                                  ? null
+                                  : () => _cambiar('CANCELADA'),
+                              variant: AppButtonVariant.danger,
+                              isFullWidth: true,
+                              height: 48,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (_compra!.estado == 'ENVIADA')
+                      AppButton(
+                        label: 'Marcar recibida',
+                        onPressed: _acting ? null : () => _cambiar('RECIBIDA'),
+                        isFullWidth: true,
+                        isLoading: _acting,
+                        height: 52,
+                      ),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 }
 
 // ─── Nueva orden sheet ────────────────────────────────────────────────────────
 
-class _NuevaOrdenSheet extends StatefulWidget {
+class _NuevaOrdenScreen extends StatefulWidget {
   final ComprasRepository repo;
   final VoidCallback onCreated;
-  const _NuevaOrdenSheet({required this.repo, required this.onCreated});
+  const _NuevaOrdenScreen({required this.repo, required this.onCreated});
 
   @override
-  State<_NuevaOrdenSheet> createState() => _NuevaOrdenSheetState();
+  State<_NuevaOrdenScreen> createState() => _NuevaOrdenScreenState();
 }
 
-class _NuevaOrdenSheetState extends State<_NuevaOrdenSheet> {
+class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
   final _etaCtrl = TextEditingController();
   final _notasCtrl = TextEditingController();
   String _proveedorId = '';
@@ -1029,126 +984,87 @@ class _NuevaOrdenSheetState extends State<_NuevaOrdenSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: const SubPageAppBar(title: 'Nueva orden de compra'),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 80,
+        ),
+        child: Column(
+          children: [
+            if (_loadingProvs)
+              const Center(child: CircularProgressIndicator())
+            else
+              DropdownButtonFormField<String>(
+                value: _proveedorId.isEmpty ? null : _proveedorId,
+                decoration: InputDecoration(
+                  labelText: 'Proveedor *',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                ),
+                hint: const Text('Seleccionar'),
+                items: _proveedores
+                    .map(
+                      (p) =>
+                          DropdownMenuItem(value: p.id, child: Text(p.nombre)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _proveedorId = v ?? ''),
+              ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _etaCtrl,
+              keyboardType: TextInputType.datetime,
+              decoration: InputDecoration(
+                labelText: 'Fecha estimada (YYYY-MM-DD)',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Nueva orden de compra',
-                    style: AppTextStyles.headlineMedium,
-                  ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _notasCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Notas',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-              ],
+              ),
             ),
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              children: [
-                if (_loadingProvs)
-                  const AppLoading()
-                else
-                  DropdownButtonFormField<String>(
-                    value: _proveedorId.isEmpty ? null : _proveedorId,
-                    decoration: InputDecoration(
-                      labelText: 'Proveedor *',
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                    ),
-                    hint: const Text('Seleccionar'),
-                    items: _proveedores
-                        .map(
-                          (p) => DropdownMenuItem(
-                            value: p.id,
-                            child: Text(p.nombre),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _proveedorId = v ?? ''),
-                  ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _etaCtrl,
-                  keyboardType: TextInputType.datetime,
-                  decoration: InputDecoration(
-                    labelText: 'Fecha estimada (YYYY-MM-DD)',
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _notasCtrl,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: 'Notas',
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                  ),
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                PrimaryButton(
-                  label: 'Crear orden',
-                  onPressed: _saving ? null : _submit,
-                  isLoading: _saving,
-                ),
-              ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 20),
+            PrimaryButton(
+              label: 'Crear orden',
+              onPressed: _saving ? null : _submit,
+              isLoading: _saving,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1156,21 +1072,21 @@ class _NuevaOrdenSheetState extends State<_NuevaOrdenSheet> {
 
 // ─── Proveedor sheet ──────────────────────────────────────────────────────────
 
-class _ProveedorSheet extends StatefulWidget {
+class _ProveedorScreen extends StatefulWidget {
   final Proveedor? proveedor;
   final ComprasRepository repo;
   final VoidCallback onSaved;
-  const _ProveedorSheet({
+  const _ProveedorScreen({
     this.proveedor,
     required this.repo,
     required this.onSaved,
   });
 
   @override
-  State<_ProveedorSheet> createState() => _ProveedorSheetState();
+  State<_ProveedorScreen> createState() => _ProveedorScreenState();
 }
 
-class _ProveedorSheetState extends State<_ProveedorSheet> {
+class _ProveedorScreenState extends State<_ProveedorScreen> {
   late TextEditingController _nombreCtrl,
       _catCtrl,
       _contactoCtrl,
@@ -1248,113 +1164,78 @@ class _ProveedorSheetState extends State<_ProveedorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: widget.proveedor == null
+            ? 'Nuevo proveedor'
+            : 'Editar proveedor',
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 80,
+        ),
+        child: Column(
+          children: [
+            AppTextField(
+              label: 'Nombre *',
+              hint: 'Distribuidora XYZ',
+              controller: _nombreCtrl,
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              label: 'Categoría',
+              hint: 'Licores, cervezas...',
+              controller: _catCtrl,
+            ),
+            const SizedBox(height: 12),
+            AppTextField(label: 'Contacto', controller: _contactoCtrl),
+            const SizedBox(height: 12),
+            AppTextField(
+              label: 'Teléfono',
+              controller: _telCtrl,
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              label: 'Email',
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            if (widget.proveedor != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text('Activo', style: AppTextStyles.bodyMedium),
+                  ),
+                  Switch(
+                    value: _activo,
+                    onChanged: (v) => setState(() => _activo = v),
+                  ),
+                ],
               ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 20),
+            PrimaryButton(
+              label: widget.proveedor == null
+                  ? 'Crear proveedor'
+                  : 'Guardar cambios',
+              onPressed: _saving ? null : _submit,
+              isLoading: _saving,
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.proveedor == null
-                        ? 'Nuevo proveedor'
-                        : 'Editar proveedor',
-                    style: AppTextStyles.headlineMedium,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          const Divider(),
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              children: [
-                AppTextField(
-                  label: 'Nombre *',
-                  hint: 'Distribuidora XYZ',
-                  controller: _nombreCtrl,
-                ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Categoría',
-                  hint: 'Licores, cervezas...',
-                  controller: _catCtrl,
-                ),
-                const SizedBox(height: 12),
-                AppTextField(label: 'Contacto', controller: _contactoCtrl),
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Teléfono',
-                  controller: _telCtrl,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-                AppTextField(
-                  label: 'Email',
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                if (widget.proveedor != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('Activo', style: AppTextStyles.bodyMedium),
-                      ),
-                      Switch(
-                        value: _activo,
-                        onChanged: (v) => setState(() => _activo = v),
-                      ),
-                    ],
-                  ),
-                ],
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                PrimaryButton(
-                  label: widget.proveedor == null
-                      ? 'Crear proveedor'
-                      : 'Guardar cambios',
-                  onPressed: _saving ? null : _submit,
-                  isLoading: _saving,
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

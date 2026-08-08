@@ -1,8 +1,9 @@
-// Sheet de precuadre de caja (solo monto declarado).
+// Pantallas de precuadre y cierre de caja.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:barbeer/core/navigation/app_nav.dart';
 import 'package:barbeer/core/theme/app_colors.dart';
 import 'package:barbeer/core/widgets/app_button.dart';
 import 'package:barbeer/core/widgets/app_text_field.dart';
@@ -14,12 +15,7 @@ void showPrecuadreSheet(
   BuildContext context, {
   required VoidCallback onSuccess,
 }) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _PrecuadreSheet(onSuccess: onSuccess),
-  );
+  AppNav.push<void>(context, _PrecuadreSheet(onSuccess: onSuccess));
 }
 
 class _PrecuadreSheet extends ConsumerStatefulWidget {
@@ -48,39 +44,45 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return _SheetFrame(
-      title: 'Registrar precuadre',
-      subtitle: 'Compara el efectivo contado con el saldo esperado',
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            _TotalBand(label: 'Saldo esperado', value: _expected),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Monto declarado (S/)',
-              hint: '0.00',
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: 'Registrar precuadre',
+        subtitle: 'Compara el efectivo contado con el saldo esperado',
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _TotalBand(label: 'Saldo esperado', value: _expected),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Monto declarado (S/)',
+                hint: '0.00',
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (v) {
+                  final n = double.tryParse(v ?? '');
+                  return n == null || n < 0 ? 'Monto inválido' : null;
+                },
               ),
-              onChanged: (_) => setState(() {}),
-              validator: (v) {
-                final n = double.tryParse(v ?? '');
-                return n == null || n < 0 ? 'Monto inválido' : null;
-              },
-            ),
-            const SizedBox(height: 10),
-            _DifferenceRow(value: _declared - _expected),
-            const SizedBox(height: 20),
-            AppButton(
-              label: 'Guardar precuadre',
-              isFullWidth: true,
-              isLoading: _loading,
-              variant: AppButtonVariant.primary,
-              onPressed: _submit,
-            ),
-          ],
+              const SizedBox(height: 10),
+              _DifferenceRow(value: _declared - _expected),
+              const SizedBox(height: 20),
+              AppButton(
+                label: 'Guardar precuadre',
+                isFullWidth: true,
+                isLoading: _loading,
+                variant: AppButtonVariant.primary,
+                onPressed: _submit,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -114,11 +116,9 @@ void showCierreSheet(
   required bool canForzar,
   required VoidCallback onSuccess,
 }) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _CierreSheet(canForzar: canForzar, onSuccess: onSuccess),
+  AppNav.push<void>(
+    context,
+    _CierreSheet(canForzar: canForzar, onSuccess: onSuccess),
   );
 }
 
@@ -154,55 +154,61 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return _SheetFrame(
-      title: 'Cerrar caja',
-      subtitle: 'El cierre es definitivo para este turno',
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            _TotalBand(label: 'Saldo esperado', value: _expected),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Monto declarado (S/)',
-              hint: '0.00',
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: 'Cerrar caja',
+        subtitle: 'El cierre es definitivo para este turno',
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _TotalBand(label: 'Saldo esperado', value: _expected),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Monto declarado (S/)',
+                hint: '0.00',
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (v) {
+                  final n = double.tryParse(v ?? '');
+                  return n == null || n < 0 ? 'Monto inválido' : null;
+                },
               ),
-              onChanged: (_) => setState(() {}),
-              validator: (v) {
-                final n = double.tryParse(v ?? '');
-                return n == null || n < 0 ? 'Monto inválido' : null;
-              },
-            ),
-            const SizedBox(height: 10),
-            _DifferenceRow(value: _declared - _expected),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Observaciones (opcional)',
-              hint: 'Detalle del arqueo',
-              controller: _notesController,
-              maxLength: 500,
-              maxLines: 3,
-            ),
-            if (widget.canForzar) ...[
-              const SizedBox(height: 12),
-              _ForzarSection(
-                forzar: _forzar,
-                motivoController: _motivoController,
-                onChanged: (v) => setState(() => _forzar = v),
+              const SizedBox(height: 10),
+              _DifferenceRow(value: _declared - _expected),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Observaciones (opcional)',
+                hint: 'Detalle del arqueo',
+                controller: _notesController,
+                maxLength: 500,
+                maxLines: 3,
+              ),
+              if (widget.canForzar) ...[
+                const SizedBox(height: 12),
+                _ForzarSection(
+                  forzar: _forzar,
+                  motivoController: _motivoController,
+                  onChanged: (v) => setState(() => _forzar = v),
+                ),
+              ],
+              const SizedBox(height: 20),
+              AppButton(
+                label: 'Confirmar cierre',
+                isFullWidth: true,
+                isLoading: _loading,
+                variant: AppButtonVariant.danger,
+                onPressed: _submit,
               ),
             ],
-            const SizedBox(height: 20),
-            AppButton(
-              label: 'Confirmar cierre',
-              isFullWidth: true,
-              isLoading: _loading,
-              variant: AppButtonVariant.danger,
-              onPressed: _submit,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -244,84 +250,6 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
 }
 
 // ── Widgets privados compartidos ─────────────────────────────────────────────
-
-class _SheetFrame extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  const _SheetFrame({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-    ),
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 38,
-          height: 4,
-          margin: const EdgeInsets.only(top: 10),
-          decoration: BoxDecoration(
-            color: AppColors.border,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: child,
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
 class _TotalBand extends StatelessWidget {
   final String label;

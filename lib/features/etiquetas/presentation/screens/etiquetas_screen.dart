@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -51,21 +52,11 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
   }
 
   void _openCreate() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => EtiquetaFormSheet(onDone: _load),
-    );
+    AppNav.push(context, EtiquetaFormSheet(onDone: _load));
   }
 
   void _openEdit(Etiqueta etiqueta) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => EtiquetaFormSheet(etiqueta: etiqueta, onDone: _load),
-    );
+    AppNav.push(context, EtiquetaFormSheet(etiqueta: etiqueta, onDone: _load));
   }
 
   Future<void> _toggleEstado(Etiqueta etiqueta) async {
