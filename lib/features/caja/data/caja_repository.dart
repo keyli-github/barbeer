@@ -274,12 +274,19 @@ class CajaRepository {
   final ApiClient _api;
   const CajaRepository(this._api);
 
+  /// Convierte response.data a Map de forma segura.
+  /// Si el backend devuelve String (error HTML/texto), retorna mapa vacío.
+  static Map<String, dynamic> _toMap(dynamic data) {
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return {};
+  }
+
   Future<List<Map<String, dynamic>>> sedes() async {
     final response = await _api.get(
       '/establecimientos',
       queryParameters: {'pagina': 1, 'limite': 100},
     );
-    final json = Map<String, dynamic>.from(response.data as Map);
+    final json = _toMap(response.data);
     return (json['data'] as List? ?? const [])
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
@@ -292,8 +299,8 @@ class CajaRepository {
       '/caja/actual',
       queryParameters: {'sedeId': ?sedeId},
     );
-    if (response.data == null) return null;
-    return CajaSesion.fromJson(Map<String, dynamic>.from(response.data as Map));
+    if (response.data == null || response.data is! Map) return null;
+    return CajaSesion.fromJson(_toMap(response.data));
   }
 
   Future<CajaPage<CajaSesion>> historial({
@@ -310,7 +317,7 @@ class CajaRepository {
         'sedeId': ?sedeId,
       },
     );
-    final json = Map<String, dynamic>.from(response.data as Map);
+    final json = CajaRepository._toMap(response.data);
     return CajaPage(
       data: (json['data'] as List? ?? const [])
           .whereType<Map>()
@@ -324,7 +331,7 @@ class CajaRepository {
 
   Future<CajaSesion> detalle(String id) async {
     final response = await _api.get('/caja/$id');
-    return CajaSesion.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 
   Future<CajaPage<CajaMovimiento>> movimientos(
@@ -336,7 +343,7 @@ class CajaRepository {
       '/caja/$id/movimientos',
       queryParameters: {'pagina': pagina, 'limite': 10, 'tipo': ?tipo},
     );
-    final json = Map<String, dynamic>.from(response.data as Map);
+    final json = CajaRepository._toMap(response.data);
     return CajaPage(
       data: (json['data'] as List? ?? const [])
           .whereType<Map>()
@@ -369,7 +376,7 @@ class CajaRepository {
         'sedeId': ?sedeId,
       },
     );
-    return CajaSesion.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 
   /// @deprecated Bloqueado por regla de negocio en V2. Retorna 403/422.
@@ -383,7 +390,7 @@ class CajaRepository {
       '/caja/$id/precuadre',
       data: {'montoDeclarado': montoDeclarado},
     );
-    return CajaSesion.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 
   /// Cierre normal (sin ventas pendientes).
@@ -401,7 +408,7 @@ class CajaRepository {
           'observaciones': observaciones!.trim(),
       },
     );
-    return CajaSesion.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 
   /// Cierre forzado con ventas pendientes (ADMIN/SUPERADMIN).
@@ -422,6 +429,6 @@ class CajaRepository {
           'observaciones': observaciones!.trim(),
       },
     );
-    return CajaSesion.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 }
