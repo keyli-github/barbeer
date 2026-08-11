@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_header.dart';
+import '../../../../core/widgets/barbeer_wordmark.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 // ─── GlobalKey para abrir el panel "Ver más" ──────────────────────────────────
@@ -67,6 +68,13 @@ const _allModules = [
     icon: Icons.liquor_outlined,
     activeIcon: Icons.liquor_rounded,
     perm: 'productos:crear',
+  ),
+  _Module(
+    path: '/categorias',
+    label: 'Categorias',
+    icon: Icons.category_outlined,
+    activeIcon: Icons.category_rounded,
+    perm: 'categorias:leer',
   ),
   _Module(
     path: '/inventario',
@@ -176,6 +184,7 @@ class ShellScreen extends ConsumerWidget {
     if (path.startsWith('/ventas')) return 'Ventas';
     if (path.startsWith('/caja')) return 'Caja';
     if (path.startsWith('/productos')) return 'Productos';
+    if (path.startsWith('/categorias')) return 'Categorias';
     if (path.startsWith('/inventario')) return 'Inventario';
     if (path.startsWith('/kardex')) return 'Kardex';
     if (path.startsWith('/compras')) return 'Compras';
@@ -478,27 +487,38 @@ class _MorePanelState extends State<_MorePanel> {
       child: SafeArea(
         child: Column(
           children: [
-            // ── Solo botón de cierre (sin logo) ─────────────────────────
+            // ── Marca + botón de cierre ─────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: AppColors.textTertiary,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 42,
+                    height: 28,
+                    child: Image.asset(
+                      'assets/images/barbeer_Log.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  const Expanded(child: BarBeerWordmark(fontSize: 21)),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceAlt,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 

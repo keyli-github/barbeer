@@ -61,6 +61,14 @@ class DashboardData {
   final int misVentasMes;
   final double misTotalesMes;
 
+  // Compras resumen
+  final int comprasPendientes;
+  final double comprasMontoTotal;
+
+  // Asistencia resumen
+  final int asistenciaPresentes;
+  final int asistenciaTotal;
+
   const DashboardData({
     this.sedes = const [],
     this.selectedSedeId,
@@ -84,6 +92,10 @@ class DashboardData {
     this.error,
     this.misVentasMes = 0,
     this.misTotalesMes = 0,
+    this.comprasPendientes = 0,
+    this.comprasMontoTotal = 0,
+    this.asistenciaPresentes = 0,
+    this.asistenciaTotal = 0,
   });
 
   DashboardData copyWith({
@@ -112,6 +124,10 @@ class DashboardData {
     bool clearError = false,
     int? misVentasMes,
     double? misTotalesMes,
+    int? comprasPendientes,
+    double? comprasMontoTotal,
+    int? asistenciaPresentes,
+    int? asistenciaTotal,
   }) => DashboardData(
     sedes: sedes ?? this.sedes,
     selectedSedeId: clearSede ? null : (selectedSedeId ?? this.selectedSedeId),
@@ -135,6 +151,10 @@ class DashboardData {
     error: clearError ? null : (error ?? this.error),
     misVentasMes: misVentasMes ?? this.misVentasMes,
     misTotalesMes: misTotalesMes ?? this.misTotalesMes,
+    comprasPendientes: comprasPendientes ?? this.comprasPendientes,
+    comprasMontoTotal: comprasMontoTotal ?? this.comprasMontoTotal,
+    asistenciaPresentes: asistenciaPresentes ?? this.asistenciaPresentes,
+    asistenciaTotal: asistenciaTotal ?? this.asistenciaTotal,
   );
 
   // % de variación ventas hoy vs ayer
@@ -437,6 +457,34 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
       } catch (_) {}
     }
 
+    // ── Compras resumen ───────────────────────────────────────────────────────
+    int comprasPendientes = 0;
+    double comprasMontoTotal = 0;
+    if (_has('compras:leer')) {
+      try {
+        final q = <String, dynamic>{};
+        if (sedeId != null) q['sedeId'] = sedeId;
+        final r = await _api.get(
+          ApiConstants.purchasesResumen,
+          queryParameters: q,
+        );
+        final data = Map<String, dynamic>.from(r.data as Map);
+        comprasPendientes = (data['pendientes'] as num?)?.toInt() ?? 0;
+        comprasMontoTotal = (data['montoPendiente'] as num?)?.toDouble() ?? 0;
+      } catch (_) {}
+    }
+
+    // ── Asistencia resumen ────────────────────────────────────────────────────
+    int asistenciaPresentes = 0, asistenciaTotal = 0;
+    if (_has('asistencia:leer')) {
+      try {
+        final r = await _api.get(ApiConstants.attendanceResumen);
+        final data = Map<String, dynamic>.from(r.data as Map);
+        asistenciaPresentes = (data['presente'] as num?)?.toInt() ?? 0;
+        asistenciaTotal = (data['totalEmpleados'] as num?)?.toInt() ?? 0;
+      } catch (_) {}
+    }
+
     state = state.copyWith(
       ventasHoy: ventasHoy,
       ventasCountHoy: countHoy,
@@ -452,6 +500,10 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
       audit: audit,
       misVentasMes: misVentasMes,
       misTotalesMes: misTotalesMes,
+      comprasPendientes: comprasPendientes,
+      comprasMontoTotal: comprasMontoTotal,
+      asistenciaPresentes: asistenciaPresentes,
+      asistenciaTotal: asistenciaTotal,
       loading: false,
       clearError: true,
     );

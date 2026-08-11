@@ -230,22 +230,23 @@ class _Tab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: InkWell(
-      borderRadius: BorderRadius.circular(8),
+    child: GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? AppColors.surface : Colors.transparent,
+          color: selected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: selected ? AppShadows.card : null,
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: AppTextStyles.labelLarge.copyWith(
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected ? Colors.white : AppColors.textSecondary,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),
@@ -385,8 +386,8 @@ class _Actual extends StatelessWidget {
           ],
           const SizedBox(height: 16),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: [
               // Movimientos manuales eliminados por regla de negocio V2.
               // Las entradas se generan automáticamente desde ventas.
@@ -396,6 +397,13 @@ class _Actual extends StatelessWidget {
                   onPressed: state.isActing ? null : onPrecuadre,
                   icon: const Icon(Icons.fact_check_outlined, size: 18),
                   label: const Text('Precuadre'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    minimumSize: const Size(0, 44),
+                  ),
                 ),
               if (canClose)
                 OutlinedButton.icon(
@@ -404,6 +412,11 @@ class _Actual extends StatelessWidget {
                   label: const Text('Cerrar'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.error,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    minimumSize: const Size(0, 44),
                   ),
                 ),
             ],

@@ -225,6 +225,7 @@ class AuditoriaScreen extends ConsumerWidget {
     final entidadCtrl = TextEditingController(text: state.entidadFilter ?? '');
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => Container(

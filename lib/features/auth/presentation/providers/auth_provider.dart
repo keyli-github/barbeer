@@ -53,6 +53,7 @@ class AuthState {
   bool canAccess(String path) {
     const m = {
       '/productos': 'productos:crear',
+      '/categorias': 'categorias:leer',
       '/inventario': 'inventario:leer',
       '/kardex': 'kardex:leer',
       '/compras': 'compras:leer',

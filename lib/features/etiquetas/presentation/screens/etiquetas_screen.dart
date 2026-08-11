@@ -65,6 +65,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
     if (!nuevoEstado) {
       final confirm = await showDialog<bool>(
         context: context,
+        useRootNavigator: true,
         builder: (ctx) => AlertDialog(
           title: const Text('Desactivar billetera'),
           content: Text(

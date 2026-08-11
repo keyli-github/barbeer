@@ -1,5 +1,5 @@
 name: barbeer
-description: "Bar Beer - Sistema de gestion para restobares"
+description: "BarBeer - Sistema de gestion para restobares"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -31,11 +31,16 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+  fonts:
+    - family: Pacifico
+      fonts:
+        - asset: assets/fonts/Pacifico-Regular.ttf
 
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/images/LOGO_GENERAL.png"
+  image_path: "assets/images/barbeer_launcher.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/LOGO_GENERAL.png"
+  adaptive_icon_foreground: "assets/images/barbeer_launcher.png"
+  adaptive_icon_foreground_inset: 16
   remove_alpha_ios: true

@@ -55,7 +55,7 @@ class ApiClient {
   static Map<String, String>? get _deviceHeaders {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
     return const {
-      'x-device-name': 'Bar Beer Android',
+      'x-device-name': 'BarBeer Android',
       'x-device-type': 'android',
       'user-agent': 'BarBeer/1.0 (Android)',
     };

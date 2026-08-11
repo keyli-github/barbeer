@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
+import 'barbeer_wordmark.dart';
 
 /// Header global fijo BarBeer — siempre visible, no se va con scroll.
 ///
@@ -70,30 +71,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            RichText(
-                              text: const TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: 'Bar',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.textPrimary,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: 'Beer',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.brand,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            const BarBeerWordmark(fontSize: 21),
                             if (subtitle != null)
                               Text(
                                 subtitle!,
@@ -115,7 +93,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: Image.asset(
-                      'assets/images/LOGO_GENERAL.png',
+                      'assets/images/barbeer_Log.png',
                       height: 52,
                       width: 52,
                       fit: BoxFit.contain,

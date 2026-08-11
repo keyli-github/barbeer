@@ -196,8 +196,8 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                          horizontal: 12,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.primarySurface,
@@ -587,14 +587,14 @@ class _IconBtn extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      width: 30,
-      height: 30,
+      width: 36,
+      height: 36,
       margin: const EdgeInsets.only(left: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: 16, color: color),
+      child: Icon(icon, size: 17, color: color),
     ),
   );
 }

@@ -4,9 +4,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="barbeer"
+        android:label="BarBeer"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"

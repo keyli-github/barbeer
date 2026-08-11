@@ -21,6 +21,7 @@ class AppBottomSheet extends StatelessWidget {
     required Widget child,
   }) => showModalBottomSheet<T>(
     context: context,
+    useRootNavigator: true,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (_) =>
@@ -110,6 +111,7 @@ class ConfirmDialog extends StatelessWidget {
   }) async {
     final r = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => ConfirmDialog(
         title: title,
         description: description,

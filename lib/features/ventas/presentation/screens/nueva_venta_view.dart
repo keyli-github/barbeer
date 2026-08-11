@@ -255,6 +255,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   void _showCarrito() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
@@ -507,7 +508,7 @@ class _ProductoCard extends StatelessWidget {
                   if (qty == 0 || agotado)
                     SizedBox(
                       width: double.infinity,
-                      height: 32,
+                      height: 36,
                       child: TextButton(
                         onPressed: (agotado || frozen) ? null : onAdd,
                         style: TextButton.styleFrom(
@@ -517,7 +518,7 @@ class _ProductoCard extends StatelessWidget {
                           foregroundColor: agotado
                               ? AppColors.textTertiary
                               : AppColors.primary,
-                          padding: EdgeInsets.zero,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -580,15 +581,15 @@ class _QtyBtn extends StatelessWidget {
       }
     },
     child: Container(
-      width: 28,
-      height: 28,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
         color: (color ?? AppColors.textTertiary).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         icon,
-        size: 16,
+        size: 18,
         color: onTap != null
             ? (color ?? AppColors.textSecondary)
             : AppColors.textDisabled,

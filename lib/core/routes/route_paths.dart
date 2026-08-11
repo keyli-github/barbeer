@@ -19,4 +19,5 @@ class RoutePaths {
   static const String compras = '/compras';
   static const String asistencia = '/asistencia';
   static const String etiquetas = '/etiquetas';
+  static const String categorias = '/categorias';
 }

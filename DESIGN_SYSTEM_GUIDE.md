@@ -1,4 +1,4 @@
-# Guía del Nuevo Sistema de Diseño - Bar Beer Mobile
+# Guía del Nuevo Sistema de Diseño - BarBeer Mobile
 
 ## 📋 Resumen de Cambios
 
@@ -512,6 +512,6 @@ floatingActionButton: FloatingActionButton(
 
 ---
 
-**Autor:** Sistema de Diseño Bar Beer  
+**Autor:** Sistema de Diseño BarBeer
 **Versión:** 1.0.0  
 **Fecha:** 2026-08-06

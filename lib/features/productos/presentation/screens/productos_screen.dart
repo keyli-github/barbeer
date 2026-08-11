@@ -216,7 +216,7 @@ class ProductosScreen extends ConsumerWidget {
                       padding: EdgeInsets.all(AppSpacing.md),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        childAspectRatio: 0.75,
+                        childAspectRatio: 0.62,
                         crossAxisSpacing: AppSpacing.sm,
                         mainAxisSpacing: AppSpacing.sm,
                       ),
@@ -626,13 +626,13 @@ class _ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─ Imagen cuadrada
+            // ─ Imagen cuadrada (proporción fija)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(11),
               ),
               child: AspectRatio(
-                aspectRatio: 1.1,
+                aspectRatio: 1.2,
                 child: DSProductImage(
                   imageUrl: product.imageUrl,
                   productName: product.nombre,
@@ -641,92 +641,94 @@ class _ProductCard extends StatelessWidget {
                 ),
               ),
             ),
-            // ─ Info compacta
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    product.nombre,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      height: 1.2,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.codigo,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textTertiary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'S/ ${product.precioVenta.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+            // ─ Info compacta (se expande para llenar el espacio restante)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.nombre,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          height: 1.2,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ),
+                    Text(
+                      product.codigo,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textTertiary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'S/ ${product.precioVenta.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: marginColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${product.margin.toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: marginColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Estado inactivo
+                    if (!product.activo) ...[
+                      const SizedBox(height: 3),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
+                          horizontal: 5,
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: marginColor.withValues(alpha: 0.12),
+                          color: AppColors.textTertiary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          '${product.margin.toStringAsFixed(0)}%',
+                        child: const Text(
+                          'Inactivo',
                           style: TextStyle(
                             fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: marginColor,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textTertiary,
                           ),
                         ),
                       ),
                     ],
-                  ),
-                  // Estado inactivo
-                  if (!product.activo) ...[
-                    const SizedBox(height: 3),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.textTertiary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'Inactivo',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
-                    ),
                   ],
-                ],
+                ),
               ),
             ),
           ],
@@ -958,6 +960,7 @@ class _ProductDetailScreen extends StatelessWidget {
                   onPressed: () async {
                     final ok = await showDialog<bool>(
                       context: context,
+                      useRootNavigator: true,
                       builder: (_) => AlertDialog(
                         title: const Text('Eliminar producto'),
                         content: Text('¿Eliminar ${product.nombre}?'),

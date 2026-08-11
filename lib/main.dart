@@ -37,7 +37,7 @@ class BarBeerApp extends ConsumerWidget {
     });
 
     return MaterialApp.router(
-      title: 'Bar Beer',
+      title: 'BarBeer',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       scrollBehavior: const AppScrollBehavior(),

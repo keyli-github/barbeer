@@ -280,7 +280,7 @@ class _SearchBarState extends State<_SearchBar> {
                         duration: const Duration(milliseconds: 180),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 6,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: widget.estadoFilter == e.$1
@@ -386,7 +386,7 @@ class _HeaderState extends State<_Header> {
                         duration: const Duration(milliseconds: 180),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 6,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: widget.estadoFilter == e.$1

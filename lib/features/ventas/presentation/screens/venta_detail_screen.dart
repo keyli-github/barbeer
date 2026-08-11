@@ -38,6 +38,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
   Future<void> _anular() async {
     final confirm = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
@@ -104,6 +105,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
     final auth = ref.watch(authProvider);
     final canAnular = canAnularVenta(auth) && !_venta.isAnulada;
     final puedeClasificar = canConciliar(auth) && _venta.isPendiente;
+    final puedeCorregir = canConciliarCorregir(auth) &&
+        !_venta.isAnulada &&
+        !_venta.isPendiente;
 
     final isAnulada = _venta.isAnulada;
     final isPendiente = _venta.isPendiente;
@@ -134,6 +138,18 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
               onPressed: _openConciliar,
               child: const Text(
                 'Clasificar',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          if (puedeCorregir)
+            TextButton(
+              onPressed: _openConciliar,
+              child: const Text(
+                'Corregir',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,

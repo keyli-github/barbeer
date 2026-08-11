@@ -1,5 +1,9 @@
 class ApiConstants {
   ApiConstants._();
+  static const String localBaseUrl = 'http://127.0.0.1:3001/api';
+  static const String productionBaseUrl =
+      'https://hia-server.tail99b0ec.ts.net/backend-bar/api';
+
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURACIÓN DE URL
   //
@@ -9,7 +13,9 @@ class ApiConstants {
   //   3. Usa esta URL:
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:3001/api',
+    defaultValue: bool.fromEnvironment('dart.vm.product')
+        ? productionBaseUrl
+        : localBaseUrl,
   );
   //
   // OPCIÓN B — WiFi (ambos en la misma red):

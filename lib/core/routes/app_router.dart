@@ -20,6 +20,9 @@ import '../../features/kardex/presentation/screens/kardex_screen.dart';
 import '../../features/compras/presentation/screens/compras_screen.dart';
 import '../../features/asistencia/presentation/screens/asistencia_screen.dart';
 import '../../features/etiquetas/presentation/screens/etiquetas_screen.dart';
+import '../../features/categorias/presentation/screens/categorias_screen.dart';
+import '../theme/app_colors.dart';
+import '../widgets/barbeer_wordmark.dart';
 import 'route_paths.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -141,6 +144,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: RoutePaths.etiquetas,
             builder: (_, __) => const EtiquetasScreen(),
           ),
+          GoRoute(
+            path: RoutePaths.categorias,
+            builder: (_, __) => const CategoriasScreen(),
+          ),
         ],
       ),
     ],
@@ -171,56 +178,32 @@ class _SplashState extends ConsumerState<_SplashScreen> {
         children: [
           // Logo real — más grande
           Image.asset(
-            'assets/images/LOGO_GENERAL.png',
-            width: 160,
-            height: 160,
+            'assets/images/barbeer_Log.png',
+            width: 132,
+            height: 88,
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => Container(
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF7ED),
+                color: AppColors.brandSurface,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Icon(
                 Icons.local_bar_rounded,
-                color: Color(0xFFF97316),
+                color: AppColors.brand,
                 size: 48,
               ),
             ),
           ),
           const SizedBox(height: 20),
-          // BarBeer con el mismo estilo del header
-          RichText(
-            text: const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Bar',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF111827),
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                TextSpan(
-                  text: 'Beer',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFF97316),
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const BarBeerWordmark(fontSize: 32),
           const SizedBox(height: 32),
           const SizedBox(
             width: 24,
             height: 24,
             child: CircularProgressIndicator(
-              color: Color(0xFFF97316),
+              color: AppColors.brand,
               strokeWidth: 2.5,
             ),
           ),

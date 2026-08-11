@@ -27,6 +27,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
   Future<void> _anular() async {
     final confirm = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(

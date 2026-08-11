@@ -16,6 +16,7 @@ class ConfirmationDialog {
   }) async {
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
@@ -104,6 +105,7 @@ class SuccessMessage {
   }) async {
     await showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (context) => _AnimatedMessageDialog(
         message: message,
@@ -126,6 +128,7 @@ class ErrorMessage {
   }) async {
     await showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (context) => _AnimatedMessageDialog(
         message: message,
@@ -256,6 +259,7 @@ class AppBottomSheet {
   }) {
     return showModalBottomSheet<T>(
       context: context,
+      useRootNavigator: true,
       isDismissible: isDismissible,
       enableDrag: enableDrag,
       isScrollControlled: true,

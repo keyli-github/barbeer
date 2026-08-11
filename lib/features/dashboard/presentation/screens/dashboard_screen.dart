@@ -194,6 +194,7 @@ class _Sede extends StatelessWidget {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: ctx,
+      useRootNavigator: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -350,12 +351,40 @@ class _Kpis extends StatelessWidget {
         ),
       );
     }
+    if (auth.hasPermission('compras:leer') && data.comprasPendientes > 0) {
+      items.add(
+        _KD(
+          Icons.local_shipping_rounded,
+          const Color(0xFF7C3AED),
+          const Color(0xFFF5F3FF),
+          'Compras pend.',
+          '${data.comprasPendientes}',
+          FormatUtils.currency(data.comprasMontoTotal),
+          false,
+          '/compras',
+        ),
+      );
+    }
+    if (auth.hasPermission('asistencia:leer') && data.asistenciaTotal > 0) {
+      items.add(
+        _KD(
+          Icons.badge_rounded,
+          const Color(0xFF059669),
+          const Color(0xFFECFDF5),
+          'Asistencia hoy',
+          '${data.asistenciaPresentes} / ${data.asistenciaTotal}',
+          '${(data.asistenciaPresentes / data.asistenciaTotal * 100).round()}% presentes',
+          true,
+          '/asistencia',
+        ),
+      );
+    }
 
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: items
-          .take(4)
+          .take(6)
           .map(
             (k) => SizedBox(
               width: (MediaQuery.of(context).size.width - 50) / 2,

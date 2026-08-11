@@ -365,6 +365,7 @@ class UsuariosScreen extends ConsumerWidget {
         final tempPwd = result?['tempPassword'] as String? ?? '';
         showDialog(
           context: context,
+          useRootNavigator: true,
           builder: (_) => AlertDialog(
             title: const Text('Contrasena temporal'),
             content: Column(

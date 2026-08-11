@@ -22,6 +22,7 @@ class _KardexState {
   final String? error;
   final int page, totalPages, total;
   final String search, tipoFilter;
+  final String? desde, hasta;
 
   const _KardexState({
     this.items = const [],
@@ -33,6 +34,8 @@ class _KardexState {
     this.total = 0,
     this.search = '',
     this.tipoFilter = '',
+    this.desde,
+    this.hasta,
   });
 
   _KardexState copyWith({
@@ -46,6 +49,10 @@ class _KardexState {
     int? total,
     String? search,
     String? tipoFilter,
+    String? desde,
+    String? hasta,
+    bool clearDesde = false,
+    bool clearHasta = false,
   }) => _KardexState(
     items: items ?? this.items,
     resumen: resumen ?? this.resumen,
@@ -56,6 +63,8 @@ class _KardexState {
     total: total ?? this.total,
     search: search ?? this.search,
     tipoFilter: tipoFilter ?? this.tipoFilter,
+    desde: clearDesde ? null : (desde ?? this.desde),
+    hasta: clearHasta ? null : (hasta ?? this.hasta),
   );
 }
 
@@ -76,8 +85,14 @@ class _KardexNotifier extends StateNotifier<_KardexState> {
           limite: 25,
           q: state.search.isEmpty ? null : state.search,
           tipo: state.tipoFilter.isEmpty ? null : state.tipoFilter,
+          desde: state.desde,
+          hasta: state.hasta,
         ),
-        _repo.resumen(tipo: state.tipoFilter.isEmpty ? null : state.tipoFilter),
+        _repo.resumen(
+          tipo: state.tipoFilter.isEmpty ? null : state.tipoFilter,
+          desde: state.desde,
+          hasta: state.hasta,
+        ),
       ]);
       final page = results[0] as KardexPage;
       final resumen = results[1] as KardexResumen;
@@ -101,6 +116,16 @@ class _KardexNotifier extends StateNotifier<_KardexState> {
 
   void setTipo(String t) {
     state = state.copyWith(tipoFilter: t);
+    load(resetPage: true);
+  }
+
+  void setDesde(String? d) {
+    state = state.copyWith(desde: d, clearDesde: d == null);
+    load(resetPage: true);
+  }
+
+  void setHasta(String? h) {
+    state = state.copyWith(hasta: h, clearHasta: h == null);
     load(resetPage: true);
   }
 
@@ -133,6 +158,10 @@ class KardexScreen extends ConsumerWidget {
             onSearch: notifier.setSearch,
             tipoFilter: state.tipoFilter,
             onTipo: notifier.setTipo,
+            desde: state.desde,
+            hasta: state.hasta,
+            onDesde: notifier.setDesde,
+            onHasta: notifier.setHasta,
           ),
           if (state.resumen != null && !state.loading)
             _KpiRow(resumen: state.resumen!),
@@ -184,11 +213,17 @@ class _Header extends StatefulWidget {
   final int total;
   final ValueChanged<String> onSearch, onTipo;
   final String tipoFilter;
+  final String? desde, hasta;
+  final ValueChanged<String?> onDesde, onHasta;
   const _Header({
     required this.total,
     required this.onSearch,
     required this.tipoFilter,
     required this.onTipo,
+    required this.desde,
+    required this.hasta,
+    required this.onDesde,
+    required this.onHasta,
   });
 
   @override
@@ -281,9 +316,132 @@ class _HeaderState extends State<_Header> {
               ],
             ),
           ),
+          // ── Date range filters ──────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _DateChip(
+                    label: 'Desde',
+                    value: widget.desde,
+                    onPick: () => _pickDate(context, isDesde: true),
+                    onClear: () => widget.onDesde(null),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _DateChip(
+                    label: 'Hasta',
+                    value: widget.hasta,
+                    onPick: () => _pickDate(context, isDesde: false),
+                    onClear: () => widget.onHasta(null),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickDate(BuildContext context, {required bool isDesde}) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      locale: const Locale('es', 'PE'),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: Theme.of(ctx).colorScheme.copyWith(
+            primary: AppColors.primary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    final formatted =
+        '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    if (isDesde) {
+      widget.onDesde(formatted);
+    } else {
+      widget.onHasta(formatted);
+    }
+  }
+}
+
+class _DateChip extends StatelessWidget {
+  final String label;
+  final String? value;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  const _DateChip({
+    required this.label,
+    required this.value,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value != null && value!.isNotEmpty;
+    return GestureDetector(
+      onTap: onPick,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: hasValue ? AppColors.primarySurface : AppColors.backgroundAlt,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: hasValue ? AppColors.primaryBorder : AppColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 14,
+              color: hasValue ? AppColors.primary : AppColors.textTertiary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                hasValue ? _formatDisplay(value!) : label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+                  color: hasValue ? AppColors.primary : AppColors.textTertiary,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (hasValue)
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDisplay(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    } catch (_) {
+      return iso;
+    }
   }
 }
 
