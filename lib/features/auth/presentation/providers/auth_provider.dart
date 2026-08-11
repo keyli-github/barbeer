@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/errors/app_exception.dart';
+import '../../../../core/navigation/app_destinations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../data/models/auth_models.dart';
@@ -51,23 +51,8 @@ class AuthState {
   List<String> get permisos => user?.permisos ?? [];
   bool hasPermission(String p) => user?.hasPermission(p) ?? false;
   bool canAccess(String path) {
-    const m = {
-      '/productos': 'productos:crear',
-      '/categorias': 'categorias:leer',
-      '/inventario': 'inventario:leer',
-      '/kardex': 'kardex:leer',
-      '/compras': 'compras:leer',
-      '/asistencia': 'asistencia:leer',
-      '/usuarios': 'usuarios:leer',
-      '/roles': 'roles:leer',
-      '/permisos': 'permisos:leer',
-      '/sucursales': 'establecimientos:leer',
-      '/auditoria': 'audit:leer',
-      '/etiquetas': 'etiquetas:crear',
-      '/caja': 'caja:leer',
-    };
-    final req = m[path];
-    return req == null || hasPermission(req);
+    final destination = appDestinationForPath(path);
+    return destination == null || destination.canAccess(hasPermission);
   }
 }
 

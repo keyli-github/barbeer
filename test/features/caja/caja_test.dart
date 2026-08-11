@@ -56,15 +56,32 @@ Map<String, dynamic> _sesionJson({
   'sedeId': 's1',
   'sede': {'id': 's1', 'nombre': 'Sede Test'},
   'montoApertura': 200.0,
+  'saldoActual': '325.50',
   'abiertaAt': '2026-08-05T08:00:00Z',
   'usuarioApertura': {'id': 'u1', 'username': 'cajero1'},
+  'usuarioPrecuadre': {'id': 'u2', 'username': 'supervisor1'},
+  'usuarioCierre': 'admin1',
+  'createdAt': '2026-08-05T08:00:00Z',
+  'updatedAt': '2026-08-05T18:00:00Z',
   'denominaciones': [],
-  if (resumen != null) 'resumen': resumen,
+  'resumen': ?resumen,
 };
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
+  final cantidades = <double, int>{
+    200: 1,
+    100: 2,
+    50: 3,
+    20: 4,
+    10: 5,
+    5: 6,
+    2: 7,
+    1: 8,
+    0.5: 9,
+  };
+
   group('Permisos de Caja', () {
     test('1. VENDEDORA no accede a Caja', () {
       final auth = _auth(
@@ -121,6 +138,17 @@ void main() {
       );
       expect(auth.hasPermission('caja:forzar-cierre'), isTrue);
     });
+
+    test('movimientos manuales requieren caja:movimientos', () {
+      final withoutPermission = _auth(
+        _user(rol: 'CAJERO', permisos: ['caja:leer']),
+      );
+      final withPermission = _auth(
+        _user(rol: 'CAJERO', permisos: ['caja:leer', 'caja:movimientos']),
+      );
+      expect(withoutPermission.hasPermission('caja:movimientos'), isFalse);
+      expect(withPermission.hasPermission('caja:movimientos'), isTrue);
+    });
   });
 
   group('Modelos CajaSesion y CajaResumen', () {
@@ -170,19 +198,27 @@ void main() {
       expect(resumen.v2!.cantidadVentas, 12);
     });
 
-    test('10. Precuadre: monto declarado se envía al backend', () {
-      // Solo verificamos que el payload del precuadre es correcto
-      final payload = {'montoDeclarado': 250.0};
-      expect(payload['montoDeclarado'], 250.0);
-      expect(payload.containsKey('observaciones'), isFalse);
+    test('10. Denominaciones y payload de precuadre cumplen contrato', () {
+      expect(cajaDenominaciones, const [200, 100, 50, 20, 10, 5, 2, 1, 0.5]);
+      final payload = {'denominaciones': cajaDenominacionesPayload(cantidades)};
+      expect(payload.containsKey('montoDeclarado'), isFalse);
+      expect(payload['denominaciones'], hasLength(9));
+      expect((payload['denominaciones'] as List).last, {
+        'denominacion': 0.5,
+        'cantidad': 9,
+      });
+      expect(cajaDenominacionesTotal(cantidades), 736.5);
     });
 
-    test('11. Cierre normal', () {
-      final payload = <String, dynamic>{
-        'montoDeclarado': 260.0,
-        'observaciones': 'Cierre sin novedades',
-      };
+    test('11. Cierre normal no envía monto declarado ni forzado', () {
+      final payload = cajaCierrePayload(
+        cantidades,
+        observaciones: ' Cierre sin novedades ',
+      );
+      expect(payload.containsKey('montoDeclarado'), isFalse);
       expect(payload.containsKey('forzarPendientes'), isFalse);
+      expect(payload['observaciones'], 'Cierre sin novedades');
+      expect(payload['denominaciones'], hasLength(9));
     });
 
     test('12. Cierre bloqueado: ventas pendientes', () {
@@ -194,21 +230,22 @@ void main() {
 
   group('Cierre forzado', () {
     test('15. Motivo obligatorio en cierre forzado', () {
-      final payload = <String, dynamic>{
-        'montoDeclarado': 260.0,
-        'forzarPendientes': true,
-        'motivoForzado': 'No se pudo clasificar',
-      };
+      final payload = cajaCierrePayload(
+        cantidades,
+        forzarPendientes: true,
+        motivoForzado: 'No se pudo clasificar',
+      );
       expect(payload['forzarPendientes'], isTrue);
       expect((payload['motivoForzado'] as String).isNotEmpty, isTrue);
     });
 
     test('16. Payload correcto del cierre forzado', () {
-      final payload = <String, dynamic>{
-        'montoDeclarado': 250.0,
-        'forzarPendientes': true,
-        'motivoForzado': 'Vendedora ausente',
-      };
+      final payload = cajaCierrePayload(
+        cantidades,
+        forzarPendientes: true,
+        motivoForzado: ' Vendedora ausente ',
+      );
+      expect(payload.containsKey('montoDeclarado'), isFalse);
       expect(payload.containsKey('forzarPendientes'), isTrue);
       expect(payload.containsKey('motivoForzado'), isTrue);
       expect(payload['motivoForzado'], 'Vendedora ausente');
@@ -222,12 +259,64 @@ void main() {
       expect(sesion.version, 'V1');
     });
 
-    test('18. No aparecen movimientos manuales en V2', () {
-      // La pantalla V2 no tiene botones de movimiento manual
-      // Verificamos que el repositorio tiene registrarMovimiento como deprecated
-      // y que la UI no lo llama
-      expect(true, isTrue, reason: 'UI V2 no invoca registrarMovimiento');
+    test('18. Movimiento manual usa el contrato de efectivo', () {
+      final payload = cajaMovimientoPayload(
+        tipo: 'SALIDA',
+        monto: 25.5,
+        concepto: ' Pago a proveedor ',
+      );
+      expect(payload, {
+        'tipo': 'SALIDA',
+        'origen': 'MANUAL',
+        'medioPago': 'EFECTIVO',
+        'monto': 25.5,
+        'concepto': 'Pago a proveedor',
+      });
     });
+  });
+
+  group('Contrato actual de Caja', () {
+    test('parsea saldo, usuarios y timestamps actuales de la sesión', () {
+      final sesion = CajaSesion.fromJson(_sesionJson());
+      expect(sesion.saldoActual, 325.5);
+      expect(sesion.usuarioApertura, 'cajero1');
+      expect(sesion.usuarioPrecuadre, 'supervisor1');
+      expect(sesion.usuarioCierre, 'admin1');
+      expect(sesion.createdAt, DateTime.parse('2026-08-05T08:00:00Z'));
+      expect(sesion.updatedAt, DateTime.parse('2026-08-05T18:00:00Z'));
+    });
+
+    test('último cierre produce conteos válidos para prefill', () {
+      final parsed = cajaCantidadesFromResponse([
+        {'denominacion': 200, 'cantidad': 2, 'subtotal': 400},
+        {'denominacion': 0.5, 'cantidad': 3, 'subtotal': 1.5},
+        {'denominacion': 0.2, 'cantidad': 99, 'subtotal': 19.8},
+      ]);
+      expect(parsed, {200.0: 2, 0.5: 3});
+      expect(cajaCantidadesFromResponse(null), isEmpty);
+    });
+
+    test(
+      'movimiento parsea ids y conciliación sin fallar con usuario null',
+      () {
+        final movement = CajaMovimiento.fromJson({
+          'id': 'm1',
+          'cajaSesionId': 'c1',
+          'sedeId': 's1',
+          'tipo': 'ENTRADA',
+          'origen': 'MANUAL',
+          'concepto': 'Vuelto',
+          'monto': 10,
+          'conciliacionId': 'co1',
+          'usuario': null,
+          'createdAt': '2026-08-05T09:00:00Z',
+        });
+        expect(movement.cajaSesionId, 'c1');
+        expect(movement.sedeId, 's1');
+        expect(movement.conciliacionId, 'co1');
+        expect(movement.usuario, isEmpty);
+      },
+    );
   });
 
   group('Errores y conectividad', () {

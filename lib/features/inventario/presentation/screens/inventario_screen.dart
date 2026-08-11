@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
-import '../../../../core/widgets/app_header.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../productos/data/productos_repository.dart' as products;
 import '../../data/inventario_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
@@ -64,8 +65,9 @@ class _InvState {
 
 class _InvNotifier extends StateNotifier<_InvState> {
   final InventarioRepository _repo;
+  final String? _sedeId;
 
-  _InvNotifier(this._repo) : super(const _InvState()) {
+  _InvNotifier(this._repo, this._sedeId) : super(const _InvState()) {
     load();
   }
 
@@ -79,8 +81,9 @@ class _InvNotifier extends StateNotifier<_InvState> {
           limite: 20,
           q: state.search.isEmpty ? null : state.search,
           estado: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+          sedeId: _sedeId,
         ),
-        _repo.resumen(),
+        _repo.resumen(sedeId: _sedeId),
       ]);
       final page = results[0] as InventarioPage;
       final resumen = results[1] as InventarioResumen;
@@ -129,7 +132,10 @@ class _InvNotifier extends StateNotifier<_InvState> {
 }
 
 final _invProvider = StateNotifierProvider<_InvNotifier, _InvState>(
-  (ref) => _InvNotifier(ref.watch(_invRepoProvider)),
+  (ref) => _InvNotifier(
+    ref.watch(_invRepoProvider),
+    ref.watch(globalSedeIdProvider),
+  ),
 );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -143,9 +149,25 @@ class InventarioScreen extends ConsumerWidget {
     final state = ref.watch(_invProvider);
     final notifier = ref.read(_invProvider.notifier);
     final canEdit = auth.hasPermission('inventario:editar');
+    final canCreate =
+        auth.hasPermission('inventario:crear') &&
+        auth.hasPermission('productos:leer') &&
+        (auth.user?.isSuperAdmin != true ||
+            auth.hasPermission('establecimientos:leer'));
+    final selectedSedeId = ref.watch(globalSedeIdProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
+              heroTag: 'inventario_config_fab',
+              backgroundColor: AppColors.brand,
+              foregroundColor: Colors.white,
+              onPressed: () => _showConfig(context, ref),
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Configurar'),
+            )
+          : null,
       body: Column(
         children: [
           _SearchBar(
@@ -189,6 +211,13 @@ class InventarioScreen extends ConsumerWidget {
                         return _InventarioTile(
                           item: state.items[i],
                           canEdit: canEdit,
+                          canConfigure: canEdit,
+                          canAdjust:
+                              canEdit &&
+                              (auth.user?.isSuperAdmin != true ||
+                                  selectedSedeId != null),
+                          onConfigure: () =>
+                              _showConfig(context, ref, item: state.items[i]),
                           onAdjust: () =>
                               _showAdjust(context, ref, state.items[i]),
                         );
@@ -208,6 +237,24 @@ class InventarioScreen extends ConsumerWidget {
         item: item,
         onSaved: () => ref.read(_invProvider.notifier).load(),
         repo: ref.read(_invRepoProvider),
+      ),
+    );
+  }
+
+  void _showConfig(
+    BuildContext context,
+    WidgetRef ref, {
+    InventarioItem? item,
+  }) {
+    AppNav.push(
+      context,
+      _InventoryConfigScreen(
+        item: item,
+        auth: ref.read(authProvider),
+        selectedSedeId: ref.read(globalSedeIdProvider),
+        sedes: ref.read(sedeScopeOptionsProvider).valueOrNull ?? const [],
+        repo: ref.read(_invRepoProvider),
+        onSaved: () => ref.read(_invProvider.notifier).load(),
       ),
     );
   }
@@ -474,11 +521,14 @@ class _Chip extends StatelessWidget {
 
 class _InventarioTile extends StatelessWidget {
   final InventarioItem item;
-  final bool canEdit;
-  final VoidCallback onAdjust;
+  final bool canEdit, canConfigure, canAdjust;
+  final VoidCallback onConfigure, onAdjust;
   const _InventarioTile({
     required this.item,
     required this.canEdit,
+    required this.canConfigure,
+    required this.canAdjust,
+    required this.onConfigure,
     required this.onAdjust,
   });
 
@@ -578,11 +628,319 @@ class _InventarioTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 if (canEdit)
-                  TextButton(onPressed: onAdjust, child: const Text('Ajustar')),
+                  Column(
+                    children: [
+                      if (canConfigure)
+                        TextButton(
+                          onPressed: onConfigure,
+                          child: const Text('Configurar'),
+                        ),
+                      TextButton(
+                        onPressed: canAdjust ? onAdjust : null,
+                        child: const Text('Ajustar'),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InventoryConfigScreen extends StatefulWidget {
+  final InventarioItem? item;
+  final AuthState auth;
+  final String? selectedSedeId;
+  final List<SedeScopeOption> sedes;
+  final InventarioRepository repo;
+  final VoidCallback onSaved;
+
+  const _InventoryConfigScreen({
+    this.item,
+    required this.auth,
+    required this.selectedSedeId,
+    required this.sedes,
+    required this.repo,
+    required this.onSaved,
+  });
+
+  @override
+  State<_InventoryConfigScreen> createState() => _InventoryConfigScreenState();
+}
+
+class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
+  late final TextEditingController _minCtrl;
+  late final TextEditingController _maxCtrl;
+  late final TextEditingController _locationCtrl;
+  List<products.Producto> _products = const [];
+  String? _productoId;
+  String? _sedeId;
+  bool _loading = false;
+  bool _saving = false;
+  String? _error;
+
+  bool get _isSuperAdmin => widget.auth.user?.isSuperAdmin == true;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _productoId = item?.productoId;
+    _sedeId = item?.sedeId.isNotEmpty == true
+        ? item!.sedeId
+        : widget.selectedSedeId;
+    final exactItem = item?.sedeId.isNotEmpty == true;
+    _minCtrl = TextEditingController(text: '${exactItem ? item!.min : 0}');
+    _maxCtrl = TextEditingController(text: '${exactItem ? item!.max : 0}');
+    _locationCtrl = TextEditingController(
+      text: exactItem ? item!.ubicacion : '',
+    );
+    if (item == null) _loadProducts();
+  }
+
+  Future<void> _loadExistingConfiguration() async {
+    final productoId = _productoId;
+    final sedeId = _sedeId;
+    if (productoId == null ||
+        productoId.isEmpty ||
+        (_isSuperAdmin && (sedeId == null || sedeId.isEmpty))) {
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final page = await widget.repo.list(
+        pagina: 1,
+        limite: 1,
+        productoId: productoId,
+        sedeId: _isSuperAdmin ? sedeId : null,
+      );
+      if (!mounted) return;
+      final existing = page.data.firstOrNull;
+      setState(() {
+        _minCtrl.text = '${existing?.min ?? 0}';
+        _maxCtrl.text = '${existing?.max ?? 0}';
+        _locationCtrl.text = existing?.ubicacion ?? '';
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() => _loading = true);
+    try {
+      final repository = products.ProductosRepository(ApiClient.instance);
+      final first = await repository.list(
+        pagina: 1,
+        limite: 100,
+        activo: 'true',
+      );
+      final loaded = [...first.data];
+      for (var page = 2; page <= first.totalPaginas; page++) {
+        final next = await repository.list(
+          pagina: page,
+          limite: 100,
+          activo: 'true',
+        );
+        loaded.addAll(next.data);
+      }
+      if (mounted) setState(() => _products = loaded);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _minCtrl.dispose();
+    _maxCtrl.dispose();
+    _locationCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final min = double.tryParse(_minCtrl.text.trim());
+    final max = double.tryParse(_maxCtrl.text.trim());
+    if (_productoId == null || _productoId!.isEmpty) {
+      setState(() => _error = 'Selecciona un producto.');
+      return;
+    }
+    if (_isSuperAdmin && (_sedeId == null || _sedeId!.isEmpty)) {
+      setState(() => _error = 'Selecciona una sede.');
+      return;
+    }
+    if (min == null || min < 0) {
+      setState(() => _error = 'El stock mínimo debe ser mayor o igual a 0.');
+      return;
+    }
+    if (max == null || max < 0 || (max != 0 && max < min)) {
+      setState(
+        () =>
+            _error = 'El objetivo debe ser 0 o mayor o igual al stock mínimo.',
+      );
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.repo.upsert(
+        productoId: _productoId!,
+        sedeId: _isSuperAdmin ? _sedeId : null,
+        stockMin: min,
+        stockMax: max,
+        ubicacion: _locationCtrl.text.trim(),
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onSaved();
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final productLocked = item != null;
+    final sedeLocked = item?.sedeId.isNotEmpty == true;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: item == null ? 'Agregar al inventario' : 'Configurar inventario',
+        subtitle: 'Mínimos, objetivo y ubicación',
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          DropdownButtonFormField<String>(
+            initialValue: _productoId,
+            decoration: const InputDecoration(labelText: 'Producto'),
+            items: [
+              if (item != null)
+                DropdownMenuItem(
+                  value: item.productoId,
+                  child: Text('${item.producto} (${item.codigo})'),
+                ),
+              if (!productLocked)
+                for (final product in _products)
+                  DropdownMenuItem(
+                    value: product.id,
+                    child: Text('${product.nombre} (${product.codigo})'),
+                  ),
+            ],
+            onChanged: productLocked || _loading
+                ? null
+                : (value) {
+                    setState(() => _productoId = value);
+                    _loadExistingConfiguration();
+                  },
+          ),
+          if (_loading) const LinearProgressIndicator(minHeight: 2),
+          if (_isSuperAdmin) ...[
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: _sedeId,
+              decoration: const InputDecoration(labelText: 'Sede'),
+              items: [
+                if (sedeLocked &&
+                    !widget.sedes.any((sede) => sede.id == _sedeId))
+                  DropdownMenuItem(
+                    value: _sedeId,
+                    child: const Text('Sede actual'),
+                  ),
+                for (final sede in widget.sedes)
+                  DropdownMenuItem(value: sede.id, child: Text(sede.nombre)),
+              ],
+              onChanged: sedeLocked
+                  ? null
+                  : (value) {
+                      setState(() => _sedeId = value);
+                      _loadExistingConfiguration();
+                    },
+            ),
+            if (widget.sedes.isEmpty && !sedeLocked)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'No hay sedes activas disponibles. Recarga e intenta de nuevo.',
+                  style: TextStyle(fontSize: 12, color: AppColors.error),
+                ),
+              ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _minCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Stock mínimo'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _maxCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Objetivo de reposición',
+                    helperText: '0 = sin objetivo',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _locationCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Ubicación',
+              hintText: 'Ej. Almacén A, estante 3',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(fontSize: 13, color: AppColors.error),
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _saving || _loading ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Guardar configuración'),
+            ),
+          ),
+        ],
       ),
     );
   }

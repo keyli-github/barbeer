@@ -53,11 +53,19 @@ class ApiClient {
   };
 
   static Map<String, String>? get _deviceHeaders {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
-    return const {
-      'x-device-name': 'BarBeer Android',
-      'x-device-type': 'android',
-      'user-agent': 'BarBeer/1.0 (Android)',
+    if (kIsWeb) return null;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => const {
+        'x-device-name': 'BarBeer Android',
+        'x-device-type': 'android',
+        'user-agent': 'BarBeer/1.0 (Android)',
+      },
+      TargetPlatform.windows => const {
+        'x-device-name': 'BarBeer Windows',
+        'x-device-type': 'windows',
+        'user-agent': 'BarBeer/1.0 (Windows)',
+      },
+      _ => null,
     };
   }
 
@@ -134,7 +142,6 @@ class ApiClient {
       if (e.response?.statusCode == 401 && !_isPublic(path) && !isRetry) {
         final newToken = await _handleRefresh();
         if (newToken != null) {
-          final h = {'Authorization': 'Bearer $newToken'};
           return _execute(
             () => _dio.fetch<T>(
               e.requestOptions..headers['Authorization'] = 'Bearer $newToken',

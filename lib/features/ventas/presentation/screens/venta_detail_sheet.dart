@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -8,6 +7,7 @@ import '../../../../core/widgets/ds_product_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
+import '../widgets/anular_venta_dialog.dart';
 import '../../../../core/widgets/ds_states.dart';
 
 class VentaDetailSheet extends ConsumerStatefulWidget {
@@ -25,35 +25,12 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
   String? _errorAnular;
 
   Future<void> _anular() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Anular venta',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          '¿Seguro que deseas anular la venta ${widget.venta.codigo}? Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text(
-              'Anular',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
+    if (_anulando) return;
+    final motivo = await showAnularVentaDialog(
+      context,
+      codigo: widget.venta.codigo,
     );
-    if (confirm != true || !mounted) return;
+    if (motivo == null || !mounted) return;
 
     setState(() {
       _anulando = true;
@@ -62,7 +39,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
     try {
       await ref
           .read(ventasRepositoryProvider)
-          .anularVenta(widget.venta.id, motivo: 'Anulada manualmente');
+          .anularVenta(widget.venta.id, motivo: motivo);
       if (mounted) {
         Navigator.pop(context);
         widget.onChanged?.call();

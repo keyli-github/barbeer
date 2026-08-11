@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/navigation/app_nav.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
@@ -9,10 +8,18 @@ import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_badge.dart';
-import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+
+String auditUsername(Map<String, dynamic> log) {
+  final usuario = log['usuario'];
+  if (usuario is Map) {
+    return usuario['username'] as String? ?? 'Sistema';
+  }
+  if (usuario is String && usuario.isNotEmpty) return usuario;
+  return log['username'] as String? ?? 'Sistema';
+}
 
 class AuditoriaState {
   final bool isLoading;
@@ -327,7 +334,7 @@ class _LogTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = log['accion'] as String? ?? '';
-    final username = log['usuario']?['username'] as String? ?? 'Sistema';
+    final username = auditUsername(log);
     final entidad = log['entidad'] as String?;
     final ip = log['ip'] as String?;
     DateTime? dt;
@@ -411,9 +418,7 @@ class _LogDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = log['accion'] as String? ?? '';
-    final username = log['usuario'] is Map
-        ? log['usuario']['username'] as String? ?? 'Sistema'
-        : 'Sistema';
+    final username = auditUsername(log);
     final entidad = log['entidad'] as String? ?? '';
     final entidadId = log['entidadId'] as String? ?? '';
     final ip = log['ip'] as String? ?? '';
@@ -552,7 +557,7 @@ class _LogDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = {
       'Accion': log['accion'] as String? ?? '',
-      'Usuario': log['usuario']?['username'] as String? ?? 'Sistema',
+      'Usuario': auditUsername(log),
       'Entidad': log['entidad'] as String? ?? '',
       'ID Entidad': log['entidadId'] as String? ?? '',
       'IP': log['ip'] as String? ?? '',

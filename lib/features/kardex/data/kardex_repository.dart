@@ -1,5 +1,16 @@
 import '../../../core/network/api_client.dart';
 
+bool kardexIsEntrada(String tipo) =>
+    tipo == 'ENTRADA' || tipo == 'ENTRADA_ANULACION';
+
+bool kardexIsSalida(String tipo) => tipo == 'SALIDA' || tipo == 'SALIDA_VENTA';
+
+String kardexTipoLabel(String tipo) => switch (tipo) {
+  'SALIDA_VENTA' => 'VENTA',
+  'ENTRADA_ANULACION' => 'ANULACIÓN',
+  _ => tipo,
+};
+
 class KardexMovimiento {
   final String id,
       producto,

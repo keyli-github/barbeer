@@ -3,156 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/navigation/app_destinations.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/barbeer_wordmark.dart';
+import '../../../../core/widgets/sede_scope_selector.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'desktop_shell.dart';
 
 // ─── GlobalKey para abrir el panel "Ver más" ──────────────────────────────────
 final shellScaffoldKey = GlobalKey<ScaffoldState>();
-
-// ─── Modelo de item de navegación ────────────────────────────────────────────
-
-class _NavItem {
-  final String path, label;
-  final IconData icon, activeIcon;
-  const _NavItem({
-    required this.path,
-    required this.label,
-    required this.icon,
-    required this.activeIcon,
-  });
-}
-
-// ─── Todos los módulos disponibles con su permiso mínimo ─────────────────────
-
-class _Module {
-  final String path, label;
-  final IconData icon, activeIcon;
-  final String? perm; // null = siempre visible
-  const _Module({
-    required this.path,
-    required this.label,
-    required this.icon,
-    required this.activeIcon,
-    this.perm,
-  });
-}
-
-const _allModules = [
-  _Module(
-    path: '/dashboard',
-    label: 'Inicio',
-    icon: Icons.home_outlined,
-    activeIcon: Icons.home_rounded,
-  ),
-  _Module(
-    path: '/ventas',
-    label: 'Ventas',
-    icon: Icons.shopping_cart_outlined,
-    activeIcon: Icons.shopping_cart_rounded,
-    perm: 'ventas:leer', // también aplica si tiene ventas:leer-propias
-  ),
-  _Module(
-    path: '/caja',
-    label: 'Caja',
-    icon: Icons.account_balance_wallet_outlined,
-    activeIcon: Icons.account_balance_wallet_rounded,
-    perm: 'caja:leer',
-  ),
-  _Module(
-    path: '/productos',
-    label: 'Productos',
-    icon: Icons.liquor_outlined,
-    activeIcon: Icons.liquor_rounded,
-    perm: 'productos:crear',
-  ),
-  _Module(
-    path: '/categorias',
-    label: 'Categorias',
-    icon: Icons.category_outlined,
-    activeIcon: Icons.category_rounded,
-    perm: 'categorias:leer',
-  ),
-  _Module(
-    path: '/inventario',
-    label: 'Inventario',
-    icon: Icons.inventory_2_outlined,
-    activeIcon: Icons.inventory_2_rounded,
-    perm: 'inventario:leer',
-  ),
-  _Module(
-    path: '/kardex',
-    label: 'Kardex',
-    icon: Icons.swap_vert_outlined,
-    activeIcon: Icons.swap_vert_rounded,
-    perm: 'kardex:leer',
-  ),
-  _Module(
-    path: '/compras',
-    label: 'Compras',
-    icon: Icons.local_shipping_outlined,
-    activeIcon: Icons.local_shipping_rounded,
-    perm: 'compras:leer',
-  ),
-  _Module(
-    path: '/asistencia',
-    label: 'Asistencia',
-    icon: Icons.badge_outlined,
-    activeIcon: Icons.badge_rounded,
-    perm: 'asistencia:leer',
-  ),
-  _Module(
-    path: '/etiquetas',
-    label: 'Billeteras',
-    icon: Icons.payment_outlined,
-    activeIcon: Icons.payment_rounded,
-    perm: 'etiquetas:crear',
-  ),
-  _Module(
-    path: '/usuarios',
-    label: 'Usuarios',
-    icon: Icons.people_outline_rounded,
-    activeIcon: Icons.people_rounded,
-    perm: 'usuarios:leer',
-  ),
-  _Module(
-    path: '/sucursales',
-    label: 'Sucursales',
-    icon: Icons.store_outlined,
-    activeIcon: Icons.store_rounded,
-    perm: 'establecimientos:leer',
-  ),
-  _Module(
-    path: '/roles',
-    label: 'Roles',
-    icon: Icons.admin_panel_settings_outlined,
-    activeIcon: Icons.admin_panel_settings_rounded,
-    perm: 'roles:leer',
-  ),
-  _Module(
-    path: '/permisos',
-    label: 'Permisos',
-    icon: Icons.security_outlined,
-    activeIcon: Icons.security_rounded,
-    perm: 'permisos:leer',
-  ),
-  _Module(
-    path: '/auditoria',
-    label: 'Auditoría',
-    icon: Icons.history_outlined,
-    activeIcon: Icons.history_rounded,
-    perm: 'audit:leer',
-  ),
-  _Module(
-    path: '/perfil',
-    label: 'Perfil',
-    icon: Icons.person_outline_rounded,
-    activeIcon: Icons.person_rounded,
-  ),
-];
 
 // ─── Shell principal ──────────────────────────────────────────────────────────
 
@@ -167,36 +28,16 @@ class ShellScreen extends ConsumerWidget {
   });
 
   /// Módulos visibles para este usuario según permisos
-  List<_Module> _visibleModules(AuthState auth) => _allModules.where((m) {
-    if (m.perm == null) return true;
-    if (m.path == '/ventas') {
-      return auth.hasPermission('ventas:leer') ||
-          auth.hasPermission('ventas:leer-propias') ||
-          auth.hasPermission('ventas:crear');
-    }
-    return auth.hasPermission(m.perm!);
-  }).toList();
+  List<AppDestination> _visibleModules(AuthState auth) => appDestinations
+      .where((destination) => destination.canAccess(auth.hasPermission))
+      .toList();
 
   /// Subtítulo que se muestra debajo de BarBeer según la ruta activa
   String _subtitleFor(String path, AuthState auth) {
-    if (path.startsWith('/dashboard'))
+    if (path.startsWith('/dashboard')) {
       return FormatUtils.roleName(auth.user?.rol ?? '');
-    if (path.startsWith('/ventas')) return 'Ventas';
-    if (path.startsWith('/caja')) return 'Caja';
-    if (path.startsWith('/productos')) return 'Productos';
-    if (path.startsWith('/categorias')) return 'Categorias';
-    if (path.startsWith('/inventario')) return 'Inventario';
-    if (path.startsWith('/kardex')) return 'Kardex';
-    if (path.startsWith('/compras')) return 'Compras';
-    if (path.startsWith('/asistencia')) return 'Asistencia';
-    if (path.startsWith('/etiquetas')) return 'Billeteras';
-    if (path.startsWith('/usuarios')) return 'Usuarios';
-    if (path.startsWith('/sucursales')) return 'Sucursales';
-    if (path.startsWith('/roles')) return 'Roles';
-    if (path.startsWith('/permisos')) return 'Permisos';
-    if (path.startsWith('/auditoria')) return 'Auditoría';
-    if (path.startsWith('/perfil')) return 'Perfil';
-    return '';
+    }
+    return appDestinationForPath(path)?.label ?? '';
   }
 
   @override
@@ -205,11 +46,23 @@ class ShellScreen extends ConsumerWidget {
     final visible = _visibleModules(auth);
     final subtitle = _subtitleFor(currentPath, auth);
 
+    if (MediaQuery.sizeOf(context).width >= 1024) {
+      return DesktopShell(
+        currentPath: currentPath,
+        destinations: visible,
+        auth: auth,
+        onNavigate: context.go,
+        onLogout: () => ref.read(authProvider.notifier).logout(),
+        headerAction: const SedeScopeSelector(),
+        child: child,
+      );
+    }
+
     const maxInBar = 4;
     final barModules = visible.take(maxInBar).toList();
     final moreModules = visible.length > maxInBar
         ? visible.sublist(maxInBar)
-        : <_Module>[];
+        : <AppDestination>[];
     final showMore = moreModules.isNotEmpty;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -224,7 +77,10 @@ class ShellScreen extends ConsumerWidget {
         key: shellScaffoldKey,
         backgroundColor: AppColors.background,
         // ── Header único para toda la app ─────────────────────────────
-        appBar: AppHeader(subtitle: subtitle),
+        appBar: AppHeader(
+          subtitle: subtitle,
+          actions: const [SedeScopeSelector(compact: true)],
+        ),
         // Panel derecho "Ver más"
         endDrawer: showMore
             ? _MorePanel(
@@ -262,7 +118,7 @@ class ShellScreen extends ConsumerWidget {
 
 class _BottomNavBar extends StatelessWidget {
   final String current;
-  final List<_Module> barModules;
+  final List<AppDestination> barModules;
   final bool showMore;
   final ValueChanged<String> go;
   final VoidCallback onMoreTap;
@@ -395,14 +251,14 @@ class _NavBarItem extends StatelessWidget {
 
 class _Section {
   final String title;
-  final List<_Module> items;
+  final List<AppDestination> items;
   const _Section({required this.title, required this.items});
 }
 
-List<_Section> _buildSections(List<_Module> modules) {
+List<_Section> _buildSections(List<AppDestination> modules) {
   final paths = modules.map((m) => m.path).toSet();
 
-  List<_Module> from(List<String> ps) => _allModules
+  List<AppDestination> from(List<String> ps) => appDestinations
       .where((m) => ps.contains(m.path) && paths.contains(m.path))
       .toList();
 
@@ -437,7 +293,7 @@ List<_Section> _buildSections(List<_Module> modules) {
 // ─── Panel derecho "Ver más" ──────────────────────────────────────────────────
 
 class _MorePanel extends StatefulWidget {
-  final List<_Module> modules;
+  final List<AppDestination> modules;
   final String current;
   final AuthState auth;
   final ValueChanged<String> go;
@@ -653,7 +509,7 @@ class _MorePanelState extends State<_MorePanel> {
 }
 
 class _PanelItem extends StatelessWidget {
-  final _Module module;
+  final AppDestination module;
   final bool active;
   final VoidCallback onTap;
   const _PanelItem({

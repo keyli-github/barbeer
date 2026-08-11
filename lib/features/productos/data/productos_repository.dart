@@ -90,6 +90,7 @@ class ProductosRepository {
     String? q,
     String? categoriaId,
     String? activo,
+    String? sedeId,
   }) async {
     final r = await _api.get(
       '/productos',
@@ -99,6 +100,7 @@ class ProductosRepository {
         if (q != null && q.isNotEmpty) 'q': q,
         if (categoriaId != null) 'categoriaId': categoriaId,
         if (activo != null) 'activo': activo,
+        if (sedeId != null) 'sedeId': sedeId,
       },
     );
     final json = Map<String, dynamic>.from(r.data as Map);

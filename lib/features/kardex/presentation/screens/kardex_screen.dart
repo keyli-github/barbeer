@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
-import '../../../../core/widgets/app_header.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/kardex_repository.dart';
 
 final _kardexRepoProvider = Provider<KardexRepository>(
@@ -70,8 +69,9 @@ class _KardexState {
 
 class _KardexNotifier extends StateNotifier<_KardexState> {
   final KardexRepository _repo;
+  final String? _sedeId;
 
-  _KardexNotifier(this._repo) : super(const _KardexState()) {
+  _KardexNotifier(this._repo, this._sedeId) : super(const _KardexState()) {
     load();
   }
 
@@ -87,11 +87,13 @@ class _KardexNotifier extends StateNotifier<_KardexState> {
           tipo: state.tipoFilter.isEmpty ? null : state.tipoFilter,
           desde: state.desde,
           hasta: state.hasta,
+          sedeId: _sedeId,
         ),
         _repo.resumen(
           tipo: state.tipoFilter.isEmpty ? null : state.tipoFilter,
           desde: state.desde,
           hasta: state.hasta,
+          sedeId: _sedeId,
         ),
       ]);
       final page = results[0] as KardexPage;
@@ -136,7 +138,10 @@ class _KardexNotifier extends StateNotifier<_KardexState> {
 }
 
 final _kardexProvider = StateNotifierProvider<_KardexNotifier, _KardexState>(
-  (ref) => _KardexNotifier(ref.watch(_kardexRepoProvider)),
+  (ref) => _KardexNotifier(
+    ref.watch(_kardexRepoProvider),
+    ref.watch(globalSedeIdProvider),
+  ),
 );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -276,6 +281,8 @@ class _HeaderState extends State<_Header> {
                   ('SALIDA', 'SALIDA'),
                   ('AJUSTE', 'AJUSTE'),
                   ('TRASLADO', 'TRASLADO'),
+                  ('SALIDA_VENTA', 'VENTA'),
+                  ('ENTRADA_ANULACION', 'ANULACIÓN'),
                 ])
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -356,9 +363,9 @@ class _HeaderState extends State<_Header> {
       locale: const Locale('es', 'PE'),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: Theme.of(ctx).colorScheme.copyWith(
-            primary: AppColors.primary,
-          ),
+          colorScheme: Theme.of(
+            ctx,
+          ).colorScheme.copyWith(primary: AppColors.primary),
         ),
         child: child!,
       ),
@@ -501,8 +508,10 @@ class _MovTile extends StatelessWidget {
   Color get _color {
     switch (mov.tipo) {
       case 'ENTRADA':
+      case 'ENTRADA_ANULACION':
         return AppColors.success;
       case 'SALIDA':
+      case 'SALIDA_VENTA':
         return AppColors.error;
       case 'AJUSTE':
         return AppColors.warning;
@@ -514,14 +523,31 @@ class _MovTile extends StatelessWidget {
   IconData get _icon {
     switch (mov.tipo) {
       case 'ENTRADA':
+      case 'ENTRADA_ANULACION':
         return Icons.arrow_downward_rounded;
       case 'SALIDA':
         return Icons.arrow_upward_rounded;
+      case 'SALIDA_VENTA':
+        return Icons.shopping_cart_outlined;
       case 'AJUSTE':
         return Icons.tune_rounded;
       default:
         return Icons.swap_horiz_rounded;
     }
+  }
+
+  bool get _isEntrada => kardexIsEntrada(mov.tipo);
+
+  bool get _isSalida => kardexIsSalida(mov.tipo);
+
+  String get _label => kardexTipoLabel(mov.tipo);
+
+  String get _cantidad {
+    final amount = mov.cantidad.abs().toStringAsFixed(
+      mov.cantidad % 1 == 0 ? 0 : 1,
+    );
+    final sign = _isEntrada ? '+' : (_isSalida ? '-' : '');
+    return '$sign$amount ${mov.unidad}';
   }
 
   @override
@@ -578,7 +604,7 @@ class _MovTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  mov.tipo,
+                  _label,
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -594,10 +620,7 @@ class _MovTile extends StatelessWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
-              Text(
-                '×${mov.cantidad.toStringAsFixed(mov.cantidad % 1 == 0 ? 0 : 1)} ${mov.unidad}',
-                style: AppTextStyles.labelSmall,
-              ),
+              Text(_cantidad, style: AppTextStyles.labelSmall),
             ],
           ),
         ],

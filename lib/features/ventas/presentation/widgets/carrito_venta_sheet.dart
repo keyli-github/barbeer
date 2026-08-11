@@ -80,14 +80,17 @@ class CarritoVentaSheet extends StatelessWidget {
               children: [
                 const Icon(Icons.shopping_cart_rounded, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'Venta actual (${items.length})',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    'Venta actual (${items.length})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 if (items.isNotEmpty)
                   TextButton(
                     onPressed: onClear,
@@ -115,7 +118,7 @@ class CarritoVentaSheet extends StatelessWidget {
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: items.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (_, i) {
                   final item = items[i];
                   return Padding(

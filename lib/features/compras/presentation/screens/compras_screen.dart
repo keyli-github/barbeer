@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../../core/navigation/app_nav.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
@@ -14,10 +13,16 @@ import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/data/models/auth_models.dart';
+import '../../../productos/data/productos_repository.dart';
 import '../../data/compras_repository.dart';
 
 final _comprasRepoProvider = Provider<ComprasRepository>(
   (ref) => ComprasRepository(ApiClient.instance),
+);
+
+final _productosRepoProvider = Provider<ProductosRepository>(
+  (ref) => ProductosRepository(ApiClient.instance),
 );
 
 // ─── Ordenes state ────────────────────────────────────────────────────────────
@@ -65,8 +70,9 @@ class _OrdenesState {
 
 class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
   final ComprasRepository _repo;
+  final String? _sedeId;
 
-  _OrdenesNotifier(this._repo) : super(const _OrdenesState()) {
+  _OrdenesNotifier(this._repo, this._sedeId) : super(const _OrdenesState()) {
     load();
   }
 
@@ -78,9 +84,11 @@ class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
         _repo.listCompras(
           pagina: p,
           estado: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+          sedeId: _sedeId,
         ),
         _repo.resumen(
           estado: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+          sedeId: _sedeId,
         ),
       ]);
       final page = results[0] as ComprasPage<Compra>;
@@ -115,7 +123,10 @@ class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
 }
 
 final _ordenesProvider = StateNotifierProvider<_OrdenesNotifier, _OrdenesState>(
-  (ref) => _OrdenesNotifier(ref.watch(_comprasRepoProvider)),
+  (ref) => _OrdenesNotifier(
+    ref.watch(_comprasRepoProvider),
+    ref.watch(globalSedeIdProvider),
+  ),
 );
 
 // ─── Proveedores state ────────────────────────────────────────────────────────
@@ -257,7 +268,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
       floatingActionButton: canCreate
           ? ListenableBuilder(
               listenable: _tabs,
-              builder: (_, __) => FloatingActionButton(
+              builder: (_, _) => FloatingActionButton(
                 heroTag: 'compras_fab',
                 backgroundColor: AppColors.brand,
                 foregroundColor: Colors.white,
@@ -276,6 +287,9 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
       context,
       _NuevaOrdenScreen(
         repo: ref.read(_comprasRepoProvider),
+        productosRepo: ref.read(_productosRepoProvider),
+        user: ref.read(authProvider).user!,
+        initialSedeId: ref.read(globalSedeIdProvider),
         onCreated: () => ref.read(_ordenesProvider.notifier).load(),
       ),
     );
@@ -459,7 +473,7 @@ class _Chip extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.09),
+        color: color.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
@@ -522,7 +536,7 @@ class _OrdenTile extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: _statusColor.withOpacity(0.12),
+                        color: _statusColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -716,17 +730,19 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
   Future<void> _load() async {
     try {
       final c = await widget.repo.getCompra(widget.id);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _compra = c;
           _loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+      }
     }
   }
 
@@ -735,13 +751,16 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
     try {
       await widget.repo.cambiarEstado(widget.id, estado);
       widget.onChanged();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _acting = false;
           _error = e.toString();
         });
+      }
     }
   }
 
@@ -913,8 +932,17 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
 
 class _NuevaOrdenScreen extends StatefulWidget {
   final ComprasRepository repo;
+  final ProductosRepository productosRepo;
+  final UserProfile user;
+  final String? initialSedeId;
   final VoidCallback onCreated;
-  const _NuevaOrdenScreen({required this.repo, required this.onCreated});
+  const _NuevaOrdenScreen({
+    required this.repo,
+    required this.productosRepo,
+    required this.user,
+    this.initialSedeId,
+    required this.onCreated,
+  });
 
   @override
   State<_NuevaOrdenScreen> createState() => _NuevaOrdenScreenState();
@@ -924,39 +952,113 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
   final _etaCtrl = TextEditingController();
   final _notasCtrl = TextEditingController();
   String _proveedorId = '';
+  String _sedeId = '';
+  String _productoId = '';
   List<Proveedor> _proveedores = [];
-  bool _loadingProvs = true, _saving = false;
+  List<CompraSede> _sedes = [];
+  List<Producto> _productos = [];
+  final List<_CompraDraftLine> _items = [];
+  bool _loading = true, _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadProvs();
+    _sedeId = widget.initialSedeId ?? widget.user.sedeId ?? '';
+    _loadOptions();
   }
 
   @override
   void dispose() {
     _etaCtrl.dispose();
     _notasCtrl.dispose();
+    for (final item in _items) {
+      item.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _loadProvs() async {
+  Future<void> _loadOptions() async {
     try {
-      final p = await widget.repo.listProveedores(limite: 100, activo: 'true');
-      if (mounted)
+      final results = await Future.wait<dynamic>([
+        widget.repo.listProveedores(limite: 100, activo: 'true'),
+        widget.productosRepo.list(limite: 100, activo: 'true'),
+        if (widget.user.isSuperAdmin) widget.repo.listSedes(),
+      ]);
+      if (!mounted) return;
+      final proveedores = results[0] as ComprasPage<Proveedor>;
+      final productos = results[1] as ProductosPage;
+      setState(() {
+        _proveedores = proveedores.data
+            .where((p) => p.activo && p.id.isNotEmpty)
+            .toList();
+        _productos = productos.data
+            .where((p) => p.activo && p.id.isNotEmpty)
+            .toList();
+        if (widget.user.isSuperAdmin) {
+          _sedes = results[2] as List<CompraSede>;
+          if (!_sedes.any((sede) => sede.id == _sedeId)) _sedeId = '';
+        }
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _proveedores = p.data;
-          _loadingProvs = false;
+          _loading = false;
+          _error = e.toString();
         });
-    } catch (_) {
-      if (mounted) setState(() => _loadingProvs = false);
+      }
     }
   }
+
+  void _addProduct() {
+    if (_productoId.isEmpty) {
+      setState(() => _error = 'Selecciona un producto.');
+      return;
+    }
+    if (_items.any((item) => item.producto.id == _productoId)) {
+      setState(() => _error = 'Este producto ya fue agregado.');
+      return;
+    }
+    final producto = _productos.firstWhere((p) => p.id == _productoId);
+    setState(() {
+      _items.add(_CompraDraftLine(producto));
+      _productoId = '';
+      _error = null;
+    });
+  }
+
+  void _removeItem(_CompraDraftLine item) {
+    setState(() => _items.remove(item));
+    item.dispose();
+  }
+
+  double get _total =>
+      _items.fold(0, (total, line) => total + (line.item?.subtotal ?? 0));
 
   Future<void> _submit() async {
     if (_proveedorId.isEmpty) {
       setState(() => _error = 'Selecciona un proveedor.');
+      return;
+    }
+    if (_sedeId.isEmpty) {
+      setState(() {
+        _error = widget.user.isSuperAdmin
+            ? 'Selecciona una sede.'
+            : 'Tu usuario no tiene una sede asignada.';
+      });
+      return;
+    }
+    if (_items.isEmpty) {
+      setState(() => _error = 'Agrega al menos un producto.');
+      return;
+    }
+    final items = _items.map((line) => line.item).toList();
+    if (items.any((item) => item == null)) {
+      setState(() {
+        _error =
+            'Cantidad, costo unitario y precio de venta deben ser números mayores a 0.';
+      });
       return;
     }
     setState(() {
@@ -966,7 +1068,8 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
     try {
       await widget.repo.createCompra(
         proveedorId: _proveedorId,
-        items: [],
+        sedeId: _sedeId,
+        items: items.cast<CompraCreateItem>(),
         eta: _etaCtrl.text.trim().isEmpty ? null : _etaCtrl.text.trim(),
         notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
       );
@@ -995,22 +1098,43 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
           bottom: MediaQuery.of(context).viewInsets.bottom + 80,
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_loadingProvs)
+            if (_loading)
               const Center(child: CircularProgressIndicator())
-            else
-              DropdownButtonFormField<String>(
-                value: _proveedorId.isEmpty ? null : _proveedorId,
-                decoration: InputDecoration(
-                  labelText: 'Proveedor *',
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.md),
+            else ...[
+              if (widget.user.isSuperAdmin) ...[
+                DropdownButtonFormField<String>(
+                  key: ValueKey('sede-$_sedeId'),
+                  initialValue: _sedeId.isEmpty ? null : _sedeId,
+                  decoration: _dropdownDecoration('Sede *'),
+                  hint: const Text('Seleccionar'),
+                  items: _sedes
+                      .map(
+                        (sede) => DropdownMenuItem(
+                          value: sede.id,
+                          child: Text(sede.nombre),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _sedeId = value ?? ''),
+                ),
+                const SizedBox(height: 14),
+              ] else
+                InputDecorator(
+                  decoration: _dropdownDecoration('Sede'),
+                  child: Text(
+                    widget.user.sedeName.isNotEmpty
+                        ? widget.user.sedeName
+                        : (_sedeId.isNotEmpty ? 'Sede asignada' : 'Sin sede'),
+                    style: AppTextStyles.bodyMedium,
                   ),
                 ),
+              if (!widget.user.isSuperAdmin) const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                key: ValueKey('proveedor-$_proveedorId'),
+                initialValue: _proveedorId.isEmpty ? null : _proveedorId,
+                decoration: _dropdownDecoration('Proveedor *'),
                 hint: const Text('Seleccionar'),
                 items: _proveedores
                     .map(
@@ -1020,6 +1144,104 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
                     .toList(),
                 onChanged: (v) => setState(() => _proveedorId = v ?? ''),
               ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Productos', style: AppTextStyles.titleMedium),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey('producto-$_productoId'),
+                      initialValue: _productoId.isEmpty ? null : _productoId,
+                      isExpanded: true,
+                      decoration: _dropdownDecoration('Producto *'),
+                      hint: const Text('Seleccionar'),
+                      items: _productos
+                          .where(
+                            (producto) => !_items.any(
+                              (item) => item.producto.id == producto.id,
+                            ),
+                          )
+                          .map(
+                            (producto) => DropdownMenuItem(
+                              value: producto.id,
+                              child: Text(
+                                '${producto.nombre} · ${producto.codigo}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _productoId = value ?? ''),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton.icon(
+                      onPressed: _addProduct,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Agregar'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_items.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 28),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundAlt,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(
+                        Icons.shopping_bag_outlined,
+                        color: AppColors.textTertiary,
+                      ),
+                      SizedBox(height: 6),
+                      Text('Agrega al menos un producto'),
+                    ],
+                  ),
+                )
+              else
+                ..._items.map(
+                  (item) => _CompraDraftCard(
+                    key: ValueKey(item.producto.id),
+                    line: item,
+                    onChanged: () => setState(() {}),
+                    onRemove: () => _removeItem(item),
+                  ),
+                ),
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySurface,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: AppColors.primaryBorder),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total', style: AppTextStyles.titleMedium),
+                    Text(
+                      'S/ ${_total.toStringAsFixed(2)}',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             TextField(
               controller: _etaCtrl,
@@ -1060,7 +1282,7 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
             const SizedBox(height: 20),
             PrimaryButton(
               label: 'Crear orden',
-              onPressed: _saving ? null : _submit,
+              onPressed: _saving || _loading ? null : _submit,
               isLoading: _saving,
             ),
           ],
@@ -1068,6 +1290,125 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
       ),
     );
   }
+
+  InputDecoration _dropdownDecoration(String label) => InputDecoration(
+    labelText: label,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+    ),
+  );
+}
+
+class _CompraDraftLine {
+  final Producto producto;
+  final TextEditingController cantidad;
+  final TextEditingController costoUnit;
+  final TextEditingController precioVenta;
+
+  _CompraDraftLine(this.producto)
+    : cantidad = TextEditingController(text: '1'),
+      costoUnit = TextEditingController(
+        text: producto.precioCosto.toStringAsFixed(2),
+      ),
+      precioVenta = TextEditingController(
+        text: producto.precioVenta.toStringAsFixed(2),
+      );
+
+  CompraCreateItem? get item => parseCompraCreateItem(
+    productoId: producto.id,
+    cantidad: cantidad.text,
+    costoUnit: costoUnit.text,
+    precioVenta: precioVenta.text,
+  );
+
+  void dispose() {
+    cantidad.dispose();
+    costoUnit.dispose();
+    precioVenta.dispose();
+  }
+}
+
+class _CompraDraftCard extends StatelessWidget {
+  final _CompraDraftLine line;
+  final VoidCallback onChanged, onRemove;
+
+  const _CompraDraftCard({
+    super.key,
+    required this.line,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      line.producto.nombre,
+                      style: AppTextStyles.titleMedium,
+                    ),
+                    Text(line.producto.codigo, style: AppTextStyles.labelSmall),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Quitar producto',
+                onPressed: onRemove,
+                color: AppColors.error,
+                icon: const Icon(Icons.delete_outline_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _numberField('Cantidad', line.cantidad)),
+              const SizedBox(width: 8),
+              Expanded(child: _numberField('Costo unit.', line.costoUnit)),
+              const SizedBox(width: 8),
+              Expanded(child: _numberField('P. venta', line.precioVenta)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Subtotal: S/ ${(line.item?.subtotal ?? 0).toStringAsFixed(2)}',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _numberField(String label, TextEditingController controller) =>
+      TextField(
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        onChanged: (_) => onChanged(),
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 12,
+          ),
+        ),
+      );
 }
 
 // ─── Proveedor sheet ──────────────────────────────────────────────────────────

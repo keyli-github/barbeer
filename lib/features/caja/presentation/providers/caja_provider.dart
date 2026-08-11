@@ -13,6 +13,7 @@ class CajaState {
   final List<CajaSesion> historial;
   final List<CajaMovimiento> movimientos;
   final List<Map<String, dynamic>> sedes;
+  final Map<double, int> aperturaSugerida;
   final String? sedeId;
   final String? estadoFiltro;
   final String? tipoFiltro;
@@ -31,6 +32,7 @@ class CajaState {
     this.historial = const [],
     this.movimientos = const [],
     this.sedes = const [],
+    this.aperturaSugerida = const {},
     this.sedeId,
     this.estadoFiltro,
     this.tipoFiltro,
@@ -52,6 +54,7 @@ class CajaState {
     List<CajaSesion>? historial,
     List<CajaMovimiento>? movimientos,
     List<Map<String, dynamic>>? sedes,
+    Map<double, int>? aperturaSugerida,
     String? sedeId,
     String? estadoFiltro,
     bool clearEstadoFiltro = false,
@@ -71,6 +74,7 @@ class CajaState {
     historial: historial ?? this.historial,
     movimientos: movimientos ?? this.movimientos,
     sedes: sedes ?? this.sedes,
+    aperturaSugerida: aperturaSugerida ?? this.aperturaSugerida,
     sedeId: sedeId ?? this.sedeId,
     estadoFiltro: clearEstadoFiltro
         ? null
@@ -102,21 +106,24 @@ class CajaNotifier extends StateNotifier<CajaState> {
         sedes = await _repository.sedes();
         sedeId ??= sedes.isNotEmpty ? sedes.first['id'] as String? : null;
       }
-      final results = await Future.wait([
+      final results = await Future.wait<Object?>([
         if (sedeId != null) _repository.actual(sedeId: sedeId),
         _repository.historial(
           pagina: state.historialPagina,
           estado: state.estadoFiltro,
           sedeId: (_user?.isSuperAdmin ?? false) ? sedeId : null,
         ),
+        _loadUltimoCierre(sedeId),
       ]);
       final actual = sedeId == null ? null : results.first as CajaSesion?;
-      final page = results.last as CajaPage<CajaSesion>;
+      final page = results[results.length - 2] as CajaPage<CajaSesion>;
+      final aperturaSugerida = results.last as Map<double, int>;
       state = state.copyWith(
         isLoading: false,
         actual: actual,
         clearActual: actual == null,
         sedes: sedes,
+        aperturaSugerida: aperturaSugerida,
         sedeId: sedeId,
         historial: page.data,
         historialPagina: page.pagina,
@@ -126,6 +133,15 @@ class CajaNotifier extends StateNotifier<CajaState> {
       if (actual != null) await loadMovimientos(actual.id);
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
+    }
+  }
+
+  Future<Map<double, int>> _loadUltimoCierre(String? sedeId) async {
+    if (sedeId == null) return const {};
+    try {
+      return await _repository.ultimoCierre(sedeId: sedeId);
+    } catch (_) {
+      return const {};
     }
   }
 
@@ -177,42 +193,44 @@ class CajaNotifier extends StateNotifier<CajaState> {
     await _repository.abrir(cantidades, sedeId: state.sedeId);
   });
 
-  /// @deprecated Bloqueado por regla de negocio en V2 (retorna 403/422).
-  /// Conservado como referencia legacy — no se llama desde la UI V2.
-  Future<void> registrarMovimiento(Map<String, dynamic> data) async {
-    final id = state.actual?.id;
-    if (id == null) return;
-    await _action(() => _repository.registrarMovimiento(id, data));
-  }
-
-  Future<void> precuadre(double monto) async {
-    final id = state.actual?.id;
-    if (id == null) return;
-    await _action(() => _repository.precuadre(id, monto));
-  }
-
-  Future<void> cerrar(double monto, String? observaciones) async {
-    final id = state.actual?.id;
-    if (id == null) return;
-    await _action(
-      () => _repository.cerrar(id, monto, observaciones: observaciones),
-    );
-  }
-
-  /// Cierre forzado con ventas pendientes (ADMIN/SUPERADMIN).
-  Future<void> cerrarForzado(
-    double monto, {
-    required String motivoForzado,
-    String? observaciones,
+  Future<void> registrarMovimiento({
+    required String tipo,
+    required double monto,
+    required String concepto,
   }) async {
     final id = state.actual?.id;
     if (id == null) return;
     await _action(
-      () => _repository.cerrarForzado(
+      () => _repository.registrarMovimiento(
         id,
-        monto,
-        motivoForzado: motivoForzado,
+        tipo: tipo,
+        monto: monto,
+        concepto: concepto,
+      ),
+    );
+  }
+
+  Future<void> precuadre(Map<double, int> cantidades) async {
+    final id = state.actual?.id;
+    if (id == null) return;
+    await _action(() => _repository.precuadre(id, cantidades));
+  }
+
+  Future<void> cerrar(
+    Map<double, int> cantidades, {
+    String? observaciones,
+    bool forzarPendientes = false,
+    String? motivoForzado,
+  }) async {
+    final id = state.actual?.id;
+    if (id == null) return;
+    await _action(
+      () => _repository.cerrar(
+        id,
+        cantidades,
         observaciones: observaciones,
+        forzarPendientes: forzarPendientes,
+        motivoForzado: motivoForzado,
       ),
     );
   }

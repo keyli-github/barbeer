@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../data/models/producto.dart';
 import '../../data/repositories/productos_repository.dart';
 
@@ -68,10 +69,12 @@ class ProductosState {
 
 class ProductosNotifier extends StateNotifier<ProductosState> {
   final ProductosRepository _repository;
+  final String? _sedeId;
   Timer? _searchTimer;
   int _request = 0;
 
-  ProductosNotifier(this._repository) : super(const ProductosState()) {
+  ProductosNotifier(this._repository, this._sedeId)
+    : super(const ProductosState()) {
     load();
   }
 
@@ -90,6 +93,7 @@ class ProductosNotifier extends StateNotifier<ProductosState> {
           q: state.search,
           categoriaId: state.categoriaId,
           activo: state.activo,
+          sedeId: _sedeId,
         ),
         _repository.summary(),
       ]);
@@ -157,5 +161,8 @@ class ProductosNotifier extends StateNotifier<ProductosState> {
 
 final productosProvider =
     StateNotifierProvider<ProductosNotifier, ProductosState>(
-      (ref) => ProductosNotifier(ref.watch(productosRepositoryProvider)),
+      (ref) => ProductosNotifier(
+        ref.watch(productosRepositoryProvider),
+        ref.watch(globalSedeIdProvider),
+      ),
     );

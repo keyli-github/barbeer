@@ -8,5 +8,17 @@ class AppScrollBehavior extends MaterialScrollBehavior {
     BuildContext context,
     Widget child,
     ScrollableDetails details,
-  ) => child;
+  ) {
+    final platform = getPlatform(context);
+    final isDesktop =
+        platform == TargetPlatform.windows ||
+        platform == TargetPlatform.linux ||
+        platform == TargetPlatform.macOS;
+    if (!isDesktop) return child;
+    return Scrollbar(
+      controller: details.controller,
+      thumbVisibility: true,
+      child: child,
+    );
+  }
 }

@@ -16,7 +16,9 @@ String _fmt(double v) => FormatUtils.currency(v);
 
 /// Vista de creación de una nueva venta (catálogo + carrito).
 class NuevaVentaView extends ConsumerStatefulWidget {
-  const NuevaVentaView({super.key});
+  final Future<List<Producto>> Function()? productsLoader;
+
+  const NuevaVentaView({super.key, this.productsLoader});
   @override
   ConsumerState<NuevaVentaView> createState() => _NuevaVentaViewState();
 }
@@ -57,15 +59,20 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _errorProducts = null;
     });
     try {
-      final repo = ProductosRepository(ApiClient.instance);
-      final result = await repo.list(pagina: 1, limite: 100, activo: 'true');
+      final products = widget.productsLoader != null
+          ? await widget.productsLoader!()
+          : (await ProductosRepository(
+              ApiClient.instance,
+            ).list(pagina: 1, limite: 100, activo: 'true')).data;
+      if (!mounted) return;
       setState(() {
-        _productos = result.data
+        _productos = products
             .where((p) => p.disponiblePos && p.activo)
             .toList();
         _loadingProducts = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _loadingProducts = false;
         _errorProducts = 'No se pudieron cargar los productos';
@@ -239,14 +246,18 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   String _friendlySubmitError(Object e) {
     final s = e.toString();
-    if (s.contains('STOCK_INSUFICIENTE'))
+    if (s.contains('STOCK_INSUFICIENTE')) {
       return 'Stock insuficiente para algún producto';
-    if (s.contains('caja') || s.contains('CAJA'))
+    }
+    if (s.contains('caja') || s.contains('CAJA')) {
       return 'No hay caja abierta en esta sede';
-    if (s.contains('SESION_LEGACY'))
+    }
+    if (s.contains('SESION_LEGACY')) {
       return 'La caja actual es legacy. Ciérrela y abra una nueva.';
-    if (s.contains('SocketException') || s.contains('connection'))
+    }
+    if (s.contains('SocketException') || s.contains('connection')) {
       return 'Sin conexión al servidor';
+    }
     if (s.contains('409')) return 'Esta venta ya fue registrada anteriormente';
     if (s.contains('403')) return 'No tienes permiso para registrar ventas';
     return 'No se pudo registrar la venta. Intenta de nuevo.';
@@ -266,7 +277,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           error: _submitError,
           onConfirm: () async {
             await _submit();
-            if (_carrito.isEmpty && mounted) Navigator.of(ctx).pop();
+            if (_carrito.isEmpty && ctx.mounted) Navigator.of(ctx).pop();
           },
           onRetry: _retry,
           onClear: () {
@@ -296,7 +307,116 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   @override
   Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
+    return desktop ? _buildDesktop() : _buildMobile();
+  }
+
+  Widget _buildDesktop() {
+    return ColoredBox(
+      key: const Key('desktop-sales-layout'),
+      color: const Color(0xFFFAFAFA),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cartWidth = constraints.maxWidth < 900 ? 340.0 : 360.0;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: _buildDesktopCatalogPanel()),
+              const SizedBox(width: AppSpacing.md),
+              SizedBox(
+                width: cartWidth,
+                child: _DesktopCartPanel(
+                  items: _carrito,
+                  total: _total,
+                  submitting: _submitting,
+                  frozen: _frozen,
+                  error: _submitError,
+                  onConfirm: _submit,
+                  onRetry: _retry,
+                  onClear: _frozen ? _discardFrozen : _clearCart,
+                  onChangeQuantity: _changeQuantity,
+                  onRemove: _removeFromCart,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDesktopCatalogPanel() {
+    final status = _loadingProducts
+        ? 'Cargando...'
+        : _errorProducts != null
+        ? 'No disponible'
+        : '${_filteredProducts.length} disponibles';
+
+    return Container(
+      key: const Key('desktop-catalog-panel'),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Catálogo de productos',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      status,
+                      key: const Key('desktop-catalog-status'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                DSSearchField(
+                  controller: _searchCtrl,
+                  placeholder: 'Buscar producto por nombre o código...',
+                  onChanged: (_) => setState(() {}),
+                  onClear: () {
+                    _searchCtrl.clear();
+                    setState(() {});
+                  },
+                ),
+              ],
+            ),
+          ),
+          _buildPaymentNote(),
+          const Divider(height: 1, color: AppColors.border),
+          Expanded(child: _buildCatalog(desktop: true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobile() {
     return Column(
+      key: const Key('mobile-sales-layout'),
       children: [
         // ── Buscador ───────────────────────────────────────────────────
         Container(
@@ -315,80 +435,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         ),
 
         // ── Nota de pago ───────────────────────────────────────────────
-        Container(
-          color: AppColors.brandSurface,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 14,
-                color: AppColors.brand,
-              ),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: Text(
-                  'El método de pago se clasifica después en Caja / Conciliación.',
-                  style: TextStyle(fontSize: 11, color: AppColors.brandDark),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _buildPaymentNote(),
 
         // ── Catálogo ───────────────────────────────────────────────────
-        Expanded(
-          child: _loadingProducts
-              ? const DSSkeletonList(count: 6)
-              : _errorProducts != null
-              ? DSErrorState(message: _errorProducts, onRetry: _loadProducts)
-              : _filteredProducts.isEmpty
-              ? DSEmptyState(
-                  icon: Icons.liquor_outlined,
-                  title: _searchCtrl.text.isNotEmpty
-                      ? 'Sin resultados'
-                      : 'Sin productos',
-                  message: _searchCtrl.text.isNotEmpty
-                      ? 'Sin productos para "${_searchCtrl.text}"'
-                      : 'No hay productos disponibles para vender.',
-                  actionLabel: 'Recargar',
-                  onAction: _loadProducts,
-                )
-              : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    100,
-                  ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.78,
-                    crossAxisSpacing: AppSpacing.sm,
-                    mainAxisSpacing: AppSpacing.sm,
-                  ),
-                  itemCount: _filteredProducts.length,
-                  itemBuilder: (_, i) {
-                    final p = _filteredProducts[i];
-                    final qty = _cartQty(p.id);
-                    return _ProductoCard(
-                      producto: p,
-                      qty: qty,
-                      frozen: _frozen,
-                      onAdd: () => _addToCart(p),
-                      onIncrease: () => _changeQuantity(p.id, 1),
-                      onDecrease: () => _changeQuantity(p.id, -1),
-                    );
-                  },
-                ),
-        ),
+        Expanded(child: _buildCatalog(desktop: false)),
 
         // ── Barra de carrito ───────────────────────────────────────────
         if (_carrito.isNotEmpty)
           _CartBar(
+            key: const Key('mobile-cart-bar'),
             count: _carrito.fold(0, (s, i) => s + i.cantidad),
             total: _total,
             frozen: _frozen,
@@ -397,20 +452,115 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       ],
     );
   }
+
+  Widget _buildPaymentNote() {
+    return Container(
+      color: AppColors.brandSurface,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, size: 14, color: AppColors.brand),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'El método de pago se clasifica después en Caja / Conciliación.',
+              style: TextStyle(fontSize: 11, color: AppColors.brandDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCatalog({required bool desktop}) {
+    if (_loadingProducts) return const DSSkeletonList(count: 6);
+    if (_errorProducts != null) {
+      return DSErrorState(message: _errorProducts, onRetry: _loadProducts);
+    }
+
+    final products = _filteredProducts;
+    if (products.isEmpty) {
+      return DSEmptyState(
+        icon: Icons.liquor_outlined,
+        title: _searchCtrl.text.isNotEmpty ? 'Sin resultados' : 'Sin productos',
+        message: _searchCtrl.text.isNotEmpty
+            ? 'Sin productos para "${_searchCtrl.text}"'
+            : 'No hay productos disponibles para vender.',
+        actionLabel: 'Recargar',
+        onAction: _loadProducts,
+      );
+    }
+
+    if (desktop) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = (constraints.maxWidth / 300).floor().clamp(2, 3);
+          return GridView.builder(
+            key: const Key('desktop-catalog-grid'),
+            padding: const EdgeInsets.all(AppSpacing.md),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisExtent: 148,
+              crossAxisSpacing: AppSpacing.sm,
+              mainAxisSpacing: AppSpacing.sm,
+            ),
+            itemCount: products.length,
+            itemBuilder: (_, i) =>
+                _buildProductCard(products[i], desktop: true),
+          );
+        },
+      );
+    }
+
+    return GridView.builder(
+      key: const Key('mobile-catalog-grid'),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        100,
+      ),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        childAspectRatio: 0.78,
+        crossAxisSpacing: AppSpacing.sm,
+        mainAxisSpacing: AppSpacing.sm,
+      ),
+      itemCount: products.length,
+      itemBuilder: (_, i) => _buildProductCard(products[i], desktop: false),
+    );
+  }
+
+  Widget _buildProductCard(Producto product, {required bool desktop}) {
+    return _ProductoCard(
+      producto: product,
+      qty: _cartQty(product.id),
+      frozen: _frozen,
+      desktop: desktop,
+      onAdd: () => _addToCart(product),
+      onIncrease: () => _changeQuantity(product.id, 1),
+      onDecrease: () => _changeQuantity(product.id, -1),
+    );
+  }
 }
 
 // --- Tarjeta de producto para nueva venta ------------------------------------
 
 class _ProductoCard extends StatelessWidget {
-  final dynamic producto;
+  final Producto producto;
   final int qty;
   final bool frozen;
+  final bool desktop;
   final VoidCallback onAdd, onIncrease, onDecrease;
 
   const _ProductoCard({
     required this.producto,
     required this.qty,
     required this.frozen,
+    required this.desktop,
     required this.onAdd,
     required this.onIncrease,
     required this.onDecrease,
@@ -418,22 +568,100 @@ class _ProductoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stock = producto.stockDisponible as int?;
+    return desktop ? _buildDesktop() : _buildMobile();
+  }
+
+  Widget _buildDesktop() {
+    final stock = producto.stockDisponible;
     final agotado = stock != null && stock <= 0;
     final stockBajo = stock != null && stock > 0 && stock <= 5;
 
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
-        border: Border.all(
-          color: qty > 0
-              ? AppColors.primary.withValues(alpha: 0.3)
-              : AppColors.border,
-          width: qty > 0 ? 1.5 : 0.75,
-        ),
-        boxShadow: AppShadows.card,
+      key: ValueKey('desktop-product-${producto.id}'),
+      decoration: _decoration,
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        children: [
+          Expanded(
+            child: DSProductImage(
+              imageUrl: producto.imageUrl,
+              productName: producto.nombre,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              radius: 0,
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    producto.codigo,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    producto.nombre,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          FormatUtils.currency(producto.precioVenta),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                      if (stockBajo)
+                        Text(
+                          '$stock disp.',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  _buildQuantityControl(agotado: agotado, stock: stock),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildMobile() {
+    final stock = producto.stockDisponible;
+    final agotado = stock != null && stock <= 0;
+    final stockBajo = stock != null && stock > 0 && stock <= 5;
+
+    return Container(
+      decoration: _decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -445,8 +673,8 @@ class _ProductoCard extends StatelessWidget {
                 top: Radius.circular(AppSpacing.radiusLG),
               ),
               child: DSProductImage(
-                imageUrl: null,
-                productName: producto.nombre as String,
+                imageUrl: producto.imageUrl,
+                productName: producto.nombre,
                 fit: BoxFit.cover,
                 width: double.infinity,
               ),
@@ -461,7 +689,7 @@ class _ProductoCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    producto.nombre as String,
+                    producto.nombre,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -474,7 +702,7 @@ class _ProductoCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        FormatUtils.currency(producto.precioVenta as double),
+                        FormatUtils.currency(producto.precioVenta),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
@@ -504,59 +732,7 @@ class _ProductoCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xxs),
-                  // Controles de cantidad
-                  if (qty == 0 || agotado)
-                    SizedBox(
-                      width: double.infinity,
-                      height: 36,
-                      child: TextButton(
-                        onPressed: (agotado || frozen) ? null : onAdd,
-                        style: TextButton.styleFrom(
-                          backgroundColor: agotado
-                              ? AppColors.surfaceAlt
-                              : AppColors.primarySurface,
-                          foregroundColor: agotado
-                              ? AppColors.textTertiary
-                              : AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Text(
-                          agotado ? 'Sin stock' : '+ Agregar',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _QtyBtn(
-                          icon: Icons.remove_rounded,
-                          onTap: frozen ? null : onDecrease,
-                        ),
-                        Text(
-                          '$qty',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        _QtyBtn(
-                          icon: Icons.add_rounded,
-                          onTap: (frozen || (stock != null && qty >= stock))
-                              ? null
-                              : onIncrease,
-                          color: AppColors.primary,
-                        ),
-                      ],
-                    ),
+                  _buildQuantityControl(agotado: agotado, stock: stock),
                 ],
               ),
             ),
@@ -565,13 +741,81 @@ class _ProductoCard extends StatelessWidget {
       ),
     );
   }
+
+  BoxDecoration get _decoration => BoxDecoration(
+    color: AppColors.surface,
+    borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+    border: Border.all(
+      color: qty > 0
+          ? AppColors.primary.withValues(alpha: 0.3)
+          : AppColors.border,
+      width: qty > 0 ? 1.5 : 0.75,
+    ),
+    boxShadow: AppShadows.card,
+  );
+
+  Widget _buildQuantityControl({required bool agotado, required int? stock}) {
+    if (qty == 0 || agotado) {
+      return SizedBox(
+        width: double.infinity,
+        height: desktop ? 32 : 36,
+        child: TextButton(
+          onPressed: (agotado || frozen) ? null : onAdd,
+          style: TextButton.styleFrom(
+            backgroundColor: agotado
+                ? AppColors.surfaceAlt
+                : AppColors.primarySurface,
+            foregroundColor: agotado
+                ? AppColors.textTertiary
+                : AppColors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            agotado ? 'Sin stock' : '+ Agregar',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _QtyBtn(
+          icon: Icons.remove_rounded,
+          onTap: frozen ? null : onDecrease,
+          size: desktop ? 28 : 34,
+        ),
+        Text(
+          '$qty',
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: AppColors.primary,
+          ),
+        ),
+        _QtyBtn(
+          icon: Icons.add_rounded,
+          onTap: (frozen || (stock != null && qty >= stock))
+              ? null
+              : onIncrease,
+          color: AppColors.primary,
+          size: desktop ? 28 : 34,
+        ),
+      ],
+    );
+  }
 }
 
 class _QtyBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final Color? color;
-  const _QtyBtn({required this.icon, this.onTap, this.color});
+  final double size;
+  const _QtyBtn({required this.icon, this.onTap, this.color, this.size = 34});
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: () {
@@ -581,8 +825,8 @@ class _QtyBtn extends StatelessWidget {
       }
     },
     child: Container(
-      width: 34,
-      height: 34,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: (color ?? AppColors.textTertiary).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -598,6 +842,441 @@ class _QtyBtn extends StatelessWidget {
   );
 }
 
+class _DesktopCartPanel extends StatelessWidget {
+  final List<CarritoItem> items;
+  final double total;
+  final bool submitting;
+  final bool frozen;
+  final String? error;
+  final VoidCallback onConfirm;
+  final VoidCallback onRetry;
+  final VoidCallback onClear;
+  final void Function(String productoId, int delta) onChangeQuantity;
+  final void Function(String productoId) onRemove;
+
+  const _DesktopCartPanel({
+    required this.items,
+    required this.total,
+    required this.submitting,
+    required this.frozen,
+    required this.error,
+    required this.onConfirm,
+    required this.onRetry,
+    required this.onClear,
+    required this.onChangeQuantity,
+    required this.onRemove,
+  });
+
+  int get _itemCount => items.fold(0, (sum, item) => sum + item.cantidad);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('desktop-cart-panel'),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.xs,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: frozen
+                        ? AppColors.warningLight
+                        : AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+                  ),
+                  child: Icon(
+                    frozen
+                        ? Icons.sync_problem_rounded
+                        : Icons.shopping_cart_rounded,
+                    size: 19,
+                    color: frozen ? AppColors.warning : AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Venta actual',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        _itemCount == 1
+                            ? '1 producto seleccionado'
+                            : '$_itemCount productos seleccionados',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (items.isNotEmpty)
+                  TextButton(
+                    key: const Key('desktop-cart-clear'),
+                    onPressed: submitting ? null : onClear,
+                    child: Text(
+                      frozen ? 'Descartar intento' : 'Limpiar',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: items.isEmpty
+                ? const _DesktopEmptyCart()
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) =>
+                        const Divider(height: 1, color: AppColors.divider),
+                    itemBuilder: (_, index) {
+                      final item = items[index];
+                      return _DesktopCartItem(
+                        key: ValueKey('desktop-cart-item-${item.productoId}'),
+                        item: item,
+                        frozen: frozen,
+                        onDecrease: () => onChangeQuantity(item.productoId, -1),
+                        onIncrease: () => onChangeQuantity(item.productoId, 1),
+                        onRemove: () => onRemove(item.productoId),
+                      );
+                    },
+                  ),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              children: [
+                if (error != null) ...[
+                  Container(
+                    key: const Key('desktop-cart-error'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: frozen
+                          ? AppColors.warningLight
+                          : AppColors.errorLight,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+                      border: Border.all(
+                        color: frozen
+                            ? AppColors.warningBorder
+                            : AppColors.errorBorder,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          error!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: frozen ? AppColors.warning : AppColors.error,
+                          ),
+                        ),
+                        if (frozen) ...[
+                          const SizedBox(height: AppSpacing.xxs),
+                          const Text(
+                            'Reintenta sin modificar el carrito para conservar la operación.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.xs),
+                        TextButton.icon(
+                          key: const Key('desktop-cart-retry'),
+                          onPressed: submitting ? null : onRetry,
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            foregroundColor: frozen
+                                ? AppColors.warning
+                                : AppColors.error,
+                          ),
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      _fmt(total),
+                      key: const Key('desktop-cart-total'),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'El método de pago se registra después en caja.',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                SizedBox(
+                  width: double.infinity,
+                  height: AppSpacing.buttonHeight,
+                  child: ElevatedButton(
+                    key: const Key('desktop-cart-confirm'),
+                    onPressed: items.isEmpty || submitting ? null : onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.brand,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.border,
+                      disabledForegroundColor: AppColors.textTertiary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusLG,
+                        ),
+                      ),
+                    ),
+                    child: submitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'CONFIRMAR VENTA',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopEmptyCart extends StatelessWidget {
+  const _DesktopEmptyCart();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
+              ),
+              child: const Icon(
+                Icons.add_shopping_cart_rounded,
+                size: 28,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Tu carrito está vacío',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            const Text(
+              'Selecciona productos del catálogo para comenzar.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopCartItem extends StatelessWidget {
+  final CarritoItem item;
+  final bool frozen;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+  final VoidCallback onRemove;
+
+  const _DesktopCartItem({
+    super.key,
+    required this.item,
+    required this.frozen,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.nombre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxxs),
+                    Text(
+                      item.codigo,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: ValueKey('desktop-cart-remove-${item.productoId}'),
+                tooltip: 'Quitar producto',
+                onPressed: frozen ? null : onRemove,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.close_rounded, size: 17),
+                color: AppColors.textTertiary,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              _QtyBtn(
+                icon: Icons.remove_rounded,
+                onTap: frozen ? null : onDecrease,
+                size: 28,
+              ),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  '${item.cantidad}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              _QtyBtn(
+                icon: Icons.add_rounded,
+                onTap: frozen ? null : onIncrease,
+                color: AppColors.primary,
+                size: 28,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  '${_fmt(item.precio)} × ${item.cantidad}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                _fmt(item.subtotal),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // --- Barra del carrito --------------------------------------------------------
 
 class _CartBar extends StatelessWidget {
@@ -607,6 +1286,7 @@ class _CartBar extends StatelessWidget {
   final VoidCallback onTap;
 
   const _CartBar({
+    super.key,
     required this.count,
     required this.total,
     required this.frozen,

@@ -47,11 +47,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('keeps the mobile composition on a wide screen', (tester) async {
-    await pumpLogin(tester, const Size(1024, 1200));
+  testWidgets('uses the two-column composition on a wide screen', (
+    tester,
+  ) async {
+    await pumpLogin(tester, const Size(1280, 800));
 
-    expect(tester.getSize(find.byKey(const Key('login-hero'))).width, 600);
-    expect(tester.getSize(find.byKey(const Key('login-panel'))).width, 600);
+    expect(find.byKey(const Key('login-desktop-composition')), findsOneWidget);
+    expect(tester.getSize(find.byKey(const Key('login-hero'))).width, 640);
+    expect(
+      tester.getSize(find.byKey(const Key('login-desktop-panel'))).width,
+      640,
+    );
+    expect(find.byKey(const Key('login-panel')), findsNothing);
+    expect(find.text('Sistema interno\nde gestión'), findsOneWidget);
+    expect(find.text('SOLO PERSONAL AUTORIZADO'), findsOneWidget);
     expect(find.text('Caja y reportes'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

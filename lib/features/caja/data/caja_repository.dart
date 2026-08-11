@@ -1,6 +1,64 @@
 import '../../../core/network/api_client.dart';
 
-const cajaDenominaciones = <double>[200, 100, 50, 20, 10, 5, 2, 1, 0.2, 0.1];
+const cajaDenominaciones = <double>[200, 100, 50, 20, 10, 5, 2, 1, 0.5];
+
+List<Map<String, dynamic>> cajaDenominacionesPayload(
+  Map<double, int> cantidades,
+) => cajaDenominaciones
+    .map(
+      (denominacion) => {
+        'denominacion': denominacion,
+        'cantidad': cantidades[denominacion] ?? 0,
+      },
+    )
+    .toList();
+
+double cajaDenominacionesTotal(Map<double, int> cantidades) =>
+    cantidades.entries.fold(0, (total, item) => total + item.key * item.value);
+
+Map<double, int> cajaCantidadesFromResponse(dynamic data) {
+  if (data is! List) return const {};
+  final cantidades = <double, int>{};
+  for (final item in data.whereType<Map>()) {
+    final denominacion = (item['denominacion'] as num?)?.toDouble();
+    final cantidad = (item['cantidad'] as num?)?.toInt();
+    if (denominacion != null &&
+        cantidad != null &&
+        cajaDenominaciones.contains(denominacion)) {
+      cantidades[denominacion] = cantidad;
+    }
+  }
+  return cantidades;
+}
+
+Map<String, dynamic> cajaMovimientoPayload({
+  required String tipo,
+  required double monto,
+  required String concepto,
+}) => {
+  'tipo': tipo,
+  'origen': 'MANUAL',
+  'medioPago': 'EFECTIVO',
+  'monto': monto,
+  'concepto': concepto.trim(),
+};
+
+Map<String, dynamic> cajaCierrePayload(
+  Map<double, int> cantidades, {
+  String? observaciones,
+  bool forzarPendientes = false,
+  String? motivoForzado,
+}) {
+  final notas = observaciones?.trim();
+  final motivo = motivoForzado?.trim();
+  return {
+    'denominaciones': cajaDenominacionesPayload(cantidades),
+    if (notas?.isNotEmpty ?? false) 'observaciones': notas,
+    if (forzarPendientes) 'forzarPendientes': true,
+    if (forzarPendientes && (motivo?.isNotEmpty ?? false))
+      'motivoForzado': motivo,
+  };
+}
 
 // ── Resumen V2 ──────────────────────────────────────────────────────────────
 
@@ -116,6 +174,7 @@ class CajaSesion {
   final String sedeId;
   final String sede;
   final double montoApertura;
+  final double? saldoActual;
   final DateTime abiertaAt;
   final DateTime? cerradaAt;
   final DateTime? precuadreAt;
@@ -127,6 +186,10 @@ class CajaSesion {
   final double? diferenciaCierre;
   final String? observacionesCierre;
   final String usuarioApertura;
+  final String? usuarioPrecuadre;
+  final String? usuarioCierre;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final CajaResumen? resumen;
   final List<Map<String, dynamic>> denominaciones;
 
@@ -139,6 +202,7 @@ class CajaSesion {
     required this.sedeId,
     required this.sede,
     required this.montoApertura,
+    this.saldoActual,
     required this.abiertaAt,
     required this.usuarioApertura,
     required this.denominaciones,
@@ -151,6 +215,10 @@ class CajaSesion {
     this.saldoEsperadoCierre,
     this.diferenciaCierre,
     this.observacionesCierre,
+    this.usuarioPrecuadre,
+    this.usuarioCierre,
+    this.createdAt,
+    this.updatedAt,
     this.resumen,
   });
 
@@ -165,6 +233,7 @@ class CajaSesion {
         ? (json['sede'] as Map)['nombre'] as String? ?? ''
         : json['sede'] as String? ?? '',
     montoApertura: (json['montoApertura'] as num?)?.toDouble() ?? 0,
+    saldoActual: _number(json['saldoActual']),
     // abiertaAt puede ser null en sesiones muy antiguas — fallback a epoch
     abiertaAt: json['abiertaAt'] is String
         ? DateTime.tryParse(json['abiertaAt'] as String) ?? DateTime(2020)
@@ -180,9 +249,11 @@ class CajaSesion {
     saldoEsperadoCierre: (json['saldoEsperadoCierre'] as num?)?.toDouble(),
     diferenciaCierre: (json['diferenciaCierre'] as num?)?.toDouble(),
     observacionesCierre: json['observacionesCierre'] as String?,
-    usuarioApertura: json['usuarioApertura'] is Map
-        ? (json['usuarioApertura'] as Map)['username'] as String? ?? ''
-        : json['usuarioApertura'] as String? ?? '',
+    usuarioApertura: _actor(json['usuarioApertura']) ?? '',
+    usuarioPrecuadre: _actor(json['usuarioPrecuadre']),
+    usuarioCierre: _actor(json['usuarioCierre']),
+    createdAt: _date(json['createdAt']),
+    updatedAt: _date(json['updatedAt']),
     resumen: json['resumen'] is Map
         ? CajaResumen.fromJson(
             Map<String, dynamic>.from(json['resumen'] as Map),
@@ -199,6 +270,18 @@ class CajaSesion {
   static DateTime? _date(dynamic value) =>
       value is String ? DateTime.tryParse(value) : null;
 
+  static double? _number(dynamic value) => switch (value) {
+    num number => number.toDouble(),
+    String text => double.tryParse(text),
+    _ => null,
+  };
+
+  static String? _actor(dynamic value) => switch (value) {
+    Map actor => actor['username']?.toString(),
+    String username when username.isNotEmpty => username,
+    _ => null,
+  };
+
   bool get isV2 => version == 'V2';
   bool get isAbierta => estado == 'ABIERTA';
   bool get isCerrada => estado == 'CERRADA';
@@ -208,12 +291,15 @@ class CajaSesion {
 
 class CajaMovimiento {
   final String id;
+  final String cajaSesionId;
+  final String sedeId;
   final String tipo;
   final String origen;
   final String? medioPago; // null en V2
   final String concepto;
   final double monto;
   final String? ventaId;
+  final String? conciliacionId;
   final String? referencia;
   final String? comprobante;
   final String usuario;
@@ -221,12 +307,15 @@ class CajaMovimiento {
 
   const CajaMovimiento({
     required this.id,
+    this.cajaSesionId = '',
+    this.sedeId = '',
     required this.tipo,
     required this.origen,
     this.medioPago,
     required this.concepto,
     required this.monto,
     this.ventaId,
+    this.conciliacionId,
     required this.usuario,
     required this.createdAt,
     this.referencia,
@@ -235,17 +324,22 @@ class CajaMovimiento {
 
   factory CajaMovimiento.fromJson(Map<String, dynamic> json) => CajaMovimiento(
     id: json['id'] as String? ?? '',
+    cajaSesionId: json['cajaSesionId'] as String? ?? '',
+    sedeId: json['sedeId'] as String? ?? '',
     tipo: json['tipo'] as String? ?? '',
     origen: json['origen'] as String? ?? '',
     medioPago: json['medioPago'] as String?,
     concepto: json['concepto'] as String? ?? '',
     monto: (json['monto'] as num?)?.toDouble() ?? 0,
     ventaId: json['ventaId'] as String?,
+    conciliacionId: json['conciliacionId'] as String?,
     referencia: json['referencia'] as String?,
     comprobante: json['comprobante'] as String?,
-    usuario: json['usuario'] is Map
-        ? (json['usuario'] as Map)['username'] as String? ?? ''
-        : json['usuario'] as String? ?? '',
+    usuario: switch (json['usuario']) {
+      Map actor => actor['username']?.toString() ?? '',
+      String username => username,
+      _ => '',
+    },
     createdAt: json['createdAt'] is String
         ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime(2020)
         : DateTime(2020),
@@ -301,6 +395,14 @@ class CajaRepository {
     );
     if (response.data == null || response.data is! Map) return null;
     return CajaSesion.fromJson(_toMap(response.data));
+  }
+
+  Future<Map<double, int>> ultimoCierre({String? sedeId}) async {
+    final response = await _api.get(
+      '/caja/ultimo-cierre',
+      queryParameters: {'sedeId': ?sedeId},
+    );
+    return cajaCantidadesFromResponse(response.data);
   }
 
   Future<CajaPage<CajaSesion>> historial({
@@ -365,69 +467,48 @@ class CajaRepository {
     final response = await _api.post(
       '/caja/apertura',
       data: {
-        'denominaciones': cajaDenominaciones
-            .map(
-              (value) => {
-                'denominacion': value,
-                'cantidad': cantidades[value] ?? 0,
-              },
-            )
-            .toList(),
+        'denominaciones': cajaDenominacionesPayload(cantidades),
         'sedeId': ?sedeId,
       },
     );
     return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 
-  /// @deprecated Bloqueado por regla de negocio en V2. Retorna 403/422.
-  Future<void> registrarMovimiento(String id, Map<String, dynamic> data) async {
-    await _api.post('/caja/$id/movimientos', data: data);
+  Future<void> registrarMovimiento(
+    String id, {
+    required String tipo,
+    required double monto,
+    required String concepto,
+  }) async {
+    await _api.post(
+      '/caja/$id/movimientos',
+      data: cajaMovimientoPayload(tipo: tipo, monto: monto, concepto: concepto),
+    );
   }
 
-  /// Registra precuadre con el monto declarado.
-  Future<CajaSesion> precuadre(String id, double montoDeclarado) async {
+  Future<CajaSesion> precuadre(String id, Map<double, int> cantidades) async {
     final response = await _api.post(
       '/caja/$id/precuadre',
-      data: {'montoDeclarado': montoDeclarado},
+      data: {'denominaciones': cajaDenominacionesPayload(cantidades)},
     );
     return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
 
-  /// Cierre normal (sin ventas pendientes).
-  /// Para cierre forzado usar [cerrarForzado].
   Future<CajaSesion> cerrar(
     String id,
-    double montoDeclarado, {
+    Map<double, int> cantidades, {
     String? observaciones,
+    bool forzarPendientes = false,
+    String? motivoForzado,
   }) async {
     final response = await _api.post(
       '/caja/$id/cierre',
-      data: {
-        'montoDeclarado': montoDeclarado,
-        if (observaciones?.trim().isNotEmpty ?? false)
-          'observaciones': observaciones!.trim(),
-      },
-    );
-    return CajaSesion.fromJson(CajaRepository._toMap(response.data));
-  }
-
-  /// Cierre forzado con ventas pendientes (ADMIN/SUPERADMIN).
-  /// Requiere permiso caja:forzar-cierre.
-  Future<CajaSesion> cerrarForzado(
-    String id,
-    double montoDeclarado, {
-    required String motivoForzado,
-    String? observaciones,
-  }) async {
-    final response = await _api.post(
-      '/caja/$id/cierre',
-      data: {
-        'montoDeclarado': montoDeclarado,
-        'forzarPendientes': true,
-        'motivoForzado': motivoForzado.trim(),
-        if (observaciones?.trim().isNotEmpty ?? false)
-          'observaciones': observaciones!.trim(),
-      },
+      data: cajaCierrePayload(
+        cantidades,
+        observaciones: observaciones,
+        forzarPendientes: forzarPendientes,
+        motivoForzado: motivoForzado,
+      ),
     );
     return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }

@@ -29,6 +29,7 @@ void main() {
         _makeUser(
           rol: 'ADMIN',
           permisos: [
+            'etiquetas:leer',
             'etiquetas:crear',
             'etiquetas:editar',
             'etiquetas:desactivar',
@@ -43,6 +44,7 @@ void main() {
         _makeUser(
           rol: 'SUPERADMIN',
           permisos: [
+            'etiquetas:leer',
             'etiquetas:crear',
             'etiquetas:editar',
             'etiquetas:desactivar',
@@ -52,15 +54,14 @@ void main() {
       expect(auth.canAccess('/etiquetas'), isTrue);
     });
 
-    test('3. CAJERO NO ve la pantalla administrativa', () {
+    test('3. CAJERO puede consultar etiquetas con etiquetas:leer', () {
       final auth = _authWith(
         _makeUser(
           rol: 'CAJERO',
           permisos: ['etiquetas:leer', 'ventas:leer', 'ventas:conciliar'],
         ),
       );
-      // etiquetas:leer NO es suficiente para acceder a /etiquetas (requiere etiquetas:crear)
-      expect(auth.canAccess('/etiquetas'), isFalse);
+      expect(auth.canAccess('/etiquetas'), isTrue);
     });
 
     test('4. VENDEDORA NO ve la pantalla de etiquetas', () {

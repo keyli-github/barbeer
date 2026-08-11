@@ -1,30 +1,65 @@
+import 'dart:async';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_header.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _pollTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => ref.read(dashboardProvider.notifier).load(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(dashboardProvider.notifier).load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final data = ref.watch(dashboardProvider);
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: desktop ? const Color(0xFFFAFAFA) : Colors.white,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 120),
+          padding: EdgeInsets.only(bottom: desktop ? 32 : 120),
           children: [
             const SizedBox(height: 8),
             // ── Sede ──
@@ -33,6 +68,11 @@ class DashboardScreen extends ConsumerWidget {
               child: _Sede(data: data, ref: ref, auth: auth),
             ),
             const SizedBox(height: 14),
+            if (data.errors.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                child: _DashboardErrors(errors: data.errors),
+              ),
             // ── KPIs ──
             if (!data.loading)
               Padding(
@@ -73,9 +113,12 @@ class _Sede extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nombre = data.selectedSede?.nombre ?? auth.user?.sede ?? 'Sin sede';
+    final nombre =
+        data.selectedSedeId == null && auth.user?.isSuperAdmin == true
+        ? 'Todas las sedes'
+        : data.selectedSede?.nombre ?? auth.user?.sede ?? 'Sin sede';
     final abierto = data.cajaActual?.isAbierta ?? false;
-    final code = data.selectedSede?.codigo ?? '';
+    final code = data.selectedSede?.codigoSede ?? '';
 
     return GestureDetector(
       onTap: canSelect ? () => _pick(context) : null,
@@ -233,7 +276,7 @@ class _Sede extends StatelessWidget {
                     )
                   : null,
               onTap: () {
-                ref.read(dashboardProvider.notifier).selectSede(null);
+                ref.read(globalSedeIdProvider.notifier).select(null);
                 Navigator.pop(ctx);
               },
             ),
@@ -241,7 +284,10 @@ class _Sede extends StatelessWidget {
               (s) => ListTile(
                 dense: true,
                 title: Text(s.nombre),
-                subtitle: Text(s.codigo, style: const TextStyle(fontSize: 11)),
+                subtitle: Text(
+                  s.codigoSede,
+                  style: const TextStyle(fontSize: 11),
+                ),
                 trailing: data.selectedSedeId == s.id
                     ? const Icon(
                         Icons.check_rounded,
@@ -250,7 +296,7 @@ class _Sede extends StatelessWidget {
                       )
                     : null,
                 onTap: () {
-                  ref.read(dashboardProvider.notifier).selectSede(s.id);
+                  ref.read(globalSedeIdProvider.notifier).select(s.id);
                   Navigator.pop(ctx);
                 },
               ),
@@ -273,6 +319,10 @@ class _Kpis extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_KD>[];
+    String value(String key, String loaded) =>
+        data.hasError(key) ? '—' : loaded;
+    String detail(String key, String loaded) =>
+        data.hasError(key) ? 'No disponible' : loaded;
     if (auth.hasPermission('ventas:leer') ||
         auth.hasPermission('ventas:leer-propias')) {
       final p = data.variacionVsAyer;
@@ -282,30 +332,75 @@ class _Kpis extends StatelessWidget {
           const Color(0xFF2563EB),
           const Color(0xFFEFF6FF),
           'Ventas del día',
-          FormatUtils.currency(data.ventasHoy),
-          p != 0
-              ? '↑ ${p.abs().toStringAsFixed(1)}% vs ayer'
-              : '${data.ventasCountHoy} ventas',
-          p >= 0,
+          value('ventas', FormatUtils.currency(data.ventasHoy)),
+          detail(
+            'ventas',
+            p != 0
+                ? '↑ ${p.abs().toStringAsFixed(1)}% vs ayer'
+                : '${data.ventasCountHoy} ventas',
+          ),
+          !data.hasError('ventas') && p >= 0,
           '/ventas',
         ),
       );
     }
     if (auth.hasPermission('caja:leer')) {
+      final caja = data.cajaActual;
+      final expectedCash = caja?.resumen?.efectivoEsperado;
+      final netSales = caja?.resumen?.v2?.totalVentasNeto;
+      final allSedes =
+          auth.user?.isSuperAdmin == true && data.selectedSedeId == null;
       items.add(
         _KD(
           Icons.account_balance_wallet_rounded,
           const Color(0xFFFF9500),
           const Color(0xFFFFF8EE),
           'Caja activa',
-          data.cajaActual?.isAbierta == true
-              ? FormatUtils.currency(data.cajaActual!.montoApertura)
+          data.hasError('caja')
+              ? '—'
+              : allSedes
+              ? 'Selecciona sede'
+              : caja?.isAbierta == true
+              ? FormatUtils.currency(expectedCash ?? caja!.montoApertura)
               : 'Cerrada',
-          data.cajaActual?.isAbierta == true
-              ? 'En ${data.cajaAperturas} apertura${data.cajaAperturas != 1 ? 's' : ''}'
-              : 'Sin turno',
-          data.cajaActual?.isAbierta == true,
+          detail(
+            'caja',
+            allSedes
+                ? 'Requiere una sede concreta'
+                : caja?.isAbierta == true
+                ? '${FormatUtils.currency(netSales ?? 0)} ventas netas'
+                : 'Sin turno abierto',
+          ),
+          caja?.isAbierta == true && !data.hasError('caja'),
           '/caja',
+        ),
+      );
+    }
+    if (auth.hasPermission('productos:leer')) {
+      items.add(
+        _KD(
+          Icons.liquor_rounded,
+          AppColors.primary,
+          AppColors.primarySurface,
+          'Productos',
+          value('productos', '${data.productos?.total ?? 0}'),
+          detail('productos', '${data.productos?.activos ?? 0} activos'),
+          !data.hasError('productos'),
+          '/productos',
+        ),
+      );
+    }
+    if (auth.hasPermission('categorias:leer')) {
+      items.add(
+        _KD(
+          Icons.category_rounded,
+          const Color(0xFF7C3AED),
+          const Color(0xFFF5F3FF),
+          'Categorías',
+          value('categorias', '${data.categoriasTotal ?? 0}'),
+          detail('categorias', 'Catálogo global'),
+          !data.hasError('categorias'),
+          '/categorias',
         ),
       );
     }
@@ -316,23 +411,40 @@ class _Kpis extends StatelessWidget {
           data.stockBajo > 0 ? AppColors.error : AppColors.success,
           data.stockBajo > 0 ? AppColors.errorLight : AppColors.successLight,
           'Stock bajo',
-          '${data.stockBajo}',
-          data.stockBajo > 0 ? 'Ver productos' : 'Todo OK',
-          data.stockBajo == 0,
+          value('inventario', '${data.inventario?.totalItems ?? 0}'),
+          detail('inventario', '${data.stockBajo} con alerta'),
+          !data.hasError('inventario') && data.stockBajo == 0,
           '/inventario',
         ),
       );
     }
-    if (auth.hasPermission('establecimientos:leer') && data.sedesTotal > 0) {
+    if (auth.hasPermission('kardex:leer')) {
+      items.add(
+        _KD(
+          Icons.swap_vert_rounded,
+          const Color(0xFF0284C7),
+          const Color(0xFFF0F9FF),
+          'Kardex',
+          value('kardex', '${data.kardex?.totalMovimientos ?? 0}'),
+          detail(
+            'kardex',
+            '${data.kardex?.entradas ?? 0} ent · ${data.kardex?.salidas ?? 0} sal',
+          ),
+          !data.hasError('kardex'),
+          '/kardex',
+        ),
+      );
+    }
+    if (auth.hasPermission('establecimientos:leer')) {
       items.add(
         _KD(
           Icons.store_rounded,
           AppColors.success,
           AppColors.successLight,
           'Sedes activas',
-          '${data.sedesActivas} / ${data.sedesTotal}',
-          '${(data.sedesActivas / data.sedesTotal * 100).round()}% operativas',
-          true,
+          value('sedes', '${data.sedesActivas} / ${data.sedesTotal}'),
+          detail('sedes', 'Sedes operativas'),
+          !data.hasError('sedes'),
           '/sucursales',
         ),
       );
@@ -351,47 +463,98 @@ class _Kpis extends StatelessWidget {
         ),
       );
     }
-    if (auth.hasPermission('compras:leer') && data.comprasPendientes > 0) {
+    if (auth.hasPermission('compras:leer')) {
       items.add(
         _KD(
           Icons.local_shipping_rounded,
           const Color(0xFF7C3AED),
           const Color(0xFFF5F3FF),
           'Compras pend.',
-          '${data.comprasPendientes}',
-          FormatUtils.currency(data.comprasMontoTotal),
-          false,
+          value('compras', '${data.comprasPendientes}'),
+          detail('compras', FormatUtils.currency(data.comprasMontoTotal)),
+          !data.hasError('compras') && data.comprasPendientes == 0,
           '/compras',
         ),
       );
     }
-    if (auth.hasPermission('asistencia:leer') && data.asistenciaTotal > 0) {
+    if (auth.hasPermission('asistencia:leer')) {
       items.add(
         _KD(
           Icons.badge_rounded,
           const Color(0xFF059669),
           const Color(0xFFECFDF5),
           'Asistencia hoy',
-          '${data.asistenciaPresentes} / ${data.asistenciaTotal}',
-          '${(data.asistenciaPresentes / data.asistenciaTotal * 100).round()}% presentes',
-          true,
+          value(
+            'asistencia',
+            '${data.asistenciaPresentes} / ${data.asistenciaTotal}',
+          ),
+          detail(
+            'asistencia',
+            '${data.asistenciaTardanzas} tard · ${data.asistenciaAusentes} aus',
+          ),
+          !data.hasError('asistencia'),
           '/asistencia',
         ),
       );
     }
+    if (auth.hasPermission('roles:leer')) {
+      items.addAll([
+        _KD(
+          Icons.people_rounded,
+          AppColors.textPrimary,
+          AppColors.backgroundAlt,
+          'Usuarios',
+          value('roles', '${data.usuariosTotal ?? 0}'),
+          detail('roles', '${data.rolesTotal ?? 0} roles activos'),
+          !data.hasError('roles'),
+          '/usuarios',
+        ),
+        _KD(
+          Icons.shield_rounded,
+          AppColors.textPrimary,
+          AppColors.backgroundAlt,
+          'Roles',
+          value('roles', '${data.rolesTotal ?? 0}'),
+          detail('roles', 'Niveles de acceso'),
+          !data.hasError('roles'),
+          '/roles',
+        ),
+      ]);
+    }
+    items.add(
+      _KD(
+        Icons.devices_rounded,
+        AppColors.textPrimary,
+        AppColors.backgroundAlt,
+        'Sesiones',
+        value('sesiones', '${data.sesionesTotal ?? 0}'),
+        detail('sesiones', 'Dispositivos conectados'),
+        !data.hasError('sesiones'),
+        '/perfil',
+      ),
+    );
 
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: items
-          .take(6)
-          .map(
-            (k) => SizedBox(
-              width: (MediaQuery.of(context).size.width - 50) / 2,
-              child: _KpiCard(k: k),
-            ),
-          )
-          .toList(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = MediaQuery.sizeOf(context).width >= 1024;
+        final columns = desktop ? 4 : 2;
+        const gap = 10.0;
+        final cardWidth =
+            (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: items
+              .map(
+                (k) => SizedBox(
+                  width: cardWidth,
+                  height: desktop ? 104 : null,
+                  child: _KpiCard(k: k),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
 }
@@ -500,20 +663,72 @@ class _SkeletonKpis extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: List.generate(
-        4,
-        (_) => Container(
-          width: (MediaQuery.of(context).size.width - 50) / 2,
-          height: 80,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F6F8),
-            borderRadius: BorderRadius.circular(12),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = MediaQuery.sizeOf(context).width >= 1024;
+        final columns = desktop ? 4 : 2;
+        const gap = 10.0;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: List.generate(
+            4,
+            (_) => Container(
+              width: width,
+              height: desktop ? 104 : 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F6F8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
+        );
+      },
+    ),
+  );
+}
+
+class _DashboardErrors extends StatelessWidget {
+  final Map<String, String> errors;
+
+  const _DashboardErrors({required this.errors});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppColors.errorLight,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.error_outline_rounded, size: 17, color: AppColors.error),
+            SizedBox(width: 7),
+            Text(
+              'Algunos datos no se pudieron actualizar',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.error,
+              ),
+            ),
+          ],
         ),
-      ),
+        const SizedBox(height: 5),
+        for (final error in errors.entries.take(3))
+          Text(
+            '${error.key}: ${error.value}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: AppColors.error),
+          ),
+      ],
     ),
   );
 }
@@ -530,12 +745,14 @@ class _Chart extends ConsumerStatefulWidget {
 class _ChartState extends ConsumerState<_Chart> {
   String _period = '7D';
   bool _initialized = false;
+  String? _lastScope;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
+      _lastScope = ref.read(globalSedeIdProvider);
       // Inicializa con 7D por defecto
       ref.read(dashboardProvider.notifier).loadChartForPeriod('7D');
     }
@@ -552,6 +769,15 @@ class _ChartState extends ConsumerState<_Chart> {
 
   @override
   Widget build(BuildContext context) {
+    final scope = ref.watch(globalSedeIdProvider);
+    if (_initialized && scope != _lastScope) {
+      _lastScope = scope;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(dashboardProvider.notifier).loadChartForPeriod(_period);
+        }
+      });
+    }
     final data = ref.watch(dashboardProvider);
     // Para 7D usamos datos del estado base; para otros usamos chartPoints
     final vals = _period == '7D' && data.chartPoints.isEmpty
@@ -867,7 +1093,11 @@ class _Activity extends StatelessWidget {
         const SizedBox(height: 10),
         ...audit.take(4).map((log) {
           final accion = log['accion'] as String? ?? '';
-          final user = log['username'] as String? ?? '';
+          final usuario = log['usuario'];
+          final user = usuario is Map
+              ? usuario['username'] as String? ?? 'Sistema'
+              : log['username'] as String? ??
+                    (usuario is String ? usuario : 'Sistema');
           final ts = log['createdAt'] as String?;
           DateTime? dt;
           try {

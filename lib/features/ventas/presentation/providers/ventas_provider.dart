@@ -30,54 +30,129 @@ class VentasListState {
     this.error,
     this.filterEstado,
   });
-
-  VentasListState copyWith({
-    List<Venta>? ventas,
-    int? total,
-    int? totalPaginas,
-    int? pagina,
-    bool? loading,
-    String? error,
-    String? filterEstado,
-  }) => VentasListState(
-    ventas: ventas ?? this.ventas,
-    total: total ?? this.total,
-    totalPaginas: totalPaginas ?? this.totalPaginas,
-    pagina: pagina ?? this.pagina,
-    loading: loading ?? this.loading,
-    error: error,
-    filterEstado: filterEstado ?? this.filterEstado,
-  );
 }
 
 class VentasListNotifier extends StateNotifier<VentasListState> {
   final VentasRepository _repo;
-  final bool _useMisVentas;
+  final bool useMisVentas;
+  int _requestVersion = 0;
 
-  VentasListNotifier(this._repo, {required bool useMisVentas})
-    : _useMisVentas = useMisVentas,
-      super(const VentasListState());
+  VentasListNotifier(this._repo, {required this.useMisVentas})
+    : super(const VentasListState());
 
-  Future<void> load({int pagina = 1, String? estado}) async {
-    state = state.copyWith(loading: true, error: null, filterEstado: estado);
+  Future<void> load({String? estado}) async {
+    final version = ++_requestVersion;
+    state = VentasListState(loading: true, filterEstado: estado);
+
+    if (estado == 'PENDIENTE') {
+      await _loadPendientes(version);
+      return;
+    }
+
+    await _loadPage(pagina: 1, estado: estado, append: false, version: version);
+  }
+
+  Future<void> loadMore() async {
+    if (state.loading || state.pagina >= state.totalPaginas) return;
+
+    final version = _requestVersion;
+    final previous = state;
+    state = VentasListState(
+      ventas: previous.ventas,
+      total: previous.total,
+      totalPaginas: previous.totalPaginas,
+      pagina: previous.pagina,
+      loading: true,
+      filterEstado: previous.filterEstado,
+    );
+    await _loadPage(
+      pagina: previous.pagina + 1,
+      estado: previous.filterEstado,
+      append: true,
+      version: version,
+    );
+  }
+
+  Future<void> _loadPage({
+    required int pagina,
+    required String? estado,
+    required bool append,
+    required int version,
+  }) async {
     try {
-      final result = _useMisVentas
-          ? await _repo.listMisVentas(pagina: pagina, estado: estado)
-          : await _repo.listVentas(pagina: pagina, estado: estado);
-      state = state.copyWith(
-        ventas: result.data,
+      final result = await _list(pagina: pagina, estado: estado);
+      if (version != _requestVersion) return;
+
+      final ventas = _uniqueVentas([
+        if (append) ...state.ventas,
+        ...result.data,
+      ]);
+      state = VentasListState(
+        ventas: ventas,
         total: result.total,
         totalPaginas: result.totalPaginas,
         pagina: pagina,
         loading: false,
+        filterEstado: estado,
       );
     } catch (e) {
-      state = state.copyWith(loading: false, error: _friendlyError(e));
+      if (version != _requestVersion) return;
+      state = VentasListState(
+        ventas: state.ventas,
+        total: state.total,
+        totalPaginas: state.totalPaginas,
+        pagina: state.pagina,
+        loading: false,
+        error: _friendlyError(e),
+        filterEstado: estado,
+      );
     }
   }
 
-  Future<void> refresh() =>
-      load(pagina: state.pagina, estado: state.filterEstado);
+  Future<void> _loadPendientes(int version) async {
+    try {
+      final first = await _list(pagina: 1, estado: null);
+      final ventas = <Venta>[...first.data];
+      for (var pagina = 2; pagina <= first.totalPaginas; pagina++) {
+        final next = await _list(pagina: pagina, estado: null);
+        if (version != _requestVersion) return;
+        ventas.addAll(next.data);
+      }
+      if (version != _requestVersion) return;
+
+      final pendientes = _uniqueVentas(
+        ventas.where((venta) => venta.isPendiente),
+      );
+      state = VentasListState(
+        ventas: pendientes,
+        total: pendientes.length,
+        totalPaginas: first.totalPaginas,
+        pagina: first.totalPaginas,
+        loading: false,
+        filterEstado: 'PENDIENTE',
+      );
+    } catch (e) {
+      if (version != _requestVersion) return;
+      state = VentasListState(
+        loading: false,
+        error: _friendlyError(e),
+        filterEstado: 'PENDIENTE',
+      );
+    }
+  }
+
+  Future<({List<Venta> data, int total, int totalPaginas})> _list({
+    required int pagina,
+    required String? estado,
+  }) => useMisVentas
+      ? _repo.listMisVentas(pagina: pagina, estado: estado)
+      : _repo.listVentas(pagina: pagina, estado: estado);
+
+  List<Venta> _uniqueVentas(Iterable<Venta> ventas) => <String, Venta>{
+    for (final venta in ventas) venta.id: venta,
+  }.values.toList();
+
+  Future<void> refresh() => load(estado: state.filterEstado);
 
   String _friendlyError(Object e) {
     final msg = e.toString();

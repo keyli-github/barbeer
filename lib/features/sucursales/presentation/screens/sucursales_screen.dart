@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -307,6 +307,7 @@ class _SedeTile extends StatelessWidget {
     final direccion = sede['direccion'] as String?;
     final telefono = sede['telefono'] as String?;
     final ruc = sede['ruc'] as String?;
+    final codigoSede = sede['codigoSede'] as String? ?? '';
     final activo = sede['activo'] as bool? ?? false;
     final userCount = sede['_count']?['usuarios'] as int? ?? 0;
 
@@ -338,6 +339,11 @@ class _SedeTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(nombre, style: AppTextStyles.titleMedium),
+                      if (codigoSede.isNotEmpty)
+                        Text(
+                          'Código: $codigoSede',
+                          style: AppTextStyles.labelSmall,
+                        ),
                       if (direccion != null && direccion.isNotEmpty)
                         Text(
                           direccion,
@@ -462,7 +468,8 @@ class _SedeDetailScreen extends StatelessWidget {
     final dir = sede['direccion'] as String? ?? '';
     final tel = sede['telefono'] as String? ?? '';
     final ruc = sede['ruc'] as String? ?? '';
-    final codigo = sede['codigo'] as String? ?? '';
+    final codigo =
+        sede['codigoSede'] as String? ?? sede['codigo'] as String? ?? '';
     final users = (sede['_count'] as Map?)?['usuarios'] as int? ?? 0;
 
     return Scaffold(
@@ -646,6 +653,7 @@ class _SedeDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = {
       'Nombre': sede['nombre'] as String? ?? '',
+      'Codigo': sede['codigoSede'] as String? ?? '',
       'Direccion': sede['direccion'] as String? ?? '',
       'Telefono': sede['telefono'] as String? ?? '',
       'RUC': sede['ruc'] as String? ?? '',
@@ -695,7 +703,11 @@ class _SedeForm extends StatefulWidget {
 
 class _SedeFormState extends State<_SedeForm> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameCtrl, _dirCtrl, _telCtrl, _rucCtrl;
+  late final TextEditingController _nameCtrl,
+      _codigoCtrl,
+      _dirCtrl,
+      _telCtrl,
+      _rucCtrl;
   bool _activo = true, _loading = false;
 
   @override
@@ -703,6 +715,9 @@ class _SedeFormState extends State<_SedeForm> {
     super.initState();
     _nameCtrl = TextEditingController(
       text: widget.sede?['nombre'] as String? ?? '',
+    );
+    _codigoCtrl = TextEditingController(
+      text: widget.sede?['codigoSede'] as String? ?? '',
     );
     _dirCtrl = TextEditingController(
       text: widget.sede?['direccion'] as String? ?? '',
@@ -719,6 +734,7 @@ class _SedeFormState extends State<_SedeForm> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _codigoCtrl.dispose();
     _dirCtrl.dispose();
     _telCtrl.dispose();
     _rucCtrl.dispose();
@@ -746,6 +762,24 @@ class _SedeFormState extends State<_SedeForm> {
               textInputAction: TextInputAction.next,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Requerido' : null,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              label: 'Código de sede',
+              hint: 'Ej. CENT',
+              controller: _codigoCtrl,
+              prefixIcon: Icons.tag_rounded,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
+                LengthLimitingTextInputFormatter(5),
+              ],
+              validator: (value) {
+                if (value == null || value.isEmpty) return null;
+                return RegExp(r'^[A-Z0-9]{2,5}$').hasMatch(value)
+                    ? null
+                    : 'Usa entre 2 y 5 letras mayúsculas o números';
+              },
             ),
             const SizedBox(height: 14),
             AppTextField(
@@ -810,6 +844,9 @@ class _SedeFormState extends State<_SedeForm> {
     setState(() => _loading = true);
     try {
       final data = <String, dynamic>{'nombre': _nameCtrl.text.trim()};
+      if (_codigoCtrl.text.isNotEmpty) {
+        data['codigoSede'] = _codigoCtrl.text.trim();
+      }
       if (_dirCtrl.text.isNotEmpty) data['direccion'] = _dirCtrl.text;
       if (_telCtrl.text.isNotEmpty) data['telefono'] = _telCtrl.text;
       if (_rucCtrl.text.isNotEmpty) data['ruc'] = _rucCtrl.text;

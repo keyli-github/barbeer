@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_spacing.dart' as spacing;
@@ -70,8 +71,10 @@ class _ProductosState {
 
 class _ProductosNotifier extends StateNotifier<_ProductosState> {
   final ProductosRepository _repo;
+  final String? _sedeId;
 
-  _ProductosNotifier(this._repo) : super(const _ProductosState()) {
+  _ProductosNotifier(this._repo, this._sedeId)
+    : super(const _ProductosState()) {
     load();
   }
 
@@ -88,6 +91,7 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
               ? null
               : state.categoriaFilter,
           activo: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+          sedeId: _sedeId,
         ),
         _repo.resumen(),
       ]);
@@ -139,7 +143,10 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
 
 final _productosNotifier =
     StateNotifierProvider<_ProductosNotifier, _ProductosState>(
-      (ref) => _ProductosNotifier(ref.watch(_repoProvider)),
+      (ref) => _ProductosNotifier(
+        ref.watch(_repoProvider),
+        ref.watch(globalSedeIdProvider),
+      ),
     );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -156,9 +163,10 @@ class ProductosScreen extends ConsumerWidget {
     final canCreate = auth.hasPermission('productos:crear');
     final canEdit = auth.hasPermission('productos:editar');
     final canDelete = auth.hasPermission('productos:eliminar');
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: desktop ? const Color(0xFFFAFAFA) : AppColors.background,
       // FAB para crear producto
       floatingActionButton: canCreate
           ? FloatingActionButton(
@@ -211,46 +219,60 @@ class ProductosScreen extends ConsumerWidget {
                       title: 'Sin productos',
                       message: 'No hay productos con los filtros actuales.',
                     )
-                  : GridView.builder(
-                      key: ValueKey('grid'),
-                      padding: EdgeInsets.all(AppSpacing.md),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.62,
-                        crossAxisSpacing: AppSpacing.sm,
-                        mainAxisSpacing: AppSpacing.sm,
-                      ),
-                      itemCount: state.items.length + 2,
-                      itemBuilder: (_, i) {
-                        if (i == state.items.length) {
-                          return SizedBox.shrink();
-                        }
-                        if (i == state.items.length + 1) {
-                          return AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: notifier.setPage,
-                          );
-                        }
-                        return _ProductCard(
-                          product: state.items[i],
-                          canEdit: canEdit,
-                          canDelete: canDelete,
-                          onEdit: () =>
-                              _showProductDetail(context, ref, state.items[i]),
-                          onToggle: () => notifier.toggleActivo(state.items[i]),
-                          onDelete: () async {
-                            final ok = await ConfirmationDialog.show(
-                              context: context,
-                              title: 'Eliminar producto',
-                              message:
-                                  '¿Eliminar "${state.items[i].nombre}"? Esta acción no se puede deshacer.',
-                              confirmText: 'Eliminar',
-                              isDestructive: true,
-                              icon: Icons.delete_outline,
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = desktop
+                            ? (constraints.maxWidth / 230).floor().clamp(3, 6)
+                            : 2;
+                        return GridView.builder(
+                          key: ValueKey('grid'),
+                          padding: EdgeInsets.all(AppSpacing.md),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                childAspectRatio: desktop ? 0.72 : 0.62,
+                                crossAxisSpacing: AppSpacing.sm,
+                                mainAxisSpacing: AppSpacing.sm,
+                              ),
+                          itemCount: state.items.length + 2,
+                          itemBuilder: (_, i) {
+                            if (i == state.items.length) {
+                              return SizedBox.shrink();
+                            }
+                            if (i == state.items.length + 1) {
+                              return AppPagination(
+                                page: state.page,
+                                totalPages: state.totalPages,
+                                total: state.total,
+                                onPageChange: notifier.setPage,
+                              );
+                            }
+                            return _ProductCard(
+                              product: state.items[i],
+                              canEdit: canEdit,
+                              canDelete: canDelete,
+                              onEdit: () => _showProductDetail(
+                                context,
+                                ref,
+                                state.items[i],
+                              ),
+                              onToggle: () =>
+                                  notifier.toggleActivo(state.items[i]),
+                              onDelete: () async {
+                                final ok = await ConfirmationDialog.show(
+                                  context: context,
+                                  title: 'Eliminar producto',
+                                  message:
+                                      '¿Eliminar "${state.items[i].nombre}"? Esta acción no se puede deshacer.',
+                                  confirmText: 'Eliminar',
+                                  isDestructive: true,
+                                  icon: Icons.delete_outline,
+                                );
+                                if (ok) {
+                                  await notifier.delete(state.items[i].id);
+                                }
+                              },
                             );
-                            if (ok) await notifier.delete(state.items[i].id);
                           },
                         );
                       },

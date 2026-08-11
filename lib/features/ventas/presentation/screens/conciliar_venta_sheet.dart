@@ -63,6 +63,14 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
       setState(() => _error = 'Selecciona una billetera');
       return;
     }
+    if (_estado == 'BILLETERA' &&
+        _selectedEtiqueta?.requiereComprobante == true &&
+        _compCtrl.text.trim().isEmpty) {
+      setState(
+        () => _error = 'Ingresa el comprobante requerido por esta billetera',
+      );
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -104,19 +112,25 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
 
   String _friendlyError(Object e) {
     final s = e.toString();
-    if (s.contains('CONCILIACION_CONGELADA'))
+    if (s.contains('CONCILIACION_CONGELADA')) {
       return 'La caja fue cerrada. No se puede modificar.';
-    if (s.contains('CONCILIACION_YA_CLASIFICADA'))
+    }
+    if (s.contains('CONCILIACION_YA_CLASIFICADA')) {
       return 'La venta ya fue clasificada por otro usuario.';
-    if (s.contains('CODIGO_OPERACION_DUPLICADO'))
+    }
+    if (s.contains('CODIGO_OPERACION_DUPLICADO')) {
       return 'Este código de operación ya fue registrado.';
-    if (s.contains('PERMISO_INSUFICIENTE'))
+    }
+    if (s.contains('PERMISO_INSUFICIENTE')) {
       return 'No tienes permiso para corregir esta clasificación.';
-    if (s.contains('VENTA_ANULADA'))
+    }
+    if (s.contains('VENTA_ANULADA')) {
       return 'No se puede conciliar una venta anulada.';
+    }
     if (s.contains('403')) return 'No tienes permiso para esta acción.';
-    if (s.contains('SocketException') || s.contains('connection'))
+    if (s.contains('SocketException') || s.contains('connection')) {
       return 'Sin conexión al servidor.';
+    }
     return 'No se pudo clasificar el pago.';
   }
 
@@ -233,7 +247,8 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
                       ),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
-                        value: _etiquetaId,
+                        key: ValueKey(_etiquetaId),
+                        initialValue: _etiquetaId,
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -256,7 +271,9 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
                       const SizedBox(height: 12),
                       if (_selectedEtiqueta?.requiereComprobante == true) ...[
                         TextField(
+                          key: const ValueKey('comprobanteField'),
                           controller: _compCtrl,
+                          maxLength: 500,
                           decoration: InputDecoration(
                             labelText: 'Comprobante / voucher',
                             border: OutlineInputBorder(
@@ -267,7 +284,9 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
                         const SizedBox(height: 12),
                       ],
                       TextField(
+                        key: const ValueKey('codigoOperacionField'),
                         controller: _codOpCtrl,
+                        maxLength: 100,
                         decoration: InputDecoration(
                           labelText: 'Código de operación (opcional)',
                           border: OutlineInputBorder(

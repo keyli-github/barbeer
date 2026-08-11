@@ -1,5 +1,118 @@
 import '../../../core/network/api_client.dart';
 
+String _stringValue(Object? value) => value is String ? value : '';
+
+String? _optionalStringValue(Object? value) {
+  final parsed = _stringValue(value).trim();
+  return parsed.isEmpty ? null : parsed;
+}
+
+double _doubleValue(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+int _intValue(Object? value) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+Map<String, dynamic> _mapValue(Object? value) =>
+    value is Map ? Map<String, dynamic>.from(value) : const <String, dynamic>{};
+
+List<Object?> _listValue(Object? value) => value is List ? value : const [];
+
+class CompraSede {
+  final String id, nombre;
+
+  const CompraSede({required this.id, required this.nombre});
+
+  factory CompraSede.fromJson(Map<String, dynamic> json) => CompraSede(
+    id: _stringValue(json['id']),
+    nombre: _stringValue(json['nombre']),
+  );
+}
+
+class CompraCreateItem {
+  final String productoId;
+  final double cantidad, costoUnit, precioVenta;
+
+  const CompraCreateItem({
+    required this.productoId,
+    required this.cantidad,
+    required this.costoUnit,
+    required this.precioVenta,
+  });
+
+  double get subtotal => cantidad * costoUnit;
+
+  bool get isValid =>
+      productoId.trim().isNotEmpty &&
+      cantidad.isFinite &&
+      cantidad > 0 &&
+      _isValidMoney(costoUnit) &&
+      _isValidMoney(precioVenta);
+
+  static bool _isValidMoney(double value) =>
+      value.isFinite &&
+      value > 0 &&
+      value <= 9999999999.99 &&
+      ((value * 100) - (value * 100).round()).abs() < 0.000001;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'productoId': productoId.trim(),
+    'cantidad': cantidad,
+    'costoUnit': costoUnit,
+    'precioVenta': precioVenta,
+  };
+}
+
+CompraCreateItem? parseCompraCreateItem({
+  required String productoId,
+  required String cantidad,
+  required String costoUnit,
+  required String precioVenta,
+}) {
+  double? parse(String value) =>
+      double.tryParse(value.trim().replaceAll(',', '.'));
+
+  final item = CompraCreateItem(
+    productoId: productoId,
+    cantidad: parse(cantidad) ?? double.nan,
+    costoUnit: parse(costoUnit) ?? double.nan,
+    precioVenta: parse(precioVenta) ?? double.nan,
+  );
+  return item.isValid ? item : null;
+}
+
+Map<String, dynamic> buildCompraCreateData({
+  required String proveedorId,
+  required String sedeId,
+  required List<CompraCreateItem> items,
+  String? eta,
+  String? notas,
+}) {
+  final normalizedProveedorId = proveedorId.trim();
+  final normalizedSedeId = sedeId.trim();
+  if (normalizedProveedorId.isEmpty) {
+    throw ArgumentError('proveedorId es requerido');
+  }
+  if (normalizedSedeId.isEmpty) throw ArgumentError('sedeId es requerido');
+  if (items.isEmpty) throw ArgumentError('Se requiere al menos un item');
+  if (items.any((item) => !item.isValid)) {
+    throw ArgumentError('Todos los items deben tener valores validos');
+  }
+  return <String, dynamic>{
+    'proveedorId': normalizedProveedorId,
+    'sedeId': normalizedSedeId,
+    'items': items.map((item) => item.toJson()).toList(),
+    if (eta?.trim().isNotEmpty ?? false) 'eta': eta!.trim(),
+    if (notas?.trim().isNotEmpty ?? false) 'notas': notas!.trim(),
+  };
+}
+
 class Proveedor {
   final String id, nombre;
   final String? categoria, contacto, telefono, email;
@@ -20,24 +133,15 @@ class Proveedor {
   });
 
   factory Proveedor.fromJson(Map<String, dynamic> j) => Proveedor(
-    id: j['id'] as String? ?? '',
-    nombre: j['nombre'] as String? ?? '',
-    categoria: (j['categoria'] as String?)?.isEmpty ?? true
-        ? null
-        : j['categoria'] as String?,
-    contacto: (j['contacto'] as String?)?.isEmpty ?? true
-        ? null
-        : j['contacto'] as String?,
-    telefono: (j['telefono'] as String?)?.isEmpty ?? true
-        ? null
-        : j['telefono'] as String?,
-    email: (j['email'] as String?)?.isEmpty ?? true
-        ? null
-        : j['email'] as String?,
-    activo: j['activo'] as bool? ?? true,
-    // ordenes y total pueden venir como Map en algunos endpoints
-    ordenes: j['ordenes'] is num ? (j['ordenes'] as num).toInt() : 0,
-    total: j['total'] is num ? (j['total'] as num).toDouble() : 0,
+    id: _stringValue(j['id']),
+    nombre: _stringValue(j['nombre']),
+    categoria: _optionalStringValue(j['categoria']),
+    contacto: _optionalStringValue(j['contacto']),
+    telefono: _optionalStringValue(j['telefono']),
+    email: _optionalStringValue(j['email']),
+    activo: j['activo'] == true,
+    ordenes: _intValue(j['ordenes']),
+    total: _doubleValue(j['total']),
   );
 }
 
@@ -54,16 +158,16 @@ class CompraItem {
     required this.subtotal,
   });
   factory CompraItem.fromJson(Map<String, dynamic> j) => CompraItem(
-    id: j['id'] as String? ?? '',
-    productoId: j['productoId'] as String? ?? '',
-    codigo: j['codigo'] is String ? j['codigo'] as String : '',
+    id: _stringValue(j['id']),
+    productoId: _stringValue(j['productoId']),
+    codigo: _stringValue(j['codigo']),
     // 'producto' puede venir como String o como Map {nombre:...}
     producto: j['producto'] is Map
-        ? ((j['producto'] as Map)['nombre'] as String? ?? '')
-        : j['producto'] as String? ?? '',
-    cantidad: (j['cantidad'] as num?)?.toDouble() ?? 0,
-    costoUnit: (j['costoUnit'] as num?)?.toDouble() ?? 0,
-    subtotal: (j['subtotal'] as num?)?.toDouble() ?? 0,
+        ? _stringValue((j['producto'] as Map)['nombre'])
+        : _stringValue(j['producto']),
+    cantidad: _doubleValue(j['cantidad']),
+    costoUnit: _doubleValue(j['costoUnit']),
+    subtotal: _doubleValue(j['subtotal']),
   );
 }
 
@@ -98,24 +202,26 @@ class Compra {
   });
 
   factory Compra.fromJson(Map<String, dynamic> j) => Compra(
-    id: j['id'] as String? ?? '',
-    orden: j['orden'] as String? ?? '',
-    fecha: j['fecha'] as String? ?? '',
+    id: _stringValue(j['id']),
+    orden: _stringValue(j['orden']),
+    fecha: _stringValue(j['fecha']),
     // 'proveedor' puede venir como String o como Map {nombre:...}
     proveedor: j['proveedor'] is Map
-        ? ((j['proveedor'] as Map)['nombre'] as String? ?? '')
-        : j['proveedor'] as String? ?? '',
-    proveedorId: j['proveedorId'] as String? ?? '',
-    estado: j['estado'] as String? ?? 'PENDIENTE',
+        ? _stringValue((j['proveedor'] as Map)['nombre'])
+        : _stringValue(j['proveedor']),
+    proveedorId: _stringValue(j['proveedorId']),
+    estado: _stringValue(j['estado']).isEmpty
+        ? 'PENDIENTE'
+        : _stringValue(j['estado']),
     // 'solicitadoPor' puede venir como String o Map {username:...}
     solicitadoPor: j['solicitadoPor'] is Map
-        ? ((j['solicitadoPor'] as Map)['username'] as String? ?? '')
-        : j['solicitadoPor'] as String? ?? '',
-    notas: j['notas'] as String? ?? '',
-    articulos: (j['articulos'] as num?)?.toInt() ?? 0,
-    total: (j['total'] as num?)?.toDouble() ?? 0,
-    eta: j['eta'] as String?,
-    recibidaAt: j['recibidaAt'] as String?,
+        ? _stringValue((j['solicitadoPor'] as Map)['username'])
+        : _stringValue(j['solicitadoPor']),
+    notas: _stringValue(j['notas']),
+    articulos: _intValue(j['articulos']),
+    total: _doubleValue(j['total']),
+    eta: _optionalStringValue(j['eta']),
+    recibidaAt: _optionalStringValue(j['recibidaAt']),
     items: j['items'] is List
         ? (j['items'] as List)
               .whereType<Map>()
@@ -135,10 +241,10 @@ class ComprasResumen {
     required this.montoPendiente,
   });
   factory ComprasResumen.fromJson(Map<String, dynamic> j) => ComprasResumen(
-    totalOrdenes: (j['totalOrdenes'] as num?)?.toInt() ?? 0,
-    pendientes: (j['pendientes'] as num?)?.toInt() ?? 0,
-    recibidas: (j['recibidas'] as num?)?.toInt() ?? 0,
-    montoPendiente: (j['montoPendiente'] as num?)?.toDouble() ?? 0,
+    totalOrdenes: _intValue(j['totalOrdenes']),
+    pendientes: _intValue(j['pendientes']),
+    recibidas: _intValue(j['recibidas']),
+    montoPendiente: _doubleValue(j['montoPendiente']),
   );
 }
 
@@ -170,17 +276,22 @@ class ComprasRepository {
         'pagina': pagina,
         'limite': limite,
         if (q != null && q.isNotEmpty) 'q': q,
-        if (activo != null) 'activo': activo,
+        'activo': ?activo,
       },
     );
-    final json = Map<String, dynamic>.from(r.data as Map);
+    final json = _mapValue(r.data);
     return ComprasPage(
-      data: (json['data'] as List? ?? [])
-          .map((e) => Proveedor.fromJson(Map<String, dynamic>.from(e as Map)))
+      data: _listValue(json['data'])
+          .whereType<Map>()
+          .map((e) => Proveedor.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
-      total: (json['total'] as num?)?.toInt() ?? 0,
-      pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
-      totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 1,
+      total: _intValue(json['total']),
+      pagina: _intValue(json['pagina']) == 0
+          ? pagina
+          : _intValue(json['pagina']),
+      totalPaginas: _intValue(json['totalPaginas']) == 0
+          ? 1
+          : _intValue(json['totalPaginas']),
     );
   }
 
@@ -202,7 +313,7 @@ class ComprasRepository {
         if (email?.trim().isNotEmpty ?? false) 'email': email!.trim(),
       },
     );
-    return Proveedor.fromJson(Map<String, dynamic>.from(r.data as Map));
+    return Proveedor.fromJson(_mapValue(r.data));
   }
 
   Future<Proveedor> updateProveedor(
@@ -210,7 +321,21 @@ class ComprasRepository {
     Map<String, dynamic> data,
   ) async {
     final r = await _api.patch('/compras/proveedores/$id', data: data);
-    return Proveedor.fromJson(Map<String, dynamic>.from(r.data as Map));
+    return Proveedor.fromJson(_mapValue(r.data));
+  }
+
+  Future<List<CompraSede>> listSedes({int pagina = 1, int limite = 100}) async {
+    final r = await _api.get(
+      '/establecimientos',
+      queryParameters: {'pagina': pagina, 'limite': limite},
+    );
+    final json = _mapValue(r.data);
+    return _listValue(json['data'])
+        .whereType<Map>()
+        .where((item) => item['activo'] == true)
+        .map((item) => CompraSede.fromJson(Map<String, dynamic>.from(item)))
+        .where((sede) => sede.id.isNotEmpty)
+        .toList();
   }
 
   // ── Órdenes de compra ────────────────────────────────────────
@@ -220,6 +345,7 @@ class ComprasRepository {
     String? q,
     String? estado,
     String? proveedorId,
+    String? sedeId,
   }) async {
     final r = await _api.get(
       '/compras',
@@ -227,54 +353,62 @@ class ComprasRepository {
         'pagina': pagina,
         'limite': limite,
         if (q != null && q.isNotEmpty) 'q': q,
-        if (estado != null) 'estado': estado,
-        if (proveedorId != null) 'proveedorId': proveedorId,
+        'estado': ?estado,
+        'proveedorId': ?proveedorId,
+        'sedeId': ?sedeId,
       },
     );
-    final json = Map<String, dynamic>.from(r.data as Map);
+    final json = _mapValue(r.data);
     return ComprasPage(
-      data: (json['data'] as List? ?? [])
-          .map((e) => Compra.fromJson(Map<String, dynamic>.from(e as Map)))
+      data: _listValue(json['data'])
+          .whereType<Map>()
+          .map((e) => Compra.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
-      total: (json['total'] as num?)?.toInt() ?? 0,
-      pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
-      totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 1,
+      total: _intValue(json['total']),
+      pagina: _intValue(json['pagina']) == 0
+          ? pagina
+          : _intValue(json['pagina']),
+      totalPaginas: _intValue(json['totalPaginas']) == 0
+          ? 1
+          : _intValue(json['totalPaginas']),
     );
   }
 
-  Future<ComprasResumen> resumen({String? estado}) async {
+  Future<ComprasResumen> resumen({String? estado, String? sedeId}) async {
     final r = await _api.get(
       '/compras/resumen',
-      queryParameters: {if (estado != null) 'estado': estado},
+      queryParameters: {'estado': ?estado, 'sedeId': ?sedeId},
     );
-    return ComprasResumen.fromJson(Map<String, dynamic>.from(r.data as Map));
+    return ComprasResumen.fromJson(_mapValue(r.data));
   }
 
   Future<Compra> getCompra(String id) async {
     final r = await _api.get('/compras/$id');
-    return Compra.fromJson(Map<String, dynamic>.from(r.data as Map));
+    return Compra.fromJson(_mapValue(r.data));
   }
 
   Future<Compra> createCompra({
     required String proveedorId,
-    required List<Map<String, dynamic>> items,
+    required String sedeId,
+    required List<CompraCreateItem> items,
     String? eta,
     String? notas,
   }) async {
     final r = await _api.post(
       '/compras',
-      data: {
-        'proveedorId': proveedorId,
-        'items': items,
-        if (eta != null) 'eta': eta,
-        if (notas?.trim().isNotEmpty ?? false) 'notas': notas!.trim(),
-      },
+      data: buildCompraCreateData(
+        proveedorId: proveedorId,
+        sedeId: sedeId,
+        items: items,
+        eta: eta,
+        notas: notas,
+      ),
     );
-    return Compra.fromJson(Map<String, dynamic>.from(r.data as Map));
+    return Compra.fromJson(_mapValue(r.data));
   }
 
   Future<Compra> cambiarEstado(String id, String estado) async {
     final r = await _api.patch('/compras/$id/estado', data: {'estado': estado});
-    return Compra.fromJson(Map<String, dynamic>.from(r.data as Map));
+    return Compra.fromJson(_mapValue(r.data));
   }
 }

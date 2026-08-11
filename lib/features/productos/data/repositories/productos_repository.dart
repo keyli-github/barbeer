@@ -12,6 +12,7 @@ class ProductosRepository {
     String? q,
     String? categoriaId,
     bool? activo,
+    String? sedeId,
   }) async {
     final response = await _api.get<Map<String, dynamic>>(
       '/productos',
@@ -22,6 +23,7 @@ class ProductosRepository {
         if (categoriaId != null && categoriaId.isNotEmpty)
           'categoriaId': categoriaId,
         if (activo != null) 'activo': activo.toString(),
+        if (sedeId != null) 'sedeId': sedeId,
       },
     );
     return ProductosPage.fromJson(response.data ?? const {});

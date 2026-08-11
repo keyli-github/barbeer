@@ -70,6 +70,14 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       setState(() => _error = 'Selecciona una billetera');
       return;
     }
+    if (_estado == 'BILLETERA' &&
+        _requiereComprobante &&
+        _compCtrl.text.trim().isEmpty) {
+      setState(
+        () => _error = 'Ingresa el comprobante requerido por esta billetera',
+      );
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -107,14 +115,18 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
 
   String _friendlyError(Object e) {
     final s = e.toString();
-    if (s.contains('CONCILIACION_CONGELADA'))
+    if (s.contains('CONCILIACION_CONGELADA')) {
       return 'La caja fue cerrada. No se puede modificar.';
-    if (s.contains('CONCILIACION_YA_CLASIFICADA'))
+    }
+    if (s.contains('CONCILIACION_YA_CLASIFICADA')) {
       return 'La venta ya fue clasificada.';
-    if (s.contains('CODIGO_OPERACION_DUPLICADO'))
+    }
+    if (s.contains('CODIGO_OPERACION_DUPLICADO')) {
       return 'Código de operación duplicado.';
-    if (s.contains('VENTA_ANULADA'))
+    }
+    if (s.contains('VENTA_ANULADA')) {
       return 'No se puede conciliar una venta anulada.';
+    }
     if (s.contains('403')) return 'Sin permiso para esta acción.';
     return 'No se pudo clasificar el pago.';
   }
@@ -186,7 +198,8 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                 )
               else
                 DropdownButtonFormField<String>(
-                  value: _etiquetaId,
+                  key: ValueKey(_etiquetaId),
+                  initialValue: _etiquetaId,
                   decoration: const InputDecoration(
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: 14,
@@ -204,10 +217,10 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                   onChanged: (v) => setState(() => _etiquetaId = v),
                 ),
 
-              if (_requiereComprobante || _etiquetaId != null) ...[
+              if (_requiereComprobante) ...[
                 const SizedBox(height: 16),
                 const Text(
-                  'Código de operación / comprobante',
+                  'Comprobante / voucher *',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -216,9 +229,11 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: _codOpCtrl,
+                  key: const ValueKey('comprobanteField'),
+                  controller: _compCtrl,
+                  maxLength: 500,
                   decoration: const InputDecoration(
-                    hintText: 'Ej. 123 456 789',
+                    hintText: 'URL o referencia del comprobante',
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 12,
@@ -229,7 +244,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
 
               const SizedBox(height: 16),
               const Text(
-                'Observaciones (opcional)',
+                'Código de operación (opcional)',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -238,11 +253,11 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
-                controller: _compCtrl,
-                maxLines: 2,
-                maxLength: 120,
+                key: const ValueKey('codigoOperacionField'),
+                controller: _codOpCtrl,
+                maxLength: 100,
                 decoration: const InputDecoration(
-                  hintText: 'Ej. Cliente habitual',
+                  hintText: 'Ej. 1234567890',
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,

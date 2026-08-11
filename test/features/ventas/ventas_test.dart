@@ -1,7 +1,13 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
+import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/features/ventas/data/models/venta_models.dart';
+import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
+import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_screen.dart';
+import 'package:barbeer/features/ventas/presentation/widgets/anular_venta_dialog.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/carrito_venta_sheet.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
@@ -24,6 +30,101 @@ AuthState _authWith(UserProfile user) =>
     AuthState(status: AuthStatus.authenticated, user: user);
 
 const _uuid = Uuid();
+
+Venta _venta(String id, {bool pendiente = false, double total = 10}) => Venta(
+  id: id,
+  codigo: 'V-$id',
+  cajaSesionId: 'caja-1',
+  sedeId: 'sede-1',
+  total: total,
+  estado: EstadoVenta.activa,
+  conciliacion: ConciliacionVenta(
+    id: 'conc-$id',
+    estado: pendiente
+        ? EstadoConciliacion.pendiente
+        : EstadoConciliacion.efectivo,
+  ),
+  items: const [],
+  createdAt: '2026-08-05T10:00:00Z',
+);
+
+class _FakeVentasRepository extends VentasRepository {
+  _FakeVentasRepository() : super(ApiClient.instance);
+
+  Map<int, List<Venta>> pages = {};
+  int total = 0;
+  int totalPaginas = 1;
+  final requestedEstados = <String?>[];
+  final conciliaciones =
+      <
+        ({
+          String id,
+          String estado,
+          String? etiquetaId,
+          String? comprobante,
+          String? codigoOperacion,
+        })
+      >[];
+
+  @override
+  Future<({List<Venta> data, int total, int totalPaginas})> listVentas({
+    int pagina = 1,
+    int limite = 20,
+    String? estado,
+    String? vendedoraId,
+    String? cajaSesionId,
+    String? sedeId,
+  }) async {
+    requestedEstados.add(estado);
+    return (
+      data: pages[pagina] ?? const <Venta>[],
+      total: total,
+      totalPaginas: totalPaginas,
+    );
+  }
+
+  @override
+  Future<({List<Venta> data, int total, int totalPaginas})> listMisVentas({
+    int pagina = 1,
+    int limite = 20,
+    String? estado,
+    String? cajaSesionId,
+  }) => listVentas(
+    pagina: pagina,
+    limite: limite,
+    estado: estado,
+    cajaSesionId: cajaSesionId,
+  );
+
+  @override
+  Future<List<Etiqueta>> listEtiquetasActivas({String? sedeId}) async => const [
+    Etiqueta(
+      id: 'etiqueta-1',
+      nombre: 'Yape',
+      activo: true,
+      requiereComprobante: true,
+      orden: 1,
+    ),
+  ];
+
+  @override
+  Future<Venta> conciliarVenta(
+    String id, {
+    required String estado,
+    String? etiquetaId,
+    String? comprobante,
+    String? codigoOperacion,
+  }) async {
+    conciliaciones.add((
+      id: id,
+      estado: estado,
+      etiquetaId: etiquetaId,
+      comprobante: comprobante,
+      codigoOperacion: codigoOperacion,
+    ));
+    return _venta(id);
+  }
+}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -273,6 +374,168 @@ void main() {
       // Simular que no hay envío en curso
       doSubmit(false);
       expect(count, 1, reason: 'Debe ejecutarse con submitting=false');
+    });
+  });
+
+  group('Listado paginado', () {
+    test(
+      'cargar más agrega páginas, elimina duplicados y refresh reinicia',
+      () async {
+        final repo = _FakeVentasRepository()
+          ..pages = {
+            1: [_venta('1'), _venta('2')],
+            2: [_venta('2', total: 20), _venta('3')],
+          }
+          ..total = 3
+          ..totalPaginas = 2;
+        final notifier = VentasListNotifier(repo, useMisVentas: false);
+
+        await notifier.load();
+        await notifier.loadMore();
+
+        expect(notifier.state.ventas.map((venta) => venta.id), ['1', '2', '3']);
+        expect(notifier.state.ventas[1].total, 20);
+        expect(notifier.state.pagina, 2);
+
+        repo
+          ..pages = {
+            1: [_venta('4')],
+          }
+          ..total = 1
+          ..totalPaginas = 1;
+        await notifier.refresh();
+
+        expect(notifier.state.ventas.map((venta) => venta.id), ['4']);
+        expect(notifier.state.pagina, 1);
+      },
+    );
+
+    test(
+      'PENDIENTE filtra conciliación local sin enviarlo al backend',
+      () async {
+        final repo = _FakeVentasRepository()
+          ..pages = {
+            1: [_venta('1', pendiente: true), _venta('2')],
+            2: [_venta('3', pendiente: true), _venta('1', pendiente: true)],
+          }
+          ..total = 4
+          ..totalPaginas = 2;
+        final notifier = VentasListNotifier(repo, useMisVentas: false);
+
+        await notifier.load(estado: 'PENDIENTE');
+
+        expect(repo.requestedEstados, [null, null]);
+        expect(notifier.state.filterEstado, 'PENDIENTE');
+        expect(notifier.state.ventas.map((venta) => venta.id), ['1', '3']);
+        expect(notifier.state.total, 2);
+      },
+    );
+
+    test(
+      'un filtro de estado válido sí se envía y reinicia la página',
+      () async {
+        final repo = _FakeVentasRepository()
+          ..pages = {
+            1: [_venta('1')],
+          }
+          ..total = 1;
+        final notifier = VentasListNotifier(repo, useMisVentas: false);
+
+        await notifier.load(estado: 'ACTIVA');
+
+        expect(repo.requestedEstados, ['ACTIVA']);
+        expect(notifier.state.filterEstado, 'ACTIVA');
+        expect(notifier.state.pagina, 1);
+      },
+    );
+  });
+
+  group('Flujos de conciliación y anulación', () {
+    testWidgets('exige comprobante y lo mapea separado del código', (
+      tester,
+    ) async {
+      final repo = _FakeVentasRepository();
+      var completed = false;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [ventasRepositoryProvider.overrideWithValue(repo)],
+          child: MaterialApp(
+            home: ConciliarVentaScreen(
+              venta: _venta('1', pendiente: true),
+              onDone: () => completed = true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Billetera').first);
+      await tester.pump();
+      expect(find.byKey(const ValueKey('comprobanteField')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('codigoOperacionField')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Confirmar clasificación'));
+      await tester.pump();
+      expect(
+        find.text('Ingresa el comprobante requerido por esta billetera'),
+        findsOneWidget,
+      );
+      expect(repo.conciliaciones, isEmpty);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('comprobanteField')),
+        'voucher-123',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('codigoOperacionField')),
+        'op-456',
+      );
+      await tester.tap(find.text('Confirmar clasificación'));
+      await tester.pump();
+
+      expect(completed, isTrue);
+      expect(repo.conciliaciones, hasLength(1));
+      expect(repo.conciliaciones.single.comprobante, 'voucher-123');
+      expect(repo.conciliaciones.single.codigoOperacion, 'op-456');
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('el diálogo exige y devuelve un motivo real', (tester) async {
+      String? motivo;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                motivo = await showAnularVentaDialog(context, codigo: 'V-001');
+              },
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Anular'));
+      await tester.pump();
+      expect(
+        find.text('El motivo de anulación es obligatorio'),
+        findsOneWidget,
+      );
+      expect(motivo, isNull);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('motivoAnulacionField')),
+        'Producto registrado por error',
+      );
+      await tester.tap(find.text('Anular'));
+      await tester.pumpAndSettle();
+
+      expect(motivo, 'Producto registrado por error');
     });
   });
 }

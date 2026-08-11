@@ -102,6 +102,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             builder: (context, constraints) {
               final pageHeight =
                   constraints.maxHeight + media.viewInsets.bottom;
+              if (constraints.maxWidth >= 1024) {
+                return Row(
+                  key: const Key('login-desktop-composition'),
+                  children: [
+                    Expanded(
+                      child: _LoginHero(height: pageHeight, desktop: true),
+                    ),
+                    Expanded(
+                      child: Container(
+                        key: const Key('login-desktop-panel'),
+                        height: pageHeight,
+                        color: const Color(0xFF0B0A08),
+                        child: SingleChildScrollView(
+                          key: const Key('login-desktop-scroll-view'),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 48,
+                            vertical: 32,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: (pageHeight - 64).clamp(
+                                0.0,
+                                double.infinity,
+                              ),
+                            ),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 520,
+                                ),
+                                child: FadeTransition(
+                                  opacity: _fade,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/barbeer_Log.png',
+                                        width: 88,
+                                        height: 72,
+                                        fit: BoxFit.contain,
+                                        semanticLabel: 'Logo de BarBeer',
+                                      ),
+                                      const SizedBox(height: 18),
+                                      _buildForm(desktop: true),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
               final contentWidth = constraints.maxWidth
                   .clamp(0.0, 600.0)
                   .toDouble();
@@ -193,26 +249,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  Widget _buildForm() => Form(
+  Widget _buildForm({bool desktop = false}) => Form(
     key: _formKey,
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
+        Text(
           'Iniciar sesión',
           style: TextStyle(
-            fontSize: 23,
+            fontSize: desktop ? 30 : 23,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: desktop ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 3),
-        const Text(
-          'Ingresa tus credenciales para ingresar',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        Text(
+          desktop
+              ? 'Ingresa tus credenciales para acceder al sistema interno'
+              : 'Ingresa tus credenciales para ingresar',
+          style: TextStyle(
+            fontSize: desktop ? 15 : 13,
+            color: desktop
+                ? Colors.white.withValues(alpha: 0.48)
+                : AppColors.textSecondary,
+          ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: desktop ? 24 : 16),
         if (_error != null) ...[
           Container(
             width: double.infinity,
@@ -254,7 +317,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           validator: (value) =>
               value == null || value.trim().isEmpty ? 'Requerido' : null,
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: desktop ? 14 : 10),
         _LoginField(
           controller: _passCtrl,
           hint: 'Contraseña',
@@ -293,10 +356,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: desktop ? 14 : 10),
         SizedBox(
           width: double.infinity,
-          height: 50,
+          height: desktop ? 54 : 50,
           child: ElevatedButton(
             onPressed: _loading ? null : _login,
             style: ElevatedButton.styleFrom(
@@ -323,11 +386,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
           ),
         ),
-        const SizedBox(height: 10),
-        const Text(
-          'BarBeer © 2026',
-          style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
-        ),
+        SizedBox(height: desktop ? 20 : 10),
+        if (desktop)
+          Row(
+            children: [
+              Expanded(
+                child: Divider(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 12,
+                      color: Colors.white.withValues(alpha: 0.32),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'SOLO PERSONAL AUTORIZADO',
+                      style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1,
+                        color: Colors.white.withValues(alpha: 0.32),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Divider(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+            ],
+          )
+        else
+          const Text(
+            'BarBeer © 2026',
+            style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+          ),
       ],
     ),
   );
@@ -335,8 +431,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
 class _LoginHero extends StatelessWidget {
   final double height;
+  final bool desktop;
 
-  const _LoginHero({required this.height});
+  const _LoginHero({required this.height, this.desktop = false});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -349,7 +446,7 @@ class _LoginHero extends StatelessWidget {
           child: Image.asset(
             'assets/images/bebb1.webp',
             fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
+            alignment: desktop ? Alignment.center : Alignment.topCenter,
           ),
         ),
         const Positioned.fill(
@@ -363,53 +460,124 @@ class _LoginHero extends StatelessWidget {
             ),
           ),
         ),
-        SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 32, 20, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Center(
-                  child: BarBeerWordmark(fontSize: 28, beerColor: Colors.white),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Accede de forma segura a la plataforma\n'
-                  'de administración de BarBeer.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xE6FFFFFF),
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const _FeatureRow(
-                  icon: Icons.bar_chart_rounded,
-                  title: 'Ventas',
-                  description: 'Consulta y analiza el rendimiento.',
-                ),
-                const SizedBox(height: 6),
-                const _FeatureRow(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Inventario',
-                  description: 'Controla stock y movimientos.',
-                ),
-                const SizedBox(height: 6),
-                const _FeatureRow(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Caja y reportes',
-                  description: 'Cierres, reportes y conciliaciones.',
-                ),
-              ],
-            ),
-          ),
-        ),
+        if (desktop) Positioned.fill(child: _content()) else _content(),
       ],
     ),
+  );
+
+  Widget _content() => SafeArea(
+    bottom: false,
+    child: Padding(
+      padding: desktop
+          ? const EdgeInsets.symmetric(horizontal: 64, vertical: 32)
+          : const EdgeInsets.fromLTRB(20, 32, 20, 12),
+      child: desktop
+          ? LayoutBuilder(
+              builder: (_, constraints) =>
+                  _desktopContent(compact: constraints.maxHeight < 600),
+            )
+          : _mobileContent(),
+    ),
+  );
+
+  Widget _desktopContent({required bool compact}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const BarBeerWordmark(fontSize: 30, beerColor: Colors.white),
+      const Spacer(),
+      const Text(
+        'SISTEMA INTERNO',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: AppColors.brand,
+          letterSpacing: 2.2,
+        ),
+      ),
+      const SizedBox(height: 10),
+      const Text(
+        'Sistema interno\nde gestión',
+        style: TextStyle(
+          fontSize: 42,
+          height: 1.05,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+          letterSpacing: -1,
+        ),
+      ),
+      const SizedBox(height: 14),
+      const Text(
+        'Accede de forma segura a la plataforma\n'
+        'de administración de BarBeer.',
+        style: TextStyle(fontSize: 14, color: Color(0xE6FFFFFF), height: 1.5),
+      ),
+      if (!compact) ...[
+        const SizedBox(height: 22),
+        const _FeatureRow(
+          icon: Icons.bar_chart_rounded,
+          title: 'Ventas',
+          description: 'Consulta y analiza el rendimiento.',
+          desktop: true,
+        ),
+        const SizedBox(height: 8),
+        const _FeatureRow(
+          icon: Icons.inventory_2_outlined,
+          title: 'Inventario',
+          description: 'Controla stock y movimientos.',
+          desktop: true,
+        ),
+        const SizedBox(height: 8),
+        const _FeatureRow(
+          icon: Icons.receipt_long_outlined,
+          title: 'Caja y reportes',
+          description: 'Cierres, reportes y conciliaciones.',
+          desktop: true,
+        ),
+      ],
+      const Spacer(),
+      Text(
+        '© ${DateTime.now().year} BarBeer ERP. Todos los derechos reservados.',
+        style: const TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
+      ),
+    ],
+  );
+
+  Widget _mobileContent() => const Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Center(child: BarBeerWordmark(fontSize: 28, beerColor: Colors.white)),
+      SizedBox(height: 8),
+      Text(
+        'Accede de forma segura a la plataforma\n'
+        'de administración de BarBeer.',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w400,
+          color: Color(0xE6FFFFFF),
+          height: 1.3,
+        ),
+      ),
+      SizedBox(height: 10),
+      _FeatureRow(
+        icon: Icons.bar_chart_rounded,
+        title: 'Ventas',
+        description: 'Consulta y analiza el rendimiento.',
+      ),
+      SizedBox(height: 6),
+      _FeatureRow(
+        icon: Icons.inventory_2_outlined,
+        title: 'Inventario',
+        description: 'Controla stock y movimientos.',
+      ),
+      SizedBox(height: 6),
+      _FeatureRow(
+        icon: Icons.receipt_long_outlined,
+        title: 'Caja y reportes',
+        description: 'Cierres, reportes y conciliaciones.',
+      ),
+    ],
   );
 }
 
@@ -440,19 +608,24 @@ class _FeatureRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
+  final bool desktop;
 
   const _FeatureRow({
     required this.icon,
     required this.title,
     required this.description,
+    this.desktop = false,
   });
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+    padding: EdgeInsets.symmetric(
+      horizontal: desktop ? 14 : 11,
+      vertical: desktop ? 10 : 7,
+    ),
     decoration: BoxDecoration(
       color: Colors.black.withValues(alpha: 0.27),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(desktop ? 12 : 10),
       border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
     ),
     child: Row(

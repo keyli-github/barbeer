@@ -1,12 +1,14 @@
 // Pantallas de precuadre y cierre de caja.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:barbeer/core/navigation/app_nav.dart';
 import 'package:barbeer/core/theme/app_colors.dart';
 import 'package:barbeer/core/widgets/app_button.dart';
 import 'package:barbeer/core/widgets/app_text_field.dart';
+import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
 
 String _money(double v) => 'S/ ${v.toStringAsFixed(2)}';
@@ -29,16 +31,24 @@ class _PrecuadreSheet extends ConsumerStatefulWidget {
 
 class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
+  late final Map<double, TextEditingController> _controllers = {
+    for (final value in cajaDenominaciones) value: TextEditingController(),
+  };
   bool _loading = false;
 
   double get _expected =>
       ref.read(cajaProvider).actual?.resumen?.efectivoEsperado ?? 0;
-  double get _declared => double.tryParse(_amountController.text) ?? 0;
+  Map<double, int> get _counts => {
+    for (final item in _controllers.entries)
+      item.key: int.tryParse(item.value.text) ?? 0,
+  };
+  double get _declared => cajaDenominacionesTotal(_counts);
 
   @override
   void dispose() {
-    _amountController.dispose();
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -58,19 +68,12 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
             children: [
               _TotalBand(label: 'Saldo esperado', value: _expected),
               const SizedBox(height: 14),
-              AppTextField(
-                label: 'Monto declarado (S/)',
-                hint: '0.00',
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                onChanged: (_) => setState(() {}),
-                validator: (v) {
-                  final n = double.tryParse(v ?? '');
-                  return n == null || n < 0 ? 'Monto inválido' : null;
-                },
+              _DenominationFields(
+                controllers: _controllers,
+                onChanged: () => setState(() {}),
               ),
+              const SizedBox(height: 14),
+              _TotalBand(label: 'Total contado', value: _declared),
               const SizedBox(height: 10),
               _DifferenceRow(value: _declared - _expected),
               const SizedBox(height: 20),
@@ -92,9 +95,7 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await ref
-          .read(cajaProvider.notifier)
-          .precuadre(double.parse(_amountController.text));
+      await ref.read(cajaProvider.notifier).precuadre(_counts);
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSuccess();
@@ -109,7 +110,7 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Sheet de cierre de caja (monto + observaciones + cierre forzado opcional).
+/// Sheet de cierre de caja (conteo + observaciones + cierre forzado opcional).
 
 void showCierreSheet(
   BuildContext context, {
@@ -134,7 +135,9 @@ class _CierreSheet extends ConsumerStatefulWidget {
 
 class _CierreSheetState extends ConsumerState<_CierreSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
+  late final Map<double, TextEditingController> _controllers = {
+    for (final value in cajaDenominaciones) value: TextEditingController(),
+  };
   final _notesController = TextEditingController();
   final _motivoController = TextEditingController();
   bool _forzar = false;
@@ -142,11 +145,17 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
 
   double get _expected =>
       ref.read(cajaProvider).actual?.resumen?.efectivoEsperado ?? 0;
-  double get _declared => double.tryParse(_amountController.text) ?? 0;
+  Map<double, int> get _counts => {
+    for (final item in _controllers.entries)
+      item.key: int.tryParse(item.value.text) ?? 0,
+  };
+  double get _declared => cajaDenominacionesTotal(_counts);
 
   @override
   void dispose() {
-    _amountController.dispose();
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
     _notesController.dispose();
     _motivoController.dispose();
     super.dispose();
@@ -168,19 +177,12 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
             children: [
               _TotalBand(label: 'Saldo esperado', value: _expected),
               const SizedBox(height: 14),
-              AppTextField(
-                label: 'Monto declarado (S/)',
-                hint: '0.00',
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                onChanged: (_) => setState(() {}),
-                validator: (v) {
-                  final n = double.tryParse(v ?? '');
-                  return n == null || n < 0 ? 'Monto inválido' : null;
-                },
+              _DenominationFields(
+                controllers: _controllers,
+                onChanged: () => setState(() {}),
               ),
+              const SizedBox(height: 14),
+              _TotalBand(label: 'Total contado', value: _declared),
               const SizedBox(height: 10),
               _DifferenceRow(value: _declared - _expected),
               const SizedBox(height: 14),
@@ -222,21 +224,15 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
     }
     setState(() => _loading = true);
     try {
-      final amount = double.parse(_amountController.text);
       final notes = _notesController.text;
-      if (_forzar) {
-        await ref
-            .read(cajaProvider.notifier)
-            .cerrarForzado(
-              amount,
-              motivoForzado: _motivoController.text.trim(),
-              observaciones: notes.isNotEmpty ? notes : null,
-            );
-      } else {
-        await ref
-            .read(cajaProvider.notifier)
-            .cerrar(amount, notes.isNotEmpty ? notes : null);
-      }
+      await ref
+          .read(cajaProvider.notifier)
+          .cerrar(
+            _counts,
+            observaciones: notes.isNotEmpty ? notes : null,
+            forzarPendientes: _forzar,
+            motivoForzado: _forzar ? _motivoController.text.trim() : null,
+          );
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSuccess();
@@ -250,6 +246,64 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
 }
 
 // ── Widgets privados compartidos ─────────────────────────────────────────────
+
+class _DenominationFields extends StatelessWidget {
+  final Map<double, TextEditingController> controllers;
+  final VoidCallback onChanged;
+
+  const _DenominationFields({
+    required this.controllers,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Cantidad por denominación',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+      ),
+      const SizedBox(height: 8),
+      GridView.count(
+        crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 2.5,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        children: [
+          for (final value in cajaDenominaciones)
+            TextFormField(
+              key: ValueKey('caja-denominacion-$value'),
+              controller: controllers[value],
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 6,
+              onChanged: (_) => onChanged(),
+              validator: (text) {
+                final cantidad = int.tryParse(
+                  text?.isEmpty ?? true ? '0' : text!,
+                );
+                return cantidad == null || cantidad > 999999
+                    ? 'Cantidad inválida'
+                    : null;
+              },
+              decoration: InputDecoration(
+                labelText: 'S/ ${_denomination(value)}',
+                hintText: '0',
+                counterText: '',
+                prefixIcon: const Icon(Icons.payments_outlined, size: 18),
+              ),
+            ),
+        ],
+      ),
+    ],
+  );
+}
 
 class _TotalBand extends StatelessWidget {
   final String label;
@@ -360,7 +414,7 @@ class _ForzarSection extends StatelessWidget {
             label: 'Motivo del cierre forzado *',
             hint: 'Explica por qué cierras con ventas pendientes…',
             controller: motivoController,
-            maxLength: 300,
+            maxLength: 500,
           ),
         ],
       ],
@@ -377,3 +431,6 @@ void _showError(BuildContext context, Object error) {
     ),
   );
 }
+
+String _denomination(double value) =>
+    value >= 1 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/ds_product_image.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
+import '../widgets/anular_venta_dialog.dart';
 import 'conciliar_venta_screen.dart';
 
 /// Subpantalla completa de detalle de venta.
@@ -36,35 +35,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
   }
 
   Future<void> _anular() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Anular venta',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          '¿Anular la venta ${_venta.codigo}? Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text(
-              'Anular',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
+    if (_anulando) return;
+    final motivo = await showAnularVentaDialog(context, codigo: _venta.codigo);
+    if (motivo == null || !mounted) return;
 
     setState(() {
       _anulando = true;
@@ -73,7 +46,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
     try {
       await ref
           .read(ventasRepositoryProvider)
-          .anularVenta(_venta.id, motivo: 'Anulada manualmente');
+          .anularVenta(_venta.id, motivo: motivo);
       if (mounted) {
         widget.onChanged?.call();
         DSSuccessOverlay.show(context, title: 'Venta anulada');
@@ -105,17 +78,11 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
     final auth = ref.watch(authProvider);
     final canAnular = canAnularVenta(auth) && !_venta.isAnulada;
     final puedeClasificar = canConciliar(auth) && _venta.isPendiente;
-    final puedeCorregir = canConciliarCorregir(auth) &&
-        !_venta.isAnulada &&
-        !_venta.isPendiente;
+    final puedeCorregir =
+        canConciliarCorregir(auth) && !_venta.isAnulada && !_venta.isPendiente;
 
     final isAnulada = _venta.isAnulada;
     final isPendiente = _venta.isPendiente;
-    final statusColor = isAnulada
-        ? AppColors.error
-        : isPendiente
-        ? AppColors.warning
-        : AppColors.success;
     final statusLabel = isAnulada
         ? 'ANULADA'
         : isPendiente

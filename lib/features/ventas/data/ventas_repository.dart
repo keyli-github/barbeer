@@ -38,15 +38,17 @@ class VentasRepository {
     String? estado,
     String? vendedoraId,
     String? cajaSesionId,
+    String? sedeId,
   }) async {
     final response = await _api.get(
       ApiConstants.ventas,
       queryParameters: {
         'pagina': pagina,
         'limite': limite,
-        if (estado != null) 'estado': estado,
-        if (vendedoraId != null) 'vendedoraId': vendedoraId,
-        if (cajaSesionId != null) 'cajaSesionId': cajaSesionId,
+        'estado': ?estado,
+        'vendedoraId': ?vendedoraId,
+        'cajaSesionId': ?cajaSesionId,
+        'sedeId': ?sedeId,
       },
     );
     final json = Map<String, dynamic>.from(response.data as Map);
@@ -64,13 +66,15 @@ class VentasRepository {
     int pagina = 1,
     int limite = 20,
     String? estado,
+    String? cajaSesionId,
   }) async {
     final response = await _api.get(
       ApiConstants.misVentas,
       queryParameters: {
         'pagina': pagina,
         'limite': limite,
-        if (estado != null) 'estado': estado,
+        'estado': ?estado,
+        'cajaSesionId': ?cajaSesionId,
       },
     );
     final json = Map<String, dynamic>.from(response.data as Map);
@@ -110,7 +114,7 @@ class VentasRepository {
       ApiConstants.conciliarVenta(id),
       data: {
         'estado': estado,
-        if (etiquetaId != null) 'etiquetaId': etiquetaId,
+        'etiquetaId': ?etiquetaId,
         if (comprobante != null && comprobante.isNotEmpty)
           'comprobante': comprobante,
         if (codigoOperacion != null && codigoOperacion.isNotEmpty)
@@ -130,7 +134,7 @@ class VentasRepository {
         'pagina': 1,
         'limite': 50,
         'soloActivas': true,
-        if (sedeId != null) 'sedeId': sedeId,
+        'sedeId': ?sedeId,
       },
     );
     final json = Map<String, dynamic>.from(response.data as Map);
@@ -143,11 +147,7 @@ class VentasRepository {
   Future<List<Etiqueta>> listEtiquetas({String? sedeId}) async {
     final response = await _api.get(
       ApiConstants.etiquetas,
-      queryParameters: {
-        'pagina': 1,
-        'limite': 50,
-        if (sedeId != null) 'sedeId': sedeId,
-      },
+      queryParameters: {'pagina': 1, 'limite': 50, 'sedeId': ?sedeId},
     );
     final json = Map<String, dynamic>.from(response.data as Map);
     return (json['data'] as List? ?? [])
@@ -168,7 +168,7 @@ class VentasRepository {
         'nombre': nombre,
         'requiereComprobante': requiereComprobante,
         'orden': orden,
-        if (sedeId != null) 'sedeId': sedeId,
+        'sedeId': ?sedeId,
       },
     );
     return Etiqueta.fromJson(Map<String, dynamic>.from(response.data as Map));
@@ -184,10 +184,9 @@ class VentasRepository {
     final response = await _api.patch(
       ApiConstants.etiqueta(id),
       data: {
-        if (nombre != null) 'nombre': nombre,
-        if (requiereComprobante != null)
-          'requiereComprobante': requiereComprobante,
-        if (orden != null) 'orden': orden,
+        'nombre': ?nombre,
+        'requiereComprobante': ?requiereComprobante,
+        'orden': ?orden,
       },
     );
     return Etiqueta.fromJson(Map<String, dynamic>.from(response.data as Map));

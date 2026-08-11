@@ -6,7 +6,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/ds_inputs.dart';
-import '../../../../core/widgets/ds_list_tile.dart';
 import '../../../../core/widgets/ds_product_image.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -108,7 +107,7 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                       itemCount:
                           ventas.length +
                           (state.totalPaginas > state.pagina ? 1 : 0),
-                      separatorBuilder: (_, __) => const Divider(
+                      separatorBuilder: (_, _) => const Divider(
                         height: 1,
                         indent: 71,
                         color: AppColors.borderLight,
@@ -116,9 +115,14 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                       itemBuilder: (_, i) {
                         if (i == ventas.length) {
                           return _LoadMoreButton(
-                            onTap: () => ref
-                                .read(ventasListProvider(_useMis).notifier)
-                                .load(pagina: state.pagina + 1),
+                            loading: state.loading,
+                            onTap: state.loading
+                                ? null
+                                : () => ref
+                                      .read(
+                                        ventasListProvider(_useMis).notifier,
+                                      )
+                                      .loadMore(),
                           );
                         }
                         return _VentaCard(
@@ -446,22 +450,29 @@ class _VentaCard extends StatelessWidget {
 }
 
 class _LoadMoreButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _LoadMoreButton({required this.onTap});
+  final VoidCallback? onTap;
+  final bool loading;
+  const _LoadMoreButton({required this.onTap, required this.loading});
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: TextButton(
         onPressed: onTap,
-        child: const Text(
-          'Cargar más',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
-          ),
-        ),
+        child: loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text(
+                'Cargar más',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
       ),
     ),
   );

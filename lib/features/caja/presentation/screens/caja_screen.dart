@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/navigation/app_nav.dart';
@@ -9,6 +9,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
@@ -76,13 +77,14 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                       canOpen: auth.hasPermission('caja:aperturar'),
                       canPrecuadre: auth.hasPermission('caja:precuadre'),
                       canClose: auth.hasPermission('caja:cerrar'),
-                      canForzar: auth.hasPermission('caja:forzar-cierre'),
+                      canMove: auth.hasPermission('caja:movimientos'),
                       onOpen: () => _showOpening(context),
                       onPrecuadre: () => _showPrecuadre(context),
                       onClose: () => _showCierre(
                         context,
                         canForzar: auth.hasPermission('caja:forzar-cierre'),
                       ),
+                      onMove: (tipo) => _showMovement(context, tipo),
                       onMovementFilter: (tipo) {
                         if (state.actual != null) {
                           ref
@@ -113,7 +115,10 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showOpening(BuildContext context) async {
-    final saved = await AppNav.push<bool>(context, const _OpeningSheet());
+    final saved = await AppNav.push<bool>(
+      context,
+      _OpeningSheet(initialCounts: ref.read(cajaProvider).aperturaSugerida),
+    );
     if (saved == true && mounted) _success('Caja abierta correctamente');
   }
 
@@ -135,8 +140,12 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     );
   }
 
-  /// @deprecated Movimientos manuales prohibidos en V2.
-  // Future<void> _showMovement(BuildContext context) async { ... }
+  Future<void> _showMovement(BuildContext context, String tipo) async {
+    final saved = await AppNav.push<bool>(context, _MovementSheet(tipo: tipo));
+    if (saved == true && mounted) {
+      _success(tipo == 'ENTRADA' ? 'Entrada registrada' : 'Salida registrada');
+    }
+  }
 
   void _success(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -169,7 +178,7 @@ class _CajaTabs extends StatelessWidget {
         // Selector de sede solo para SuperAdmin
         if (isSuperAdmin && state.sedes.isNotEmpty) ...[
           DropdownButtonFormField<String>(
-            value: state.sedeId,
+            initialValue: state.sedeId,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Sede',
@@ -259,10 +268,11 @@ class _Actual extends StatelessWidget {
   final bool canOpen;
   final bool canPrecuadre;
   final bool canClose;
-  final bool canForzar;
+  final bool canMove;
   final VoidCallback onOpen;
   final VoidCallback onPrecuadre;
   final VoidCallback onClose;
+  final ValueChanged<String> onMove;
   final ValueChanged<String?> onMovementFilter;
   final ValueChanged<int> onMovementPage;
 
@@ -272,10 +282,11 @@ class _Actual extends StatelessWidget {
     required this.canOpen,
     required this.canPrecuadre,
     required this.canClose,
-    this.canForzar = false,
+    this.canMove = false,
     required this.onOpen,
     required this.onPrecuadre,
     required this.onClose,
+    required this.onMove,
     required this.onMovementFilter,
     required this.onMovementPage,
   });
@@ -389,9 +400,34 @@ class _Actual extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              // Movimientos manuales eliminados por regla de negocio V2.
-              // Las entradas se generan automáticamente desde ventas.
-              // Las salidas digitales se generan desde conciliación.
+              if (canMove)
+                OutlinedButton.icon(
+                  onPressed: state.isActing ? null : () => onMove('ENTRADA'),
+                  icon: const Icon(Icons.south_west_rounded, size: 18),
+                  label: const Text('Entrada'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.success,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    minimumSize: const Size(0, 44),
+                  ),
+                ),
+              if (canMove)
+                OutlinedButton.icon(
+                  onPressed: state.isActing ? null : () => onMove('SALIDA'),
+                  icon: const Icon(Icons.north_east_rounded, size: 18),
+                  label: const Text('Salida'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    minimumSize: const Size(0, 44),
+                  ),
+                ),
               if (canPrecuadre)
                 OutlinedButton.icon(
                   onPressed: state.isActing ? null : onPrecuadre,
@@ -555,7 +591,8 @@ class _Historial extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         _money(
-                          session.resumen?.efectivoEsperado ??
+                          session.saldoActual ??
+                              session.resumen?.efectivoEsperado ??
                               session.montoApertura,
                         ),
                         style: AppTextStyles.labelLarge.copyWith(
@@ -579,22 +616,35 @@ class _Historial extends StatelessWidget {
 }
 
 class _OpeningSheet extends ConsumerStatefulWidget {
-  const _OpeningSheet();
+  final Map<double, int> initialCounts;
+
+  const _OpeningSheet({required this.initialCounts});
 
   @override
   ConsumerState<_OpeningSheet> createState() => _OpeningSheetState();
 }
 
 class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
-  late final Map<double, TextEditingController> _controllers = {
-    for (final value in cajaDenominaciones) value: TextEditingController(),
-  };
+  late final Map<double, TextEditingController> _controllers;
   bool _loading = false;
 
   double get _total => _controllers.entries.fold(
     0,
     (sum, entry) => sum + entry.key * (int.tryParse(entry.value.text) ?? 0),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = {
+      for (final value in cajaDenominaciones)
+        value: TextEditingController(
+          text: widget.initialCounts.containsKey(value)
+              ? widget.initialCounts[value].toString()
+              : '',
+        ),
+    };
+  }
 
   @override
   void dispose() {
@@ -609,7 +659,9 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
     backgroundColor: Colors.white,
     appBar: SubPageAppBar(
       title: 'Apertura de caja',
-      subtitle: 'Conteo obligatorio de las 10 denominaciones PEN',
+      subtitle: widget.initialCounts.isEmpty
+          ? 'Conteo obligatorio de las 9 denominaciones PEN'
+          : 'Prefill del último cierre; verifica el efectivo físico',
     ),
     body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -625,12 +677,16 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
             children: [
               for (final value in cajaDenominaciones)
                 TextFormField(
+                  key: ValueKey('apertura-denominacion-$value'),
                   controller: _controllers[value],
                   keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 6,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: 'S/ ${_denomination(value)}',
                     hintText: '0',
+                    counterText: '',
                     prefixIcon: const Icon(Icons.payments_outlined, size: 18),
                   ),
                 ),
@@ -666,10 +722,113 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
   }
 }
 
-// === MOVIMIENTOS MANUALES ELIMINADOS ===
-// Las entradas y salidas se generan automaticamente desde ventas y conciliacion.
-// _MovementOption, _MovementSheet y _ArqueoSheet removidos por regla de negocio V2.
-// Los sheets de arqueo están en widgets/caja_arqueo_sheets.dart.
+class _MovementSheet extends ConsumerStatefulWidget {
+  final String tipo;
+
+  const _MovementSheet({required this.tipo});
+
+  @override
+  ConsumerState<_MovementSheet> createState() => _MovementSheetState();
+}
+
+class _MovementSheetState extends ConsumerState<_MovementSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _conceptController = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _conceptController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entrada = widget.tipo == 'ENTRADA';
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: SubPageAppBar(
+        title: entrada ? 'Nueva entrada' : 'Nueva salida',
+        subtitle: 'Movimiento manual de efectivo',
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              AppTextField(
+                label: 'Monto (S/)',
+                hint: '0.00',
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (text) {
+                  final value = double.tryParse(text ?? '');
+                  if (value == null || value <= 0 || value > 999999999.99) {
+                    return 'Ingresa un monto válido mayor a 0';
+                  }
+                  if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(text!)) {
+                    return 'Usa como máximo 2 decimales';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              AppTextField(
+                label: 'Concepto / motivo',
+                hint: entrada
+                    ? 'Ej. Cambio para vuelto'
+                    : 'Ej. Pago a proveedor',
+                controller: _conceptController,
+                maxLength: 160,
+                textCapitalization: TextCapitalization.sentences,
+                validator: (text) => (text?.trim().isEmpty ?? true)
+                    ? 'Ingresa un concepto'
+                    : null,
+              ),
+              const SizedBox(height: 20),
+              AppButton(
+                label: entrada ? 'Registrar entrada' : 'Registrar salida',
+                icon: entrada
+                    ? Icons.south_west_rounded
+                    : Icons.north_east_rounded,
+                isFullWidth: true,
+                isLoading: _loading,
+                variant: entrada
+                    ? AppButtonVariant.primary
+                    : AppButtonVariant.danger,
+                onPressed: _submit,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      await ref
+          .read(cajaProvider.notifier)
+          .registrarMovimiento(
+            tipo: widget.tipo,
+            monto: double.parse(_amountController.text),
+            concepto: _conceptController.text.trim(),
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) _sheetError(context, error);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
 
 class _DetailSheet extends StatelessWidget {
   final Future<CajaSesion> future;
@@ -768,72 +927,6 @@ class _DetailSheet extends StatelessWidget {
   );
 }
 
-class _SheetFrame extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  const _SheetFrame({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-    ),
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    decoration: const BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 38,
-          height: 4,
-          margin: const EdgeInsets.only(top: 10),
-          decoration: BoxDecoration(
-            color: AppColors.border,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: AppTextStyles.headlineMedium),
-                    const SizedBox(height: 3),
-                    Text(subtitle, style: AppTextStyles.labelSmall),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: child,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 class _Metric extends StatelessWidget {
   final double width;
   final String label;
@@ -915,7 +1008,12 @@ class _MovementTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    '${movement.medioPago} · ${movement.origen} · ${_dateTime(movement.createdAt)}',
+                    [
+                      if (movement.medioPago?.isNotEmpty ?? false)
+                        movement.medioPago!,
+                      if (movement.origen.isNotEmpty) movement.origen,
+                      _dateTime(movement.createdAt),
+                    ].join(' · '),
                     style: AppTextStyles.labelSmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
