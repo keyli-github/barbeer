@@ -20,14 +20,8 @@ class VentasRepository {
   /// Crea una venta nueva.
   /// [idempotencyKey] se genera con [generateIdempotencyKey()].
   /// El backend calcula precios y totales; el cliente solo envía productoId + cantidad.
-  Future<Venta> crearVenta({
-    required String idempotencyKey,
-    required List<Map<String, dynamic>> items,
-  }) async {
-    final response = await _api.post(
-      ApiConstants.ventas,
-      data: {'idempotencyKey': idempotencyKey, 'items': items},
-    );
+  Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
+    final response = await _api.post(ApiConstants.ventas, data: payload.json);
     return Venta.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
 
@@ -140,6 +134,20 @@ class VentasRepository {
     final json = Map<String, dynamic>.from(response.data as Map);
     return (json['data'] as List? ?? [])
         .map((e) => Etiqueta.fromJson(Map<String, dynamic>.from(e as Map)))
+        .where((e) => e.tipo == 'ENTRADA' || e.tipo == 'AMBOS')
+        .toList();
+  }
+
+  Future<List<VendedorVenta>> listVendedores({required String sedeId}) async {
+    final response = await _api.get(
+      ApiConstants.users,
+      queryParameters: {'pagina': 1, 'limite': 100, 'sedeId': sedeId},
+    );
+    final json = Map<String, dynamic>.from(response.data as Map);
+    return (json['data'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => VendedorVenta.fromJson(Map<String, dynamic>.from(item)))
+        .where((user) => user.id.isNotEmpty)
         .toList();
   }
 

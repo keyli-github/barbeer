@@ -1,5 +1,5 @@
-/// Modelos de datos para el módulo de Ventas y Conciliación.
-/// Espejo de los DTOs del backend NestJS.
+// Modelos de datos para el módulo de Ventas y Conciliación.
+// Espejo de los DTOs del backend NestJS.
 
 // ─── Etiqueta (billetera digital) ──────────────────────────────────────────
 
@@ -9,6 +9,7 @@ class Etiqueta {
   final bool activo;
   final String? sedeId;
   final bool requiereComprobante;
+  final String tipo;
   final int orden;
 
   const Etiqueta({
@@ -17,6 +18,7 @@ class Etiqueta {
     required this.activo,
     this.sedeId,
     required this.requiereComprobante,
+    this.tipo = 'ENTRADA',
     required this.orden,
   });
 
@@ -26,6 +28,7 @@ class Etiqueta {
     activo: j['activo'] as bool? ?? true,
     sedeId: j['sedeId'] as String?,
     requiereComprobante: j['requiereComprobante'] as bool? ?? true,
+    tipo: j['tipo'] as String? ?? 'ENTRADA',
     orden: (j['orden'] as num?)?.toInt() ?? 0,
   );
 }
@@ -140,6 +143,8 @@ class Venta {
   final EstadoVenta estado;
   final String? motivoAnulacion;
   final String? anuladaAt;
+  final double? recargoMonto;
+  final String? recargoMotivo;
   final ConciliacionVenta? conciliacion;
   final List<VentaItem> items;
   final String createdAt;
@@ -154,6 +159,8 @@ class Venta {
     required this.estado,
     this.motivoAnulacion,
     this.anuladaAt,
+    this.recargoMonto,
+    this.recargoMotivo,
     this.conciliacion,
     required this.items,
     required this.createdAt,
@@ -169,6 +176,8 @@ class Venta {
     estado: parseEstadoVenta(j['estado'] as String?),
     motivoAnulacion: j['motivoAnulacion'] as String?,
     anuladaAt: j['anuladaAt'] as String?,
+    recargoMonto: (j['recargoMonto'] as num?)?.toDouble(),
+    recargoMotivo: j['recargoMotivo'] as String?,
     conciliacion: j['conciliacion'] is Map
         ? ConciliacionVenta.fromJson(
             Map<String, dynamic>.from(j['conciliacion'] as Map),
@@ -184,4 +193,56 @@ class Venta {
 
   bool get isAnulada => estado == EstadoVenta.anulada;
   bool get isPendiente => conciliacion?.estado == EstadoConciliacion.pendiente;
+  double get subtotalSinRecargo => total - (recargoMonto ?? 0);
+}
+
+class VendedorVenta {
+  final String id;
+  final String username;
+  final String rol;
+
+  const VendedorVenta({
+    required this.id,
+    required this.username,
+    required this.rol,
+  });
+
+  factory VendedorVenta.fromJson(Map<String, dynamic> j) => VendedorVenta(
+    id: j['id'] as String? ?? '',
+    username: j['username'] as String? ?? '',
+    rol: (j['rol'] as Map?)?['nombre'] as String? ?? '',
+  );
+}
+
+/// Immutable value retained after ambiguous failures for an exact retry.
+class CreateVentaPayload {
+  final Map<String, dynamic> json;
+
+  CreateVentaPayload({
+    required String idempotencyKey,
+    required List<Map<String, dynamic>> items,
+    String? sedeId,
+    String? vendedoraId,
+    required EstadoConciliacion estadoConciliacion,
+    String? etiquetaId,
+    String? comprobante,
+    String? codigoOperacion,
+    double? recargoMonto,
+    String? recargoMotivo,
+  }) : json = Map.unmodifiable({
+         'idempotencyKey': idempotencyKey,
+         'items': List.unmodifiable(
+           items.map((item) => Map<String, dynamic>.unmodifiable(item)),
+         ),
+         'sedeId': ?sedeId,
+         'vendedoraId': ?vendedoraId,
+         'estadoConciliacion': estadoConciliacion.name.toUpperCase(),
+         'etiquetaId': ?etiquetaId,
+         'comprobante': ?comprobante,
+         'codigoOperacion': ?codigoOperacion,
+         'recargoMonto': ?recargoMonto,
+         'recargoMotivo': ?recargoMotivo,
+       });
+
+  String get idempotencyKey => json['idempotencyKey'] as String;
 }

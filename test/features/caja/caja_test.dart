@@ -2,6 +2,52 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:barbeer/features/caja/data/caja_repository.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
+import 'package:barbeer/features/caja/presentation/providers/movimientos_provider.dart';
+import 'package:barbeer/core/network/api_client.dart';
+
+class _FakeCajaRepository extends CajaRepository {
+  _FakeCajaRepository() : super(ApiClient.instance);
+
+  String? lastSedeId;
+  String? lastTipo;
+  String? lastFechaInicio;
+  String? lastFechaFin;
+  int? lastPagina;
+
+  @override
+  Future<CajaPage<CajaMovimiento>> movimientosGenerales({
+    int pagina = 1,
+    int limite = 20,
+    String? tipo,
+    required String sedeId,
+    String? fechaInicio,
+    String? fechaFin,
+  }) async {
+    lastSedeId = sedeId;
+    lastTipo = tipo;
+    lastFechaInicio = fechaInicio;
+    lastFechaFin = fechaFin;
+    lastPagina = pagina;
+    return CajaPage(
+      data: [
+        CajaMovimiento.fromJson({
+          'id': 'm1',
+          'cajaSesionId': 'c1',
+          'sedeId': sedeId,
+          'tipo': tipo ?? 'ENTRADA',
+          'origen': 'MANUAL',
+          'concepto': 'Movimiento general',
+          'monto': 20,
+          'usuario': {'username': 'cajero'},
+          'createdAt': '2026-08-13T10:00:00Z',
+        }),
+      ],
+      total: 21,
+      pagina: pagina,
+      totalPaginas: 2,
+    );
+  }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -317,6 +363,70 @@ void main() {
         expect(movement.usuario, isEmpty);
       },
     );
+
+    test('parsea precuadre, etiqueta y propiedad de apertura', () {
+      final sesionJson = _sesionJson();
+      sesionJson['denominacionesPrecuadre'] = [
+        {'denominacion': 100, 'cantidad': 2, 'subtotal': 200},
+      ];
+      final sesion = CajaSesion.fromJson(sesionJson);
+      final movement = CajaMovimiento.fromJson({
+        'id': 'm2',
+        'tipo': 'ENTRADA',
+        'origen': 'PAGO_NO_EFECTIVO',
+        'concepto': 'Pago Yape',
+        'monto': 30,
+        'usuario': {'username': 'cajero1'},
+        'etiquetaId': 'e1',
+        'etiqueta': {'id': 'e1', 'nombre': 'Yape'},
+        'createdAt': '2026-08-13T10:00:00Z',
+      });
+
+      expect(sesion.denominacionesPrecuadre, hasLength(1));
+      expect(sesion.usuarioAperturaId, 'u1');
+      expect(sesion.isOwnedBy(userId: 'u1', username: 'otro'), isTrue);
+      expect(movement.etiquetaId, 'e1');
+      expect(movement.etiqueta, 'Yape');
+    });
+
+    test('representa propietario ausente sin bloquear el parseo', () {
+      final json = _sesionJson();
+      json['usuarioApertura'] = null;
+      final sesion = CajaSesion.fromJson(json);
+
+      expect(sesion.usuarioAperturaLabel, 'Usuario no disponible');
+      expect(sesion.isOwnedBy(userId: 'u1', username: 'test'), isFalse);
+    });
+  });
+
+  group('Movimientos generales', () {
+    test('aplica sede, fechas, tipo y paginación', () async {
+      final repository = _FakeCajaRepository();
+      final notifier = MovimientosNotifier(repository, 's1');
+      await Future<void>.delayed(Duration.zero);
+
+      await notifier.filtrarFechas(DateTime(2026, 8, 1), DateTime(2026, 8, 13));
+      await notifier.filtrarTipo('SALIDA');
+      await notifier.cambiarPagina(2);
+
+      expect(repository.lastSedeId, 's1');
+      expect(repository.lastFechaInicio, '2026-08-01');
+      expect(repository.lastFechaFin, '2026-08-13');
+      expect(repository.lastTipo, 'SALIDA');
+      expect(repository.lastPagina, 2);
+      expect(notifier.state.total, 21);
+      expect(notifier.state.movimientos, hasLength(1));
+    });
+
+    test('sin sede no consulta el endpoint', () async {
+      final repository = _FakeCajaRepository();
+      final notifier = MovimientosNotifier(repository, null);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.lastSedeId, isNull);
+      expect(notifier.state.movimientos, isEmpty);
+      expect(notifier.state.error, isNull);
+    });
   });
 
   group('Errores y conectividad', () {

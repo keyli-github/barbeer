@@ -15,6 +15,7 @@ import '../../features/perfil/presentation/screens/perfil_screen.dart';
 import '../../features/productos/presentation/screens/productos_screen.dart';
 import '../../features/ventas/presentation/screens/ventas_screen.dart';
 import '../../features/caja/presentation/screens/caja_screen.dart';
+import '../../features/caja/presentation/screens/movimientos_screen.dart';
 import '../../features/inventario/presentation/screens/inventario_screen.dart';
 import '../../features/kardex/presentation/screens/kardex_screen.dart';
 import '../../features/compras/presentation/screens/compras_screen.dart';
@@ -123,6 +124,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: RoutePaths.caja,
             builder: (_, __) => const CajaScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.movimientos,
+            builder: (_, __) => const MovimientosScreen(),
           ),
           GoRoute(
             path: RoutePaths.inventario,

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../auth/data/models/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caja_repository.dart';
@@ -12,7 +13,6 @@ class CajaState {
   final CajaSesion? actual;
   final List<CajaSesion> historial;
   final List<CajaMovimiento> movimientos;
-  final List<Map<String, dynamic>> sedes;
   final Map<double, int> aperturaSugerida;
   final String? sedeId;
   final String? estadoFiltro;
@@ -31,7 +31,6 @@ class CajaState {
     this.actual,
     this.historial = const [],
     this.movimientos = const [],
-    this.sedes = const [],
     this.aperturaSugerida = const {},
     this.sedeId,
     this.estadoFiltro,
@@ -53,7 +52,6 @@ class CajaState {
     bool clearActual = false,
     List<CajaSesion>? historial,
     List<CajaMovimiento>? movimientos,
-    List<Map<String, dynamic>>? sedes,
     Map<double, int>? aperturaSugerida,
     String? sedeId,
     String? estadoFiltro,
@@ -73,7 +71,6 @@ class CajaState {
     actual: clearActual ? null : (actual ?? this.actual),
     historial: historial ?? this.historial,
     movimientos: movimientos ?? this.movimientos,
-    sedes: sedes ?? this.sedes,
     aperturaSugerida: aperturaSugerida ?? this.aperturaSugerida,
     sedeId: sedeId ?? this.sedeId,
     estadoFiltro: clearEstadoFiltro
@@ -92,20 +89,19 @@ class CajaState {
 class CajaNotifier extends StateNotifier<CajaState> {
   final CajaRepository _repository;
   final UserProfile? _user;
+  final String? _globalSedeId;
 
-  CajaNotifier(this._repository, this._user) : super(const CajaState()) {
+  CajaNotifier(this._repository, this._user, this._globalSedeId)
+    : super(const CajaState()) {
     load();
   }
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      var sedes = state.sedes;
-      var sedeId = state.sedeId ?? _user?.sedeId;
-      if (_user?.isSuperAdmin ?? false) {
-        sedes = await _repository.sedes();
-        sedeId ??= sedes.isNotEmpty ? sedes.first['id'] as String? : null;
-      }
+      final sedeId = (_user?.isSuperAdmin ?? false)
+          ? _globalSedeId
+          : _user?.sedeId;
       final results = await Future.wait<Object?>([
         if (sedeId != null) _repository.actual(sedeId: sedeId),
         _repository.historial(
@@ -122,7 +118,6 @@ class CajaNotifier extends StateNotifier<CajaState> {
         isLoading: false,
         actual: actual,
         clearActual: actual == null,
-        sedes: sedes,
         aperturaSugerida: aperturaSugerida,
         sedeId: sedeId,
         historial: page.data,
@@ -143,11 +138,6 @@ class CajaNotifier extends StateNotifier<CajaState> {
     } catch (_) {
       return const {};
     }
-  }
-
-  Future<void> seleccionarSede(String sedeId) async {
-    state = state.copyWith(sedeId: sedeId, historialPagina: 1);
-    await load();
   }
 
   Future<void> filtrarHistorial(String? estado) async {
@@ -188,6 +178,9 @@ class CajaNotifier extends StateNotifier<CajaState> {
   }
 
   Future<CajaSesion> detalle(String id) => _repository.detalle(id);
+
+  Future<void> reaperturar(String id) =>
+      _action(() => _repository.reaperturar(id));
 
   Future<void> abrir(Map<double, int> cantidades) => _action(() async {
     await _repository.abrir(cantidades, sedeId: state.sedeId);
@@ -252,9 +245,8 @@ final cajaRepositoryProvider = Provider<CajaRepository>(
   (ref) => CajaRepository(ApiClient.instance),
 );
 
-final cajaProvider = StateNotifierProvider<CajaNotifier, CajaState>(
-  (ref) => CajaNotifier(
-    ref.watch(cajaRepositoryProvider),
-    ref.watch(authProvider).user,
-  ),
-);
+final cajaProvider = StateNotifierProvider<CajaNotifier, CajaState>((ref) {
+  final user = ref.watch(authProvider.select((auth) => auth.user));
+  final globalSedeId = ref.watch(globalSedeIdProvider);
+  return CajaNotifier(ref.watch(cajaRepositoryProvider), user, globalSedeId);
+});

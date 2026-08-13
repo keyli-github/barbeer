@@ -116,6 +116,9 @@ class ApiConstants {
   static String etiqueta(String id) => '/etiquetas/$id';
   static String etiquetaEstado(String id) => '/etiquetas/$id/estado';
 
+  // ── Uploads ──────────────────────────────────────────────────────────────
+  static const String uploads = '/uploads';
+
   // ── Health ───────────────────────────────────────────────────────────────
   static const String health = '/health';
 }

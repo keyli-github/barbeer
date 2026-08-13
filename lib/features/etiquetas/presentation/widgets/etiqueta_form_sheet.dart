@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../ventas/data/models/venta_models.dart';
-import '../../../ventas/presentation/providers/ventas_provider.dart';
+import '../../data/models/etiqueta.dart';
+import '../providers/etiquetas_provider.dart';
 
 /// Formulario para crear o editar una billetera digital.
 class EtiquetaFormSheet extends ConsumerStatefulWidget {
@@ -18,8 +18,8 @@ class EtiquetaFormSheet extends ConsumerStatefulWidget {
 
 class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
   late final TextEditingController _nombreCtrl;
-  late final TextEditingController _ordenCtrl;
   late bool _requiereComprobante;
+  late EtiquetaTipo _tipo;
   bool _saving = false;
   String? _error;
 
@@ -29,16 +29,13 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
   void initState() {
     super.initState();
     _nombreCtrl = TextEditingController(text: widget.etiqueta?.nombre ?? '');
-    _ordenCtrl = TextEditingController(
-      text: (widget.etiqueta?.orden ?? 0).toString(),
-    );
     _requiereComprobante = widget.etiqueta?.requiereComprobante ?? true;
+    _tipo = widget.etiqueta?.tipo ?? EtiquetaTipo.entrada;
   }
 
   @override
   void dispose() {
     _nombreCtrl.dispose();
-    _ordenCtrl.dispose();
     super.dispose();
   }
 
@@ -48,11 +45,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
       setState(() => _error = 'El nombre es obligatorio');
       return;
     }
-    final orden = int.tryParse(_ordenCtrl.text.trim());
-    if (orden == null || orden < 0) {
-      setState(() => _error = 'El orden debe ser un número ≥ 0');
-      return;
-    }
+    if (widget.etiqueta?.esSistema == true) return;
     if (_saving) return;
     setState(() {
       _saving = true;
@@ -60,25 +53,25 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
     });
 
     try {
-      final repo = ref.read(ventasRepositoryProvider);
+      final repo = ref.read(etiquetasRepositoryProvider);
       if (_isEdit) {
-        await repo.updateEtiqueta(
+        await repo.update(
           widget.etiqueta!.id,
           nombre: nombre,
           requiereComprobante: _requiereComprobante,
-          orden: orden,
+          tipo: _tipo,
         );
       } else {
-        await repo.createEtiqueta(
+        await repo.create(
           nombre: nombre,
           requiereComprobante: _requiereComprobante,
-          orden: orden,
+          tipo: _tipo,
         );
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isEdit ? 'Billetera actualizada' : 'Billetera creada'),
+          content: Text(_isEdit ? 'Etiqueta actualizada' : 'Etiqueta creada'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -99,12 +92,12 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
     if (s.contains('409') ||
         s.contains('duplicate') ||
         s.contains('ya existe')) {
-      return 'Ya existe una billetera con ese nombre';
+      return 'Ya existe una etiqueta con ese nombre';
     }
     if (s.contains('SocketException') || s.contains('connection')) {
       return 'Sin conexión al servidor';
     }
-    return 'No se pudo guardar la billetera';
+    return 'No se pudo guardar la etiqueta';
   }
 
   @override
@@ -112,7 +105,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: SubPageAppBar(
-        title: _isEdit ? 'Editar billetera' : 'Nueva billetera',
+        title: _isEdit ? 'Editar etiqueta' : 'Nueva etiqueta',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -124,7 +117,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
               controller: _nombreCtrl,
               decoration: InputDecoration(
                 labelText: 'Nombre *',
-                hintText: 'Ej: Yape, Plin, Agora',
+                hintText: 'Ej: Yape, Gastos, Caja chica',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -132,17 +125,23 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
               textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 12),
-            // Orden
-            TextField(
-              controller: _ordenCtrl,
+            DropdownButtonFormField<EtiquetaTipo>(
+              initialValue: _tipo,
               decoration: InputDecoration(
-                labelText: 'Orden de visualización',
-                hintText: '0',
+                labelText: 'Tipo *',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              keyboardType: TextInputType.number,
+              items: EtiquetaTipo.values
+                  .map(
+                    (tipo) => DropdownMenuItem(
+                      value: tipo,
+                      child: Text('${tipo.value} - ${tipo.label}'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (tipo) => setState(() => _tipo = tipo ?? _tipo),
             ),
             const SizedBox(height: 12),
             // RequiereComprobante
@@ -159,7 +158,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
               ),
               dense: true,
               contentPadding: EdgeInsets.zero,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
             const SizedBox(height: 16),
             // Error
@@ -200,7 +199,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
                         ),
                       )
                     : Text(
-                        _isEdit ? 'Guardar cambios' : 'Crear billetera',
+                        _isEdit ? 'Guardar cambios' : 'Crear etiqueta',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
               ),

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -27,12 +29,13 @@ class ConciliarVentaScreen extends ConsumerStatefulWidget {
 class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
   String _estado = 'EFECTIVO';
   String? _etiquetaId;
-  final _compCtrl = TextEditingController();
   final _codOpCtrl = TextEditingController();
   bool _saving = false;
   String? _error;
   List<Etiqueta> _etiquetas = [];
   bool _loadingEtiquetas = false;
+  Uint8List? _voucherBytes;
+  String? _voucherFilename;
 
   @override
   void initState() {
@@ -42,7 +45,6 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
 
   @override
   void dispose() {
-    _compCtrl.dispose();
     _codOpCtrl.dispose();
     super.dispose();
   }
@@ -64,6 +66,15 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
   bool get _requiereComprobante =>
       _selectedEtiqueta?.requiereComprobante ?? false;
 
+  Future<void> _pickVoucher() async {
+    final file = await ref.read(voucherImagePickerProvider)();
+    if (file == null || !mounted) return;
+    setState(() {
+      _voucherBytes = file.bytes;
+      _voucherFilename = file.filename;
+    });
+  }
+
   Future<void> _submit() async {
     if (_saving) return;
     if (_estado == 'BILLETERA' && _etiquetaId == null) {
@@ -72,7 +83,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
     }
     if (_estado == 'BILLETERA' &&
         _requiereComprobante &&
-        _compCtrl.text.trim().isEmpty) {
+        _voucherBytes == null) {
       setState(
         () => _error = 'Ingresa el comprobante requerido por esta billetera',
       );
@@ -83,15 +94,23 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       _error = null;
     });
     try {
+      String? comprobante;
+      if (_estado == 'BILLETERA' && _voucherBytes != null) {
+        final upload = await ref
+            .read(uploadClientProvider)
+            .uploadImage(
+              bytes: _voucherBytes!,
+              filename: _voucherFilename ?? 'comprobante.jpg',
+            );
+        comprobante = upload.url;
+      }
       await ref
           .read(ventasRepositoryProvider)
           .conciliarVenta(
             widget.venta.id,
             estado: _estado,
             etiquetaId: _estado == 'BILLETERA' ? _etiquetaId : null,
-            comprobante: _compCtrl.text.trim().isNotEmpty
-                ? _compCtrl.text.trim()
-                : null,
+            comprobante: comprobante,
             codigoOperacion: _codOpCtrl.text.trim().isNotEmpty
                 ? _codOpCtrl.text.trim()
                 : null,
@@ -217,7 +236,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                   onChanged: (v) => setState(() => _etiquetaId = v),
                 ),
 
-              if (_requiereComprobante) ...[
+              if (_requiereComprobante || _estado == 'BILLETERA') ...[
                 const SizedBox(height: 16),
                 const Text(
                   'Comprobante / voucher *',
@@ -228,17 +247,15 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                TextField(
+                OutlinedButton.icon(
                   key: const ValueKey('comprobanteField'),
-                  controller: _compCtrl,
-                  maxLength: 500,
-                  decoration: const InputDecoration(
-                    hintText: 'URL o referencia del comprobante',
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
+                  onPressed: _saving ? null : _pickVoucher,
+                  icon: Icon(
+                    _voucherBytes == null
+                        ? Icons.upload_file_rounded
+                        : Icons.check_circle_rounded,
                   ),
+                  label: Text(_voucherFilename ?? 'Seleccionar imagen'),
                 ),
               ],
 

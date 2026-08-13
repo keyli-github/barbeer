@@ -22,8 +22,8 @@ class ProductosRepository {
         if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
         if (categoriaId != null && categoriaId.isNotEmpty)
           'categoriaId': categoriaId,
-        if (activo != null) 'activo': activo.toString(),
-        if (sedeId != null) 'sedeId': sedeId,
+        if (activo case final activo?) 'activo': activo.toString(),
+        'sedeId': ?sedeId,
       },
     );
     return ProductosPage.fromJson(response.data ?? const {});

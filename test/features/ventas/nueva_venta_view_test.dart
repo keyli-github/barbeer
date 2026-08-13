@@ -1,12 +1,16 @@
 import 'dart:async';
 
 import 'package:barbeer/core/network/api_client.dart';
+import 'package:barbeer/core/errors/app_exception.dart';
+import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/core/widgets/ds_product_image.dart';
 import 'package:barbeer/features/productos/data/productos_repository.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
 import 'package:barbeer/features/ventas/presentation/screens/nueva_venta_view.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/carrito_venta_sheet.dart';
+import 'package:barbeer/features/auth/data/models/auth_models.dart';
+import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,10 +74,44 @@ const _products = [
   ),
 ];
 
+class _TestAuthNotifier extends AuthNotifier {
+  _TestAuthNotifier(super.repository, AuthState value) {
+    state = value;
+  }
+}
+
+class _RetryVentasRepository extends VentasRepository {
+  _RetryVentasRepository() : super(ApiClient.instance);
+
+  final attempts = <CreateVentaPayload>[];
+
+  @override
+  Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
+    attempts.add(payload);
+    if (attempts.length == 1) throw const NetworkException();
+    return Venta(
+      id: 'v1',
+      codigo: 'V-001',
+      cajaSesionId: 'c1',
+      sedeId: 's1',
+      total: 12,
+      estado: EstadoVenta.activa,
+      conciliacion: const ConciliacionVenta(
+        id: 'co1',
+        estado: EstadoConciliacion.efectivo,
+      ),
+      items: const [],
+      createdAt: '2026-08-13T10:00:00Z',
+    );
+  }
+}
+
 Future<void> _pumpNuevaVenta(
   WidgetTester tester, {
   required Size size,
   required Future<List<Producto>> Function() loader,
+  List<String> permissions = const [],
+  VentasRepository? repository,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -85,8 +123,25 @@ Future<void> _pumpNuevaVenta(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        authProvider.overrideWith(
+          (ref) => _TestAuthNotifier(
+            ref.read(authRepositoryProvider),
+            AuthState(
+              status: AuthStatus.authenticated,
+              user: UserProfile(
+                id: 'u1',
+                username: 'seller',
+                rol: 'VENDEDORA',
+                nivel: 10,
+                sedeId: 's1',
+                createdAt: '2026-01-01',
+                permisos: permissions,
+              ),
+            ),
+          ),
+        ),
         ventasRepositoryProvider.overrideWithValue(
-          VentasRepository(ApiClient.instance),
+          repository ?? VentasRepository(ApiClient.instance),
         ),
       ],
       child: MaterialApp(
@@ -199,6 +254,67 @@ void main() {
       expect(find.text('No disponible'), findsOneWidget);
       expect(find.text('No se pudieron cargar los productos'), findsOneWidget);
       expect(find.text('Reintentar'), findsOneWidget);
+    });
+
+    testWidgets('permite precio positivo y muestra detalles de pago', (
+      tester,
+    ) async {
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        permissions: const ['ventas:precio-personalizado'],
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('+ Agregar').first);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('custom-price-field')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('custom-price-field')), '0');
+      await tester.tap(find.text('Guardar'));
+      await tester.pump();
+      expect(find.text('Ingresa un precio mayor a 0'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('custom-price-field')),
+        '16.50',
+      );
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('sale-details')), findsOneWidget);
+      expect(find.byKey(const ValueKey('payment-pendiente')), findsOneWidget);
+      expect(find.byKey(const ValueKey('payment-efectivo')), findsOneWidget);
+      expect(find.byKey(const ValueKey('payment-billetera')), findsOneWidget);
+      expect(find.textContaining('16.50'), findsWidgets);
+    });
+
+    testWidgets('reintento ambiguo usa el mismo payload congelado y clave', (
+      tester,
+    ) async {
+      final repo = _RetryVentasRepository();
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        repository: repo,
+      );
+      await tester.pump();
+      await tester.tap(find.text('+ Agregar').first);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.pump();
+
+      expect(repo.attempts, hasLength(1));
+      final frozenPayload = repo.attempts.single;
+      expect(find.byKey(const Key('desktop-cart-retry')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('desktop-cart-retry')));
+      await tester.pump();
+      expect(repo.attempts, hasLength(2));
+      expect(identical(repo.attempts.first, repo.attempts.last), isTrue);
+      expect(repo.attempts.last.idempotencyKey, frozenPayload.idempotencyKey);
+      await tester.pump(const Duration(seconds: 3));
     });
   });
 }

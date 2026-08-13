@@ -186,12 +186,14 @@ class CajaSesion {
   final double? diferenciaCierre;
   final String? observacionesCierre;
   final String usuarioApertura;
+  final String? usuarioAperturaId;
   final String? usuarioPrecuadre;
   final String? usuarioCierre;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final CajaResumen? resumen;
   final List<Map<String, dynamic>> denominaciones;
+  final List<Map<String, dynamic>> denominacionesPrecuadre;
 
   const CajaSesion({
     required this.id,
@@ -205,7 +207,9 @@ class CajaSesion {
     this.saldoActual,
     required this.abiertaAt,
     required this.usuarioApertura,
+    this.usuarioAperturaId,
     required this.denominaciones,
+    this.denominacionesPrecuadre = const [],
     this.cerradaAt,
     this.precuadreAt,
     this.montoDeclaradoPrecuadre,
@@ -250,6 +254,7 @@ class CajaSesion {
     diferenciaCierre: (json['diferenciaCierre'] as num?)?.toDouble(),
     observacionesCierre: json['observacionesCierre'] as String?,
     usuarioApertura: _actor(json['usuarioApertura']) ?? '',
+    usuarioAperturaId: _actorId(json['usuarioApertura']),
     usuarioPrecuadre: _actor(json['usuarioPrecuadre']),
     usuarioCierre: _actor(json['usuarioCierre']),
     createdAt: _date(json['createdAt']),
@@ -265,6 +270,11 @@ class CajaSesion {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList(),
+    denominacionesPrecuadre:
+        (json['denominacionesPrecuadre'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList(),
   );
 
   static DateTime? _date(dynamic value) =>
@@ -282,9 +292,24 @@ class CajaSesion {
     _ => null,
   };
 
+  static String? _actorId(dynamic value) => switch (value) {
+    Map actor when actor['id'] != null => actor['id'].toString(),
+    _ => null,
+  };
+
   bool get isV2 => version == 'V2';
   bool get isAbierta => estado == 'ABIERTA';
   bool get isCerrada => estado == 'CERRADA';
+  String get usuarioAperturaLabel => usuarioApertura.trim().isEmpty
+      ? 'Usuario no disponible'
+      : usuarioApertura;
+
+  bool isOwnedBy({required String userId, required String username}) {
+    if (usuarioAperturaId?.isNotEmpty ?? false) {
+      return usuarioAperturaId == userId;
+    }
+    return usuarioApertura.isNotEmpty && usuarioApertura == username;
+  }
 }
 
 // ── Movimiento de Caja ──────────────────────────────────────────────────────
@@ -302,6 +327,8 @@ class CajaMovimiento {
   final String? conciliacionId;
   final String? referencia;
   final String? comprobante;
+  final String? etiquetaId;
+  final String? etiqueta;
   final String usuario;
   final DateTime createdAt;
 
@@ -320,6 +347,8 @@ class CajaMovimiento {
     required this.createdAt,
     this.referencia,
     this.comprobante,
+    this.etiquetaId,
+    this.etiqueta,
   });
 
   factory CajaMovimiento.fromJson(Map<String, dynamic> json) => CajaMovimiento(
@@ -335,6 +364,12 @@ class CajaMovimiento {
     conciliacionId: json['conciliacionId'] as String?,
     referencia: json['referencia'] as String?,
     comprobante: json['comprobante'] as String?,
+    etiquetaId: json['etiquetaId'] as String?,
+    etiqueta: switch (json['etiqueta']) {
+      Map value => value['nombre']?.toString(),
+      String value when value.isNotEmpty => value,
+      _ => null,
+    },
     usuario: switch (json['usuario']) {
       Map actor => actor['username']?.toString() ?? '',
       String username => username,
@@ -375,17 +410,9 @@ class CajaRepository {
     return {};
   }
 
-  Future<List<Map<String, dynamic>>> sedes() async {
-    final response = await _api.get(
-      '/establecimientos',
-      queryParameters: {'pagina': 1, 'limite': 100},
-    );
-    final json = _toMap(response.data);
-    return (json['data'] as List? ?? const [])
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .where((item) => item['activo'] != false)
-        .toList();
+  static int _totalPaginas(dynamic value) {
+    final pages = (value as num?)?.toInt() ?? 1;
+    return pages < 1 ? 1 : pages;
   }
 
   Future<CajaSesion?> actual({String? sedeId}) async {
@@ -427,7 +454,7 @@ class CajaRepository {
           .toList(),
       total: (json['total'] as num?)?.toInt() ?? 0,
       pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
-      totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 1,
+      totalPaginas: _totalPaginas(json['totalPaginas']),
     );
   }
 
@@ -455,7 +482,40 @@ class CajaRepository {
           .toList(),
       total: (json['total'] as num?)?.toInt() ?? 0,
       pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
-      totalPaginas: (json['totalPaginas'] as num?)?.toInt() ?? 1,
+      totalPaginas: _totalPaginas(json['totalPaginas']),
+    );
+  }
+
+  Future<CajaPage<CajaMovimiento>> movimientosGenerales({
+    int pagina = 1,
+    int limite = 20,
+    String? tipo,
+    required String sedeId,
+    String? fechaInicio,
+    String? fechaFin,
+  }) async {
+    final response = await _api.get(
+      '/caja/movimientos-generales',
+      queryParameters: {
+        'pagina': pagina,
+        'limite': limite,
+        'tipo': ?tipo,
+        'sedeId': sedeId,
+        'fechaInicio': ?fechaInicio,
+        'fechaFin': ?fechaFin,
+      },
+    );
+    final json = CajaRepository._toMap(response.data);
+    return CajaPage(
+      data: (json['data'] as List? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => CajaMovimiento.fromJson(Map<String, dynamic>.from(item)),
+          )
+          .toList(),
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      pagina: (json['pagina'] as num?)?.toInt() ?? pagina,
+      totalPaginas: _totalPaginas(json['totalPaginas']),
     );
   }
 
@@ -492,6 +552,10 @@ class CajaRepository {
       data: {'denominaciones': cajaDenominacionesPayload(cantidades)},
     );
     return CajaSesion.fromJson(CajaRepository._toMap(response.data));
+  }
+
+  Future<void> reaperturar(String id) async {
+    await _api.post('/caja/$id/reapertura');
   }
 
   Future<CajaSesion> cerrar(

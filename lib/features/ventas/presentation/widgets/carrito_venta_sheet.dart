@@ -9,7 +9,7 @@ class CarritoItem {
   final String productoId;
   final String nombre;
   final String codigo;
-  final double precio;
+  double precio;
   int cantidad;
 
   CarritoItem({
@@ -34,6 +34,8 @@ class CarritoVentaSheet extends StatelessWidget {
   final VoidCallback onClear;
   final void Function(String productoId, int delta) onChangeQuantity;
   final void Function(String productoId) onRemove;
+  final void Function(CarritoItem item)? onEditPrice;
+  final Widget? saleDetails;
 
   const CarritoVentaSheet({
     super.key,
@@ -46,13 +48,15 @@ class CarritoVentaSheet extends StatelessWidget {
     required this.onClear,
     required this.onChangeQuantity,
     required this.onRemove,
+    this.onEditPrice,
+    this.saleDetails,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.7,
+        maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -138,12 +142,32 @@ class CarritoVentaSheet extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              Text(
-                                '${_fmtCurrency(item.precio)} × ${item.cantidad} = ${_fmtCurrency(item.subtotal)}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      '${_fmtCurrency(item.precio)} × ${item.cantidad} = ${_fmtCurrency(item.subtotal)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  if (onEditPrice != null)
+                                    IconButton(
+                                      key: ValueKey(
+                                        'mobile-edit-price-${item.productoId}',
+                                      ),
+                                      visualDensity: VisualDensity.compact,
+                                      constraints: const BoxConstraints(),
+                                      padding: const EdgeInsets.only(left: 4),
+                                      onPressed: () => onEditPrice!(item),
+                                      icon: const Icon(
+                                        Icons.edit_rounded,
+                                        size: 13,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
@@ -217,14 +241,10 @@ class CarritoVentaSheet extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'El método de pago se registra después en caja.',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
+                  if (saleDetails != null) ...[
+                    const SizedBox(height: 8),
+                    saleDetails!,
+                  ],
                   if (error != null) ...[
                     const SizedBox(height: 8),
                     Container(

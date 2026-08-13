@@ -40,11 +40,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
           _CajaTabs(
             historial: _historial,
             state: state,
-            isSuperAdmin: auth.user?.isSuperAdmin ?? false,
             onTab: (v) => setState(() => _historial = v),
-            onSede: (v) {
-              if (v != null) ref.read(cajaProvider.notifier).seleccionarSede(v);
-            },
           ),
           Expanded(
             child: AnimatedSwitcher(
@@ -74,10 +70,16 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                   : _Actual(
                       key: const ValueKey('current'),
                       state: state,
-                      canOpen: auth.hasPermission('caja:aperturar'),
+                      canOpen:
+                          auth.hasPermission('caja:aperturar') &&
+                          state.sedeId != null,
                       canPrecuadre: auth.hasPermission('caja:precuadre'),
                       canClose: auth.hasPermission('caja:cerrar'),
                       canMove: auth.hasPermission('caja:movimientos'),
+                      hasSedeScope: state.sedeId != null,
+                      userId: auth.user?.id ?? '',
+                      username: auth.user?.username ?? '',
+                      isSuperAdmin: auth.user?.isSuperAdmin ?? false,
                       onOpen: () => _showOpening(context),
                       onPrecuadre: () => _showPrecuadre(context),
                       onClose: () => _showCierre(
@@ -108,9 +110,14 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showDetail(BuildContext context, String id) async {
+    final isSuperAdmin = ref.read(authProvider).user?.isSuperAdmin ?? false;
     AppNav.push(
       context,
-      _DetailSheet(future: ref.read(cajaProvider.notifier).detalle(id)),
+      _DetailSheet(
+        future: ref.read(cajaProvider.notifier).detalle(id),
+        canReopen: isSuperAdmin,
+        onReopen: () => ref.read(cajaProvider.notifier).reaperturar(id),
+      ),
     );
   }
 
@@ -136,6 +143,9 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     showCierreSheet(
       context,
       canForzar: canForzar,
+      initialCounts: cajaCantidadesFromResponse(
+        ref.read(cajaProvider).actual?.denominacionesPrecuadre,
+      ),
       onSuccess: () => _success('Caja cerrada correctamente'),
     );
   }
@@ -157,16 +167,12 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 class _CajaTabs extends StatelessWidget {
   final bool historial;
   final CajaState state;
-  final bool isSuperAdmin;
   final ValueChanged<bool> onTab;
-  final ValueChanged<String?> onSede;
 
   const _CajaTabs({
     required this.historial,
     required this.state,
-    required this.isSuperAdmin,
     required this.onTab,
-    required this.onSede,
   });
 
   @override
@@ -175,30 +181,6 @@ class _CajaTabs extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
     child: Column(
       children: [
-        // Selector de sede solo para SuperAdmin
-        if (isSuperAdmin && state.sedes.isNotEmpty) ...[
-          DropdownButtonFormField<String>(
-            initialValue: state.sedeId,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Sede',
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            items: state.sedes
-                .map(
-                  (s) => DropdownMenuItem(
-                    value: s['id'] as String,
-                    child: Text(
-                      s['nombre'] as String? ?? '',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                )
-                .toList(),
-            onChanged: onSede,
-          ),
-          const SizedBox(height: 8),
-        ],
         // Tabs: Turno actual / Historial
         Container(
           padding: const EdgeInsets.all(4),
@@ -269,6 +251,10 @@ class _Actual extends StatelessWidget {
   final bool canPrecuadre;
   final bool canClose;
   final bool canMove;
+  final bool hasSedeScope;
+  final String userId;
+  final String username;
+  final bool isSuperAdmin;
   final VoidCallback onOpen;
   final VoidCallback onPrecuadre;
   final VoidCallback onClose;
@@ -283,6 +269,10 @@ class _Actual extends StatelessWidget {
     required this.canPrecuadre,
     required this.canClose,
     this.canMove = false,
+    required this.hasSedeScope,
+    required this.userId,
+    required this.username,
+    required this.isSuperAdmin,
     required this.onOpen,
     required this.onPrecuadre,
     required this.onClose,
@@ -298,13 +288,17 @@ class _Actual extends StatelessWidget {
       return AppEmptyState(
         icon: Icons.lock_clock_outlined,
         title: 'No hay una caja abierta',
-        description: canOpen
+        description: !hasSedeScope
+            ? 'Selecciona una sede en el encabezado para consultar o abrir su caja.'
+            : canOpen
             ? 'Registra el conteo de efectivo para iniciar el turno.'
             : 'Un usuario autorizado debe abrir la caja de esta sede.',
         actionLabel: canOpen ? 'Abrir caja' : null,
         onAction: canOpen ? onOpen : null,
       );
     }
+    final canInteract =
+        isSuperAdmin || session.isOwnedBy(userId: userId, username: username);
     final summary =
         session.resumen ??
         CajaResumen(
@@ -334,7 +328,7 @@ class _Actual extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${session.sede} · ${_dateTime(session.abiertaAt)}',
+                  '${session.sede} · ${_dateTime(session.abiertaAt)} · ${session.usuarioAperturaLabel}',
                   style: AppTextStyles.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -396,11 +390,32 @@ class _Actual extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
+          if (!canInteract) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warningLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Text(
+                session.usuarioApertura.isEmpty
+                    ? 'No se pudo verificar quién abrió esta caja. Solo SUPERADMIN puede intervenir.'
+                    : 'Caja abierta por ${session.usuarioAperturaLabel}. Solo ese usuario o SUPERADMIN puede operar el turno.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.warning,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              if (canMove)
+              if (canMove && canInteract)
                 OutlinedButton.icon(
                   onPressed: state.isActing ? null : () => onMove('ENTRADA'),
                   icon: const Icon(Icons.south_west_rounded, size: 18),
@@ -414,7 +429,7 @@ class _Actual extends StatelessWidget {
                     minimumSize: const Size(0, 44),
                   ),
                 ),
-              if (canMove)
+              if (canMove && canInteract)
                 OutlinedButton.icon(
                   onPressed: state.isActing ? null : () => onMove('SALIDA'),
                   icon: const Icon(Icons.north_east_rounded, size: 18),
@@ -428,7 +443,7 @@ class _Actual extends StatelessWidget {
                     minimumSize: const Size(0, 44),
                   ),
                 ),
-              if (canPrecuadre)
+              if (canPrecuadre && canInteract)
                 OutlinedButton.icon(
                   onPressed: state.isActing ? null : onPrecuadre,
                   icon: const Icon(Icons.fact_check_outlined, size: 18),
@@ -441,7 +456,7 @@ class _Actual extends StatelessWidget {
                     minimumSize: const Size(0, 44),
                   ),
                 ),
-              if (canClose)
+              if (canClose && canInteract)
                 OutlinedButton.icon(
                   onPressed: state.isActing ? null : onClose,
                   icon: const Icon(Icons.lock_outline_rounded, size: 18),
@@ -573,7 +588,7 @@ class _Historial extends StatelessWidget {
                       children: [
                         Text(session.sede, style: AppTextStyles.titleMedium),
                         Text(
-                          '${_dateTime(session.abiertaAt)} · ${session.usuarioApertura}',
+                          '${_dateTime(session.abiertaAt)} · ${session.usuarioAperturaLabel}',
                           style: AppTextStyles.labelSmall,
                         ),
                       ],
@@ -830,10 +845,23 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
   }
 }
 
-class _DetailSheet extends StatelessWidget {
+class _DetailSheet extends StatefulWidget {
   final Future<CajaSesion> future;
+  final bool canReopen;
+  final Future<void> Function() onReopen;
 
-  const _DetailSheet({required this.future});
+  const _DetailSheet({
+    required this.future,
+    required this.canReopen,
+    required this.onReopen,
+  });
+
+  @override
+  State<_DetailSheet> createState() => _DetailSheetState();
+}
+
+class _DetailSheetState extends State<_DetailSheet> {
+  bool _reopening = false;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -845,7 +873,7 @@ class _DetailSheet extends StatelessWidget {
     body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: FutureBuilder<CajaSesion>(
-        future: future,
+        future: widget.future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const _InlineSkeleton();
@@ -858,7 +886,7 @@ class _DetailSheet extends StatelessWidget {
             'Sede': session.sede,
             'Estado': session.estado,
             'Apertura': _money(session.montoApertura),
-            'Abierta por': session.usuarioApertura,
+            'Abierta por': session.usuarioAperturaLabel,
             'Fecha de apertura': _dateTime(session.abiertaAt),
             if (session.resumen != null)
               'Saldo esperado': _money(session.resumen!.efectivoEsperado),
@@ -900,6 +928,26 @@ class _DetailSheet extends StatelessWidget {
                     )
                     .toList(),
               ),
+              if (session.denominacionesPrecuadre.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Conteo de precuadre',
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: session.denominacionesPrecuadre
+                      .map(
+                        (item) => _ReadOnlyChip(
+                          label:
+                              'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
               if (session.resumen?.v2?.porBilletera.isNotEmpty ?? false) ...[
                 const SizedBox(height: 16),
                 CajaBilleteraCard(
@@ -919,12 +967,53 @@ class _DetailSheet extends StatelessWidget {
                   resumenProductos: session.resumen!.v2!.resumenProductos,
                 ),
               ],
+              if (widget.canReopen && session.isCerrada && session.isV2) ...[
+                const SizedBox(height: 24),
+                PrimaryButton(
+                  label: 'Reaperturar caja',
+                  icon: Icons.lock_open_rounded,
+                  isLoading: _reopening,
+                  onPressed: _reopen,
+                ),
+              ],
             ],
           );
         },
       ),
     ),
   );
+
+  Future<void> _reopen() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reaperturar caja'),
+        content: const Text(
+          'La sesión volverá a estado abierta y se limpiará su cierre. ¿Deseas continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Reaperturar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _reopening = true);
+    try {
+      await widget.onReopen();
+      if (mounted) Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) _sheetError(context, error);
+    } finally {
+      if (mounted) setState(() => _reopening = false);
+    }
+  }
 }
 
 class _Metric extends StatelessWidget {
@@ -1011,6 +1100,8 @@ class _MovementTile extends StatelessWidget {
                     [
                       if (movement.medioPago?.isNotEmpty ?? false)
                         movement.medioPago!,
+                      if (movement.etiqueta?.isNotEmpty ?? false)
+                        movement.etiqueta!,
                       if (movement.origen.isNotEmpty) movement.origen,
                       _dateTime(movement.createdAt),
                     ].join(' · '),

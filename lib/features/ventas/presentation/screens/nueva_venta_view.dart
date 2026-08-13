@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/errors/app_exception.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
@@ -9,6 +11,8 @@ import '../../../../core/widgets/ds_inputs.dart';
 import '../../../../core/widgets/ds_product_image.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../productos/data/productos_repository.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/carrito_venta_sheet.dart';
 
@@ -32,6 +36,18 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   bool _submitting = false;
   String? _submitError;
   late String _idempotencyKey;
+  CreateVentaPayload? _retryPayload;
+  EstadoConciliacion _payment = EstadoConciliacion.efectivo;
+  List<Etiqueta> _etiquetas = [];
+  String? _etiquetaId;
+  List<VendedorVenta> _vendedores = [];
+  String? _vendedoraId;
+  double? _recargoMonto;
+  String? _recargoMotivo;
+  String _codigoOperacion = '';
+  Uint8List? _voucherBytes;
+  String? _voucherFilename;
+  String? _loadedSedeId;
 
   /// true después de un intento fallido ambiguo (timeout, error de red).
   /// Mientras está congelado, no se puede modificar el carrito.
@@ -59,25 +75,70 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _errorProducts = null;
     });
     try {
+      final auth = ref.read(authProvider);
+      final selectedSedeId = ref.read(globalSedeIdProvider);
+      final effectiveSedeId = auth.user?.isSuperAdmin == true
+          ? selectedSedeId
+          : auth.user?.sedeId;
+      if (widget.productsLoader == null && effectiveSedeId == null) {
+        throw StateError(
+          auth.user?.isSuperAdmin == true
+              ? 'Selecciona una sede para vender'
+              : 'Tu usuario no tiene una sede asignada',
+        );
+      }
       final products = widget.productsLoader != null
           ? await widget.productsLoader!()
-          : (await ProductosRepository(
-              ApiClient.instance,
-            ).list(pagina: 1, limite: 100, activo: 'true')).data;
+          : (await ProductosRepository(ApiClient.instance).list(
+              pagina: 1,
+              limite: 100,
+              activo: 'true',
+              sedeId: effectiveSedeId,
+            )).data;
       if (!mounted) return;
       setState(() {
         _productos = products
             .where((p) => p.disponiblePos && p.activo)
             .toList();
         _loadingProducts = false;
+        _loadedSedeId = effectiveSedeId;
       });
+      if (effectiveSedeId != null) {
+        await _loadSaleOptions(effectiveSedeId);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadingProducts = false;
-        _errorProducts = 'No se pudieron cargar los productos';
+        _errorProducts = e is StateError
+            ? e.message.toString()
+            : 'No se pudieron cargar los productos';
       });
     }
+  }
+
+  Future<void> _loadSaleOptions(String sedeId) async {
+    final repo = ref.read(ventasRepositoryProvider);
+    final auth = ref.read(authProvider);
+    final results = await Future.wait<Object>([
+      repo.listEtiquetasActivas(sedeId: sedeId).catchError((_) => <Etiqueta>[]),
+      if (canReadAllVentas(auth))
+        repo.listVendedores(sedeId: sedeId).catchError((_) => <VendedorVenta>[])
+      else
+        Future.value(<VendedorVenta>[]),
+    ]);
+    if (!mounted || _loadedSedeId != sedeId) return;
+    setState(() {
+      _etiquetas = results[0] as List<Etiqueta>;
+      _vendedores = results[1] as List<VendedorVenta>;
+      if (!_etiquetas.any((e) => e.id == _etiquetaId)) {
+        _etiquetaId = _etiquetas.firstOrNull?.id;
+      }
+      final user = auth.user;
+      _vendedoraId = _vendedores.any((v) => v.id == _vendedoraId)
+          ? _vendedoraId
+          : user?.id;
+    });
   }
 
   List<Producto> get _filteredProducts {
@@ -100,7 +161,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   int? _stockDisponible(String productoId) =>
       _productos.where((p) => p.id == productoId).firstOrNull?.stockDisponible;
 
-  void _addToCart(Producto product) {
+  void _addToCart(Producto product, {double? precioVenta}) {
     if (_frozen) return; // Carrito congelado tras error ambiguo
     final existing = _carrito
         .where((i) => i.productoId == product.id)
@@ -115,17 +176,82 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     setState(() {
       if (existing != null) {
         existing.cantidad++;
+        if (precioVenta != null) existing.precio = precioVenta;
       } else {
         _carrito.add(
           CarritoItem(
             productoId: product.id,
             nombre: product.nombre,
             codigo: product.codigo,
-            precio: product.precioVenta,
+            precio: precioVenta ?? product.precioVenta,
           ),
         );
       }
     });
+  }
+
+  Future<void> _selectProduct(Producto product) async {
+    if (_frozen) return;
+    final canEdit = ref
+        .read(authProvider)
+        .hasPermission('ventas:precio-personalizado');
+    if (!canEdit) {
+      _addToCart(product);
+      return;
+    }
+    final price = await _askPrice(product.nombre, product.precioVenta);
+    if (price != null) _addToCart(product, precioVenta: price);
+  }
+
+  Future<double?> _askPrice(String productName, double current) async {
+    var text = current.toStringAsFixed(2);
+    String? error;
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Precio de $productName'),
+          content: TextFormField(
+            key: const Key('custom-price-field'),
+            initialValue: text,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
+            decoration: InputDecoration(
+              labelText: 'Precio a cobrar',
+              errorText: error,
+            ),
+            onChanged: (value) => text = value,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = double.tryParse(text.trim());
+                if (value == null || value <= 0) {
+                  setDialogState(() => error = 'Ingresa un precio mayor a 0');
+                  return;
+                }
+                Navigator.pop(context, value);
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    return result;
+  }
+
+  Future<void> _editPrice(CarritoItem item) async {
+    if (_frozen) return;
+    final price = await _askPrice(item.nombre, item.precio);
+    if (price != null && mounted) setState(() => item.precio = price);
   }
 
   void _changeQuantity(String productoId, int delta) {
@@ -166,6 +292,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     setState(() {
       _frozen = false;
       _submitError = null;
+      _retryPayload = null;
       _idempotencyKey = ref
           .read(ventasRepositoryProvider)
           .generateIdempotencyKey();
@@ -177,33 +304,343 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _carrito.clear();
       _frozen = false;
       _submitError = null;
+      _retryPayload = null;
+      _recargoMonto = null;
+      _recargoMotivo = null;
+      _payment = EstadoConciliacion.efectivo;
+      _codigoOperacion = '';
+      _voucherBytes = null;
+      _voucherFilename = null;
       _idempotencyKey = ref
           .read(ventasRepositoryProvider)
           .generateIdempotencyKey();
     });
   }
 
-  double get _total => _carrito.fold(0.0, (sum, i) => sum + i.subtotal);
+  double get _subtotal => _carrito.fold(0.0, (sum, i) => sum + i.subtotal);
+  double get _total => _subtotal + (_recargoMonto ?? 0);
+
+  Future<void> _pickVoucher(VoidCallback refresh) async {
+    final file = await ref.read(voucherImagePickerProvider)();
+    if (file == null || !mounted) return;
+    setState(() {
+      _voucherBytes = file.bytes;
+      _voucherFilename = file.filename;
+    });
+    refresh();
+  }
+
+  Future<void> _editRecargo(VoidCallback refresh) async {
+    var amountText = _recargoMonto?.toStringAsFixed(2) ?? '';
+    var reasonText = _recargoMotivo ?? '';
+    String? error;
+    final result = await showDialog<(double, String)>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Recargo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const Key('recargo-amount-field'),
+                initialValue: amountText,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Monto',
+                  errorText: error,
+                ),
+                onChanged: (value) => amountText = value,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                key: const Key('recargo-reason-field'),
+                initialValue: reasonText,
+                maxLength: 100,
+                decoration: const InputDecoration(labelText: 'Motivo'),
+                onChanged: (value) => reasonText = value,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final amount = double.tryParse(amountText.trim());
+                final reason = reasonText.trim();
+                if (amount == null || amount <= 0 || reason.isEmpty) {
+                  setDialogState(
+                    () => error = 'Monto y motivo son obligatorios',
+                  );
+                  return;
+                }
+                Navigator.pop(context, (amount, reason));
+              },
+              child: const Text('Aplicar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _recargoMonto = result.$1;
+      _recargoMotivo = result.$2;
+    });
+    refresh();
+  }
+
+  Widget _buildSaleDetails({required VoidCallback refresh}) {
+    final auth = ref.read(authProvider);
+    final selectedEtiqueta = _etiquetas
+        .where((item) => item.id == _etiquetaId)
+        .firstOrNull;
+    void update(VoidCallback change) {
+      setState(change);
+      refresh();
+    }
+
+    return Container(
+      key: const Key('sale-details'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (canReadAllVentas(auth) && _vendedores.isNotEmpty) ...[
+            DropdownButtonFormField<String>(
+              key: const Key('seller-field'),
+              initialValue: _vendedores.any((v) => v.id == _vendedoraId)
+                  ? _vendedoraId
+                  : null,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Asignar venta a',
+                isDense: true,
+              ),
+              items: _vendedores
+                  .map(
+                    (seller) => DropdownMenuItem(
+                      value: seller.id,
+                      child: Text('${seller.username} (${seller.rol})'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: _frozen
+                  ? null
+                  : (value) => update(() => _vendedoraId = value),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          Wrap(
+            spacing: 6,
+            children: EstadoConciliacion.values
+                .map(
+                  (payment) => ChoiceChip(
+                    key: ValueKey('payment-${payment.name}'),
+                    label: Text(estadoConciliacionLabel(payment)),
+                    selected: _payment == payment,
+                    onSelected: _frozen
+                        ? null
+                        : (_) => update(() => _payment = payment),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                )
+                .toList(),
+          ),
+          if (_payment == EstadoConciliacion.billetera) ...[
+            const SizedBox(height: AppSpacing.xs),
+            DropdownButtonFormField<String>(
+              key: const Key('wallet-field'),
+              initialValue: _etiquetas.any((e) => e.id == _etiquetaId)
+                  ? _etiquetaId
+                  : null,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Billetera / banco',
+                isDense: true,
+              ),
+              items: _etiquetas
+                  .map(
+                    (e) => DropdownMenuItem(value: e.id, child: Text(e.nombre)),
+                  )
+                  .toList(),
+              onChanged: _frozen
+                  ? null
+                  : (value) => update(() {
+                      _etiquetaId = value;
+                      _voucherBytes = null;
+                      _voucherFilename = null;
+                    }),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            TextFormField(
+              key: const Key('sale-operation-code-field'),
+              initialValue: _codigoOperacion,
+              enabled: !_frozen,
+              maxLength: 100,
+              decoration: const InputDecoration(
+                labelText: 'Código de operación (opcional)',
+                isDense: true,
+                counterText: '',
+              ),
+              onChanged: (value) => _codigoOperacion = value,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            OutlinedButton.icon(
+              key: const Key('voucher-picker'),
+              onPressed: _frozen ? null : () => _pickVoucher(refresh),
+              icon: Icon(
+                _voucherBytes == null
+                    ? Icons.upload_file_rounded
+                    : Icons.check_circle_rounded,
+                size: 17,
+              ),
+              label: Text(
+                _voucherFilename ??
+                    (selectedEtiqueta?.requiereComprobante == true
+                        ? 'Subir comprobante *'
+                        : 'Subir comprobante (opcional)'),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: _recargoMonto == null
+                    ? TextButton.icon(
+                        key: const Key('add-surcharge'),
+                        onPressed: _frozen ? null : () => _editRecargo(refresh),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Agregar recargo'),
+                      )
+                    : Text(
+                        'Recargo: ${_fmt(_recargoMonto!)}\n${_recargoMotivo ?? ''}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+              ),
+              if (_recargoMonto != null)
+                IconButton(
+                  key: const Key('remove-surcharge'),
+                  onPressed: _frozen
+                      ? null
+                      : () => update(() {
+                          _recargoMonto = null;
+                          _recargoMotivo = null;
+                        }),
+                  icon: const Icon(Icons.close_rounded, size: 17),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _submit() async {
     if (_submitting || _carrito.isEmpty) return;
+    if (_retryPayload != null) {
+      await _executePayload(_retryPayload!);
+      return;
+    }
+    final auth = ref.read(authProvider);
+    final sedeId = auth.user?.isSuperAdmin == true
+        ? ref.read(globalSedeIdProvider)
+        : auth.user?.sedeId;
+    if (auth.user?.isSuperAdmin == true && sedeId == null) {
+      setState(
+        () => _submitError = 'Selecciona una sede para registrar la venta',
+      );
+      return;
+    }
+    final etiqueta = _etiquetas.where((e) => e.id == _etiquetaId).firstOrNull;
+    if (_payment == EstadoConciliacion.billetera && etiqueta == null) {
+      setState(() => _submitError = 'Selecciona una billetera compatible');
+      return;
+    }
+    if (_payment == EstadoConciliacion.billetera &&
+        etiqueta?.requiereComprobante == true &&
+        _voucherBytes == null) {
+      setState(
+        () =>
+            _submitError = 'La billetera seleccionada requiere un comprobante',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _submitError = null;
     });
+    String? comprobante;
     try {
-      final repo = ref.read(ventasRepositoryProvider);
-      await repo.crearVenta(
+      if (_payment == EstadoConciliacion.billetera && _voucherBytes != null) {
+        final upload = await ref
+            .read(uploadClientProvider)
+            .uploadImage(
+              bytes: _voucherBytes!,
+              filename: _voucherFilename ?? 'comprobante.jpg',
+            );
+        comprobante = upload.url;
+      }
+      final payload = CreateVentaPayload(
         idempotencyKey: _idempotencyKey,
         items: _carrito
             .map(
               (i) => <String, dynamic>{
                 'productoId': i.productoId,
                 'cantidad': i.cantidad,
+                'precioVenta': i.precio,
               },
             )
             .toList(),
+        sedeId: auth.user?.isSuperAdmin == true ? sedeId : null,
+        vendedoraId: _vendedoraId ?? auth.user?.id,
+        estadoConciliacion: _payment,
+        etiquetaId: _payment == EstadoConciliacion.billetera
+            ? _etiquetaId
+            : null,
+        comprobante: comprobante,
+        codigoOperacion:
+            _payment == EstadoConciliacion.billetera &&
+                _codigoOperacion.trim().isNotEmpty
+            ? _codigoOperacion.trim()
+            : null,
+        recargoMonto: _recargoMonto,
+        recargoMotivo: _recargoMotivo,
       );
+      await _executePayload(payload);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _submitError = _friendlySubmitError(e);
+      });
+    }
+  }
+
+  Future<void> _executePayload(CreateVentaPayload payload) async {
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
+    try {
+      final repo = ref.read(ventasRepositoryProvider);
+      await repo.crearVenta(payload: payload);
       if (!mounted) return;
       // Feedback de éxito centrado
       DSSuccessOverlay.show(
@@ -215,6 +652,14 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _carrito.clear();
         _idempotencyKey = repo.generateIdempotencyKey();
         _submitting = false;
+        _retryPayload = null;
+        _frozen = false;
+        _recargoMonto = null;
+        _recargoMotivo = null;
+        _payment = EstadoConciliacion.efectivo;
+        _codigoOperacion = '';
+        _voucherBytes = null;
+        _voucherFilename = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -225,15 +670,28 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _submitError = error;
         // Si el error es ambiguo (timeout, red), congelar el carrito
         // para que el usuario no modifique y reintente con el mismo key.
-        if (isAmbiguous) _frozen = true;
+        if (isAmbiguous) {
+          _retryPayload = payload;
+          _frozen = true;
+        } else {
+          _retryPayload = null;
+        }
       });
     }
   }
 
-  void _retry() => _submit(); // Mismo idempotencyKey
+  void _retry() {
+    final payload = _retryPayload;
+    if (payload != null) _executePayload(payload);
+  }
 
   /// Determina si el error es ambiguo (no sabemos si el backend recibió la solicitud).
   bool _isAmbiguousError(Object e) {
+    if (e is AppException) {
+      return e is NetworkException ||
+          e.statusCode == null ||
+          e.statusCode! >= 500;
+    }
     final s = e.toString();
     // Errores claros del backend: NO son ambiguos (sabemos que no se creó)
     if (s.contains('STOCK_INSUFICIENTE')) return false;
@@ -300,6 +758,17 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             setModalState(() {});
             setState(() {});
           },
+          onEditPrice:
+              ref
+                      .read(authProvider)
+                      .hasPermission('ventas:precio-personalizado') &&
+                  !_frozen
+              ? (item) async {
+                  await _editPrice(item);
+                  setModalState(() {});
+                }
+              : null,
+          saleDetails: _buildSaleDetails(refresh: () => setModalState(() {})),
         ),
       ),
     );
@@ -307,6 +776,21 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+    final selectedSedeId = ref.watch(globalSedeIdProvider);
+    final effectiveSedeId = auth.user?.isSuperAdmin == true
+        ? selectedSedeId
+        : auth.user?.sedeId;
+    if (widget.productsLoader == null &&
+        effectiveSedeId != _loadedSedeId &&
+        !_loadingProducts &&
+        !_frozen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _clearCart();
+        _loadProducts();
+      });
+    }
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
     return desktop ? _buildDesktop() : _buildMobile();
   }
@@ -336,6 +820,13 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                   onClear: _frozen ? _discardFrozen : _clearCart,
                   onChangeQuantity: _changeQuantity,
                   onRemove: _removeFromCart,
+                  onEditPrice:
+                      ref
+                          .read(authProvider)
+                          .hasPermission('ventas:precio-personalizado')
+                      ? _editPrice
+                      : null,
+                  saleDetails: _buildSaleDetails(refresh: () {}),
                 ),
               ),
             ],
@@ -466,7 +957,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           SizedBox(width: 6),
           Expanded(
             child: Text(
-              'El método de pago se clasifica después en Caja / Conciliación.',
+              'Configura pago, vendedor y recargos en la venta actual.',
               style: TextStyle(fontSize: 11, color: AppColors.brandDark),
             ),
           ),
@@ -540,7 +1031,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       qty: _cartQty(product.id),
       frozen: _frozen,
       desktop: desktop,
-      onAdd: () => _addToCart(product),
+      onAdd: () => _selectProduct(product),
       onIncrease: () => _changeQuantity(product.id, 1),
       onDecrease: () => _changeQuantity(product.id, -1),
     );
@@ -853,6 +1344,8 @@ class _DesktopCartPanel extends StatelessWidget {
   final VoidCallback onClear;
   final void Function(String productoId, int delta) onChangeQuantity;
   final void Function(String productoId) onRemove;
+  final void Function(CarritoItem item)? onEditPrice;
+  final Widget saleDetails;
 
   const _DesktopCartPanel({
     required this.items,
@@ -865,6 +1358,8 @@ class _DesktopCartPanel extends StatelessWidget {
     required this.onClear,
     required this.onChangeQuantity,
     required this.onRemove,
+    this.onEditPrice,
+    required this.saleDetails,
   });
 
   int get _itemCount => items.fold(0, (sum, item) => sum + item.cantidad);
@@ -948,7 +1443,15 @@ class _DesktopCartPanel extends StatelessWidget {
           const Divider(height: 1, color: AppColors.border),
           Expanded(
             child: items.isEmpty
-                ? const _DesktopEmptyCart()
+                ? Column(
+                    children: [
+                      const Expanded(child: _DesktopEmptyCart()),
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        child: saleDetails,
+                      ),
+                    ],
+                  )
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -965,6 +1468,9 @@ class _DesktopCartPanel extends StatelessWidget {
                         onDecrease: () => onChangeQuantity(item.productoId, -1),
                         onIncrease: () => onChangeQuantity(item.productoId, 1),
                         onRemove: () => onRemove(item.productoId),
+                        onEditPrice: onEditPrice == null
+                            ? null
+                            : () => onEditPrice!(item),
                       );
                     },
                   ),
@@ -1030,6 +1536,33 @@ class _DesktopCartPanel extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
+                if (items.isNotEmpty) ...[
+                  saleDetails,
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                if (total !=
+                    items.fold(0.0, (sum, item) => sum + item.subtotal))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Subtotal',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          _fmt(
+                            items.fold(0.0, (sum, item) => sum + item.subtotal),
+                          ),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1051,17 +1584,6 @@ class _DesktopCartPanel extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'El método de pago se registra después en caja.',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 SizedBox(
@@ -1161,6 +1683,7 @@ class _DesktopCartItem extends StatelessWidget {
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onRemove;
+  final VoidCallback? onEditPrice;
 
   const _DesktopCartItem({
     super.key,
@@ -1169,6 +1692,7 @@ class _DesktopCartItem extends StatelessWidget {
     required this.onDecrease,
     required this.onIncrease,
     required this.onRemove,
+    this.onEditPrice,
   });
 
   @override
@@ -1249,15 +1773,33 @@ class _DesktopCartItem extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: Text(
-                  '${_fmt(item.precio)} × ${item.cantidad}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textTertiary,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '${_fmt(item.precio)} × ${item.cantidad}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                    if (onEditPrice != null)
+                      IconButton(
+                        key: ValueKey('desktop-edit-price-${item.productoId}'),
+                        onPressed: frozen ? null : onEditPrice,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 28,
+                          height: 28,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.edit_rounded, size: 13),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),

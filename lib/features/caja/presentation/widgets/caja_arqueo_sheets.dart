@@ -115,19 +115,29 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
 void showCierreSheet(
   BuildContext context, {
   required bool canForzar,
+  Map<double, int> initialCounts = const {},
   required VoidCallback onSuccess,
 }) {
   AppNav.push<void>(
     context,
-    _CierreSheet(canForzar: canForzar, onSuccess: onSuccess),
+    _CierreSheet(
+      canForzar: canForzar,
+      initialCounts: initialCounts,
+      onSuccess: onSuccess,
+    ),
   );
 }
 
 class _CierreSheet extends ConsumerStatefulWidget {
   final bool canForzar;
+  final Map<double, int> initialCounts;
   final VoidCallback onSuccess;
 
-  const _CierreSheet({required this.canForzar, required this.onSuccess});
+  const _CierreSheet({
+    required this.canForzar,
+    required this.initialCounts,
+    required this.onSuccess,
+  });
 
   @override
   ConsumerState<_CierreSheet> createState() => _CierreSheetState();
@@ -136,7 +146,12 @@ class _CierreSheet extends ConsumerStatefulWidget {
 class _CierreSheetState extends ConsumerState<_CierreSheet> {
   final _formKey = GlobalKey<FormState>();
   late final Map<double, TextEditingController> _controllers = {
-    for (final value in cajaDenominaciones) value: TextEditingController(),
+    for (final value in cajaDenominaciones)
+      value: TextEditingController(
+        text: widget.initialCounts.containsKey(value)
+            ? widget.initialCounts[value].toString()
+            : '',
+      ),
   };
   final _notesController = TextEditingController();
   final _motivoController = TextEditingController();

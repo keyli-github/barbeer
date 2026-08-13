@@ -1,5 +1,7 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/upload_client.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../../data/ventas_repository.dart';
@@ -9,6 +11,23 @@ import '../../data/ventas_repository.dart';
 final ventasRepositoryProvider = Provider<VentasRepository>((ref) {
   return VentasRepository(ApiClient.instance);
 });
+
+final uploadClientProvider = Provider<UploadClient>((ref) {
+  return UploadClient(ApiClient.instance);
+});
+
+final voucherImagePickerProvider =
+    Provider<Future<PickedUploadImage?> Function()>((ref) {
+      return () async {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          withData: true,
+        );
+        final file = result?.files.single;
+        if (file?.bytes == null) return null;
+        return PickedUploadImage(bytes: file!.bytes!, filename: file.name);
+      };
+    });
 
 // ── Ventas list state ────────────────────────────────────────────────────────
 

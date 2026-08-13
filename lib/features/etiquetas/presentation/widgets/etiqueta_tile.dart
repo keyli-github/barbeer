@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../ventas/data/models/venta_models.dart';
+import '../../data/models/etiqueta.dart';
 
 /// Tarjeta que muestra una etiqueta (billetera digital) en la lista.
 class EtiquetaTile extends StatelessWidget {
   final Etiqueta etiqueta;
   final bool canEdit;
+  final bool canDeactivate;
   final VoidCallback? onEdit;
   final VoidCallback? onToggle;
 
@@ -13,6 +14,7 @@ class EtiquetaTile extends StatelessWidget {
     super.key,
     required this.etiqueta,
     this.canEdit = false,
+    this.canDeactivate = false,
     this.onEdit,
     this.onToggle,
   });
@@ -88,17 +90,22 @@ class EtiquetaTile extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (etiqueta.esSistema) ...[
+                        const SizedBox(width: 6),
+                        _Badge(label: 'SISTEMA', color: AppColors.info),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        'Orden: ${etiqueta.orden}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textTertiary,
-                        ),
+                      _Badge(
+                        label: etiqueta.tipo.value,
+                        color: switch (etiqueta.tipo) {
+                          EtiquetaTipo.entrada => AppColors.success,
+                          EtiquetaTipo.salida => AppColors.error,
+                          EtiquetaTipo.ambos => AppColors.primary,
+                        },
                       ),
                       const SizedBox(width: 12),
                       Icon(
@@ -142,13 +149,14 @@ class EtiquetaTile extends StatelessWidget {
               ),
             ),
             // Actions
-            if (canEdit) ...[
+            if (canEdit && !etiqueta.esSistema)
               IconButton(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_rounded, size: 18),
                 color: AppColors.textSecondary,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
+            if (canDeactivate && !etiqueta.esSistema)
               IconButton(
                 onPressed: onToggle,
                 icon: Icon(
@@ -162,10 +170,30 @@ class EtiquetaTile extends StatelessWidget {
                     : AppColors.textTertiary,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
-            ],
           ],
         ),
       ),
     );
   }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: color.withValues(alpha: 0.25)),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: color),
+    ),
+  );
 }

@@ -14,6 +14,7 @@ class RoutePaths {
   static const String productos = '/productos';
   static const String ventas = '/ventas';
   static const String caja = '/caja';
+  static const String movimientos = '/movimientos';
   static const String inventario = '/inventario';
   static const String kardex = '/kardex';
   static const String compras = '/compras';

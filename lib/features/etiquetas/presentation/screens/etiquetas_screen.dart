@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../ventas/data/models/venta_models.dart';
-import '../../../ventas/presentation/providers/ventas_provider.dart';
+import '../../data/models/etiqueta.dart';
+import '../providers/etiquetas_provider.dart';
 import '../widgets/etiqueta_form_sheet.dart';
 import '../widgets/etiqueta_tile.dart';
 
-/// Pantalla administrativa de billeteras digitales (Yape, Plin, Agora, etc.).
-/// Solo accesible para ADMIN y SUPERADMIN.
 class EtiquetasScreen extends ConsumerStatefulWidget {
   const EtiquetasScreen({super.key});
   @override
@@ -35,8 +31,8 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
       _error = null;
     });
     try {
-      final repo = ref.read(ventasRepositoryProvider);
-      final result = await repo.listEtiquetas();
+      final repo = ref.read(etiquetasRepositoryProvider);
+      final result = await repo.list();
       if (!mounted) return;
       setState(() {
         _etiquetas = result;
@@ -56,10 +52,12 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
   }
 
   void _openEdit(Etiqueta etiqueta) {
+    if (etiqueta.esSistema) return;
     AppNav.push(context, EtiquetaFormSheet(etiqueta: etiqueta, onDone: _load));
   }
 
   Future<void> _toggleEstado(Etiqueta etiqueta) async {
+    if (etiqueta.esSistema) return;
     final nuevoEstado = !etiqueta.activo;
     // Confirmar desactivación
     if (!nuevoEstado) {
@@ -67,10 +65,10 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
         context: context,
         useRootNavigator: true,
         builder: (ctx) => AlertDialog(
-          title: const Text('Desactivar billetera'),
+          title: const Text('Desactivar etiqueta'),
           content: Text(
             '¿Desactivar "${etiqueta.nombre}"?\n\n'
-            'No se podrá usar para clasificar nuevos pagos hasta que se reactive.',
+            'No se podrá usar en nuevas operaciones hasta que se reactive.',
           ),
           actions: [
             TextButton(
@@ -92,8 +90,8 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
     }
 
     try {
-      final repo = ref.read(ventasRepositoryProvider);
-      await repo.toggleEtiqueta(etiqueta.id, activo: nuevoEstado);
+      final repo = ref.read(etiquetasRepositoryProvider);
+      await repo.updateActivo(etiqueta.id, activo: nuevoEstado);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -119,7 +117,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
 
   String _friendlyError(Object e) {
     final s = e.toString();
-    if (s.contains('403')) return 'No tienes permiso para gestionar billeteras';
+    if (s.contains('403')) return 'No tienes permiso para gestionar etiquetas';
     if (s.contains('conciliaciones') || s.contains('pendiente')) {
       return 'La billetera tiene pagos pendientes de confirmar';
     }
@@ -132,11 +130,13 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final canManage = auth.user?.hasPermission('etiquetas:crear') ?? false;
+    final canCreate = auth.hasPermission('etiquetas:crear');
+    final canEdit = auth.hasPermission('etiquetas:editar');
+    final canDeactivate = auth.hasPermission('etiquetas:desactivar');
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton: canManage
+      floatingActionButton: canCreate
           ? FloatingActionButton(
               heroTag: 'etiquetas_fab',
               backgroundColor: AppColors.brand,
@@ -159,8 +159,8 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                 border: Border.all(color: AppColors.primaryBorder),
               ),
               child: Text(
-                'Solo billeteras digitales autorizadas. '
-                'No deben representar tarjetas, retiros ni depósitos.',
+                'Clasifica métodos de pago, ingresos y salidas. '
+                'Las etiquetas del sistema son de solo lectura.',
                 style: TextStyle(fontSize: 11, color: AppColors.primary),
               ),
             ),
@@ -203,7 +203,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'No hay billeteras configuradas',
+                          'No hay etiquetas configuradas',
                           style: TextStyle(color: AppColors.textTertiary),
                         ),
                       ],
@@ -214,12 +214,13 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
                       itemCount: _etiquetas.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (_, i) {
                         final et = _etiquetas[i];
                         return EtiquetaTile(
                           etiqueta: et,
-                          canEdit: canManage,
+                          canEdit: canEdit,
+                          canDeactivate: canDeactivate,
                           onEdit: () => _openEdit(et),
                           onToggle: () => _toggleEstado(et),
                         );

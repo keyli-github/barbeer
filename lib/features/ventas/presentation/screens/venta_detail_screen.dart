@@ -234,6 +234,15 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
 
             const SizedBox(height: 12),
 
+            if (_venta.recargoMonto != null) ...[
+              _Section('Recargo', [
+                _InfoRow('Monto', FormatUtils.currency(_venta.recargoMonto!)),
+                if (_venta.recargoMotivo != null)
+                  _InfoRow('Motivo', _venta.recargoMotivo!),
+              ]),
+              const SizedBox(height: 12),
+            ],
+
             // ── Conciliación / método de pago
             if (_venta.conciliacion != null) ...[
               _Section('Método de pago', [
@@ -334,25 +343,40 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.primaryBorder),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  const Text(
-                    'Total',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
+                  if (_venta.recargoMonto != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Subtotal'),
+                          Text(FormatUtils.currency(_venta.subtotalSinRecargo)),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    FormatUtils.currency(_venta.total),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      letterSpacing: -0.5,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        FormatUtils.currency(_venta.total),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

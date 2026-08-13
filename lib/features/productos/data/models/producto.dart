@@ -13,7 +13,7 @@ class Producto {
   final bool activo;
   final double margin;
   final int? stockDisponible;
-  final String? imageUrl;
+  final String? imagenUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -32,7 +32,7 @@ class Producto {
     required this.activo,
     required this.margin,
     this.stockDisponible,
-    this.imageUrl,
+    this.imagenUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -54,10 +54,12 @@ class Producto {
     activo: json['activo'] as bool? ?? false,
     margin: (json['margin'] as num?)?.toDouble() ?? 0,
     stockDisponible: (json['stockDisponible'] as num?)?.toInt(),
-    imageUrl: json['imageUrl'] as String?,
+    imagenUrl: json['imagenUrl'] as String?,
     createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
     updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
   );
+
+  String? get imageUrl => imagenUrl;
 }
 
 class ProductosResumen {
@@ -122,6 +124,7 @@ class ProductoPayload {
   final double precioCosto;
   final bool disponiblePos;
   final bool activo;
+  final String? imagenUrl;
 
   const ProductoPayload({
     required this.codigo,
@@ -133,6 +136,7 @@ class ProductoPayload {
     required this.precioCosto,
     required this.disponiblePos,
     required this.activo,
+    this.imagenUrl,
   });
 
   Map<String, dynamic> toCreateJson() => {
@@ -145,6 +149,7 @@ class ProductoPayload {
     'precioCosto': precioCosto,
     'disponiblePos': disponiblePos,
     'activo': activo,
+    if (imagenUrl case final imagenUrl?) 'imagenUrl': imagenUrl.trim(),
   };
 
   Map<String, dynamic> toUpdateJson() {

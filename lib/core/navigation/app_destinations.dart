@@ -71,6 +71,14 @@ const appDestinations = <AppDestination>[
     permissions: ['caja:leer'],
   ),
   AppDestination(
+    path: RoutePaths.movimientos,
+    label: 'Movimientos',
+    icon: Icons.receipt_long_outlined,
+    activeIcon: Icons.receipt_long_rounded,
+    section: AppDestinationSection.operations,
+    permissions: ['caja:leer'],
+  ),
+  AppDestination(
     path: RoutePaths.productos,
     label: 'Productos',
     icon: Icons.liquor_outlined,

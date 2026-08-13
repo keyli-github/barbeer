@@ -43,5 +43,13 @@ void main() {
         isTrue,
       );
     });
+
+    test('movimientos is a caja:leer destination', () {
+      expect(_authWith(['caja:leer']).canAccess('/movimientos'), isTrue);
+      expect(
+        _authWith(['caja:movimientos']).canAccess('/movimientos'),
+        isFalse,
+      );
+    });
   });
 }

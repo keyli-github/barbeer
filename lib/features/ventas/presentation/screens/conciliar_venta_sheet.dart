@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -24,12 +26,13 @@ class ConciliarVentaSheet extends ConsumerStatefulWidget {
 class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
   String _estado = 'EFECTIVO';
   String? _etiquetaId;
-  final _compCtrl = TextEditingController();
   final _codOpCtrl = TextEditingController();
   bool _saving = false;
   String? _error;
   List<Etiqueta> _etiquetas = [];
   bool _loadingEtiquetas = false;
+  Uint8List? _voucherBytes;
+  String? _voucherFilename;
 
   @override
   void initState() {
@@ -39,7 +42,6 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
 
   @override
   void dispose() {
-    _compCtrl.dispose();
     _codOpCtrl.dispose();
     super.dispose();
   }
@@ -57,6 +59,15 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
   Etiqueta? get _selectedEtiqueta =>
       _etiquetas.where((e) => e.id == _etiquetaId).firstOrNull;
 
+  Future<void> _pickVoucher() async {
+    final file = await ref.read(voucherImagePickerProvider)();
+    if (file == null || !mounted) return;
+    setState(() {
+      _voucherBytes = file.bytes;
+      _voucherFilename = file.filename;
+    });
+  }
+
   Future<void> _submit() async {
     if (_saving) return;
     if (_estado == 'BILLETERA' && _etiquetaId == null) {
@@ -65,7 +76,7 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
     }
     if (_estado == 'BILLETERA' &&
         _selectedEtiqueta?.requiereComprobante == true &&
-        _compCtrl.text.trim().isEmpty) {
+        _voucherBytes == null) {
       setState(
         () => _error = 'Ingresa el comprobante requerido por esta billetera',
       );
@@ -77,13 +88,21 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
     });
     try {
       final repo = ref.read(ventasRepositoryProvider);
+      String? comprobante;
+      if (_estado == 'BILLETERA' && _voucherBytes != null) {
+        final upload = await ref
+            .read(uploadClientProvider)
+            .uploadImage(
+              bytes: _voucherBytes!,
+              filename: _voucherFilename ?? 'comprobante.jpg',
+            );
+        comprobante = upload.url;
+      }
       await repo.conciliarVenta(
         widget.venta.id,
         estado: _estado,
         etiquetaId: _estado == 'BILLETERA' ? _etiquetaId : null,
-        comprobante: _compCtrl.text.trim().isNotEmpty
-            ? _compCtrl.text.trim()
-            : null,
+        comprobante: comprobante,
         codigoOperacion: _codOpCtrl.text.trim().isNotEmpty
             ? _codOpCtrl.text.trim()
             : null,
@@ -269,16 +288,20 @@ class _ConciliarVentaSheetState extends ConsumerState<ConciliarVentaSheet> {
                         onChanged: (v) => setState(() => _etiquetaId = v),
                       ),
                       const SizedBox(height: 12),
-                      if (_selectedEtiqueta?.requiereComprobante == true) ...[
-                        TextField(
+                      if (_estado == 'BILLETERA') ...[
+                        OutlinedButton.icon(
                           key: const ValueKey('comprobanteField'),
-                          controller: _compCtrl,
-                          maxLength: 500,
-                          decoration: InputDecoration(
-                            labelText: 'Comprobante / voucher',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                          onPressed: _saving ? null : _pickVoucher,
+                          icon: Icon(
+                            _voucherBytes == null
+                                ? Icons.upload_file_rounded
+                                : Icons.check_circle_rounded,
+                          ),
+                          label: Text(
+                            _voucherFilename ??
+                                (_selectedEtiqueta?.requiereComprobante == true
+                                    ? 'Seleccionar comprobante *'
+                                    : 'Seleccionar comprobante (opcional)'),
                           ),
                         ),
                         const SizedBox(height: 12),

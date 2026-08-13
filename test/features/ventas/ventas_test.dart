@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 import 'package:barbeer/core/network/api_client.dart';
+import 'package:barbeer/core/network/upload_client.dart';
 import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
@@ -124,6 +127,19 @@ class _FakeVentasRepository extends VentasRepository {
     ));
     return _venta(id);
   }
+}
+
+class _FakeUploadClient extends UploadClient {
+  _FakeUploadClient() : super(ApiClient.instance);
+
+  @override
+  Future<UploadResult> uploadImage({
+    required Uint8List bytes,
+    required String filename,
+  }) async => const UploadResult(
+    url: '/api/uploads/voucher.jpg?token=test',
+    filename: 'voucher.jpg',
+  );
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -357,6 +373,52 @@ void main() {
       expect(conc.etiquetaNombre, 'Yape');
       expect(conc.codigoOperacion, 'YPE-001');
     });
+
+    test('payload de venta congela todos los campos para reintentos', () {
+      final sourceItems = <Map<String, dynamic>>[
+        {'productoId': 'p1', 'cantidad': 2, 'precioVenta': 15.5},
+      ];
+      final payload = CreateVentaPayload(
+        idempotencyKey: 'key-1',
+        sedeId: 's1',
+        vendedoraId: 'u1',
+        items: sourceItems,
+        estadoConciliacion: EstadoConciliacion.billetera,
+        etiquetaId: 'e1',
+        comprobante: '/api/uploads/v.jpg',
+        codigoOperacion: 'OP-1',
+        recargoMonto: 5,
+        recargoMotivo: 'Servicio',
+      );
+
+      sourceItems.first['cantidad'] = 99;
+      expect(payload.idempotencyKey, 'key-1');
+      expect((payload.json['items'] as List).single['cantidad'], 2);
+      expect(payload.json['estadoConciliacion'], 'BILLETERA');
+      expect(
+        () => (payload.json['items'] as List).add(<String, dynamic>{}),
+        throwsUnsupportedError,
+      );
+    });
+
+    test('Venta.fromJson expone recargo y subtotal', () {
+      final venta = Venta.fromJson({
+        'id': 'v3',
+        'codigo': 'V-003',
+        'cajaSesionId': 'c1',
+        'sedeId': 's1',
+        'total': 35,
+        'recargoMonto': 5,
+        'recargoMotivo': 'Delivery',
+        'estado': 'ACTIVA',
+        'items': [],
+        'createdAt': '2026-08-05T10:00:00Z',
+      });
+
+      expect(venta.recargoMonto, 5);
+      expect(venta.recargoMotivo, 'Delivery');
+      expect(venta.subtotalSinRecargo, 30);
+    });
   });
 
   group('Doble confirmación', () {
@@ -458,7 +520,16 @@ void main() {
       var completed = false;
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [ventasRepositoryProvider.overrideWithValue(repo)],
+          overrides: [
+            ventasRepositoryProvider.overrideWithValue(repo),
+            uploadClientProvider.overrideWithValue(_FakeUploadClient()),
+            voucherImagePickerProvider.overrideWithValue(
+              () async => PickedUploadImage(
+                bytes: Uint8List.fromList([0xff, 0xd8, 0xff]),
+                filename: 'voucher.jpg',
+              ),
+            ),
+          ],
           child: MaterialApp(
             home: ConciliarVentaScreen(
               venta: _venta('1', pendiente: true),
@@ -485,10 +556,8 @@ void main() {
       );
       expect(repo.conciliaciones, isEmpty);
 
-      await tester.enterText(
-        find.byKey(const ValueKey('comprobanteField')),
-        'voucher-123',
-      );
+      await tester.tap(find.byKey(const ValueKey('comprobanteField')));
+      await tester.pump();
       await tester.enterText(
         find.byKey(const ValueKey('codigoOperacionField')),
         'op-456',
@@ -498,7 +567,10 @@ void main() {
 
       expect(completed, isTrue);
       expect(repo.conciliaciones, hasLength(1));
-      expect(repo.conciliaciones.single.comprobante, 'voucher-123');
+      expect(
+        repo.conciliaciones.single.comprobante,
+        '/api/uploads/voucher.jpg?token=test',
+      );
       expect(repo.conciliaciones.single.codigoOperacion, 'op-456');
       await tester.pump(const Duration(seconds: 3));
     });

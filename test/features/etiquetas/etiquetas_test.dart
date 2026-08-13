@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:barbeer/features/ventas/data/models/venta_models.dart';
+import 'package:barbeer/features/etiquetas/data/models/etiqueta.dart';
+import 'package:barbeer/features/etiquetas/presentation/widgets/etiqueta_tile.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
+import 'package:flutter/material.dart';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -83,12 +85,16 @@ void main() {
         'activo': true,
         'sedeId': null,
         'requiereComprobante': true,
+        'tipo': 'AMBOS',
+        'esSistema': true,
         'orden': 1,
       };
       final et = Etiqueta.fromJson(json);
       expect(et.nombre, 'Yape');
       expect(et.activo, isTrue);
       expect(et.requiereComprobante, isTrue);
+      expect(et.tipo, EtiquetaTipo.ambos);
+      expect(et.esSistema, isTrue);
       expect(et.orden, 1);
       expect(et.sedeId, isNull);
     });
@@ -102,17 +108,18 @@ void main() {
       final payload = <String, dynamic>{
         'nombre': 'Agora',
         'requiereComprobante': true,
-        'orden': 3,
+        'tipo': 'SALIDA',
       };
       expect(payload['nombre'], 'Agora');
       expect(payload.containsKey('sedeId'), isFalse);
+      expect(payload.containsKey('orden'), isFalse);
     });
 
     test('8. Editar etiqueta (solo campos modificables)', () {
       final payload = <String, dynamic>{
         'nombre': 'Yape Actualizado',
         'requiereComprobante': false,
-        'orden': 2,
+        'tipo': 'ENTRADA',
       };
       // No debe contener activo (eso va por otro endpoint)
       expect(payload.containsKey('activo'), isFalse);
@@ -141,11 +148,8 @@ void main() {
 
   group('Validaciones', () {
     test('12. Evitar doble envío (submitting)', () {
-      var count = 0;
-      void doSubmit() => count++;
-      const saving = true;
-      if (!saving) doSubmit();
-      expect(count, 0);
+      bool canSubmit(bool saving) => !saving;
+      expect(canSubmit(true), isFalse);
     });
 
     test('13. Manejo de 403 (sin permiso)', () {
@@ -160,6 +164,73 @@ void main() {
             errorString.contains('connection'),
         isTrue,
       );
+    });
+  });
+
+  group('EtiquetaTile', () {
+    const editable = Etiqueta(
+      id: 'custom',
+      nombre: 'Gastos',
+      activo: true,
+      requiereComprobante: false,
+      tipo: EtiquetaTipo.salida,
+      esSistema: false,
+      orden: 2,
+    );
+
+    testWidgets('muestra AMBOS y oculta acciones para etiquetas del sistema', (
+      tester,
+    ) async {
+      const sistema = Etiqueta(
+        id: 'system',
+        nombre: 'Efectivo',
+        activo: true,
+        requiereComprobante: false,
+        tipo: EtiquetaTipo.ambos,
+        esSistema: true,
+        orden: 1,
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: EtiquetaTile(
+              etiqueta: sistema,
+              canEdit: true,
+              canDeactivate: true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('AMBOS'), findsOneWidget);
+      expect(find.text('SISTEMA'), findsOneWidget);
+      expect(find.byIcon(Icons.edit_rounded), findsNothing);
+      expect(find.byIcon(Icons.toggle_on_rounded), findsNothing);
+    });
+
+    testWidgets('respeta permisos independientes de editar y desactivar', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: EtiquetaTile(etiqueta: editable, canEdit: true)),
+        ),
+      );
+
+      expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.toggle_on_rounded), findsNothing);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: EtiquetaTile(etiqueta: editable, canDeactivate: true),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.edit_rounded), findsNothing);
+      expect(find.byIcon(Icons.toggle_on_rounded), findsOneWidget);
     });
   });
 }

@@ -4,7 +4,7 @@ import '../../categorias/data/categorias_repository.dart';
 class Producto {
   final String id, codigo, nombre, categoriaId, unidad;
   final String categoria;
-  final String? descripcion, presentacion, imageUrl;
+  final String? descripcion, presentacion, imagenUrl;
   final double precioVenta, precioCosto;
   final bool disponiblePos, activo;
   final double margin;
@@ -19,7 +19,7 @@ class Producto {
     required this.unidad,
     this.descripcion,
     this.presentacion,
-    this.imageUrl,
+    this.imagenUrl,
     required this.precioVenta,
     required this.precioCosto,
     required this.disponiblePos,
@@ -40,7 +40,7 @@ class Producto {
     unidad: j['unidad'] as String? ?? 'un',
     descripcion: j['descripcion'] as String?,
     presentacion: j['presentacion'] as String?,
-    imageUrl: j['imageUrl'] as String?,
+    imagenUrl: j['imagenUrl'] as String?,
     precioVenta: (j['precioVenta'] as num?)?.toDouble() ?? 0,
     precioCosto: (j['precioCosto'] as num?)?.toDouble() ?? 0,
     disponiblePos: j['disponiblePos'] as bool? ?? false,
@@ -48,6 +48,8 @@ class Producto {
     margin: (j['margin'] as num?)?.toDouble() ?? 0,
     stockDisponible: (j['stockDisponible'] as num?)?.toInt(),
   );
+
+  String? get imageUrl => imagenUrl;
 }
 
 class ProductosResumen {
@@ -98,9 +100,9 @@ class ProductosRepository {
         'pagina': pagina,
         'limite': limite,
         if (q != null && q.isNotEmpty) 'q': q,
-        if (categoriaId != null) 'categoriaId': categoriaId,
-        if (activo != null) 'activo': activo,
-        if (sedeId != null) 'sedeId': sedeId,
+        'categoriaId': ?categoriaId,
+        'activo': ?activo,
+        'sedeId': ?sedeId,
       },
     );
     final json = Map<String, dynamic>.from(r.data as Map);
@@ -131,6 +133,7 @@ class ProductosRepository {
     required double precioVenta,
     required double precioCosto,
     String? descripcion,
+    String? imagenUrl,
     String? unidad,
     bool disponiblePos = false,
     bool activo = true,
@@ -145,7 +148,8 @@ class ProductosRepository {
         'precioCosto': precioCosto,
         if (descripcion?.trim().isNotEmpty ?? false)
           'descripcion': descripcion!.trim(),
-        if (unidad != null) 'unidad': unidad,
+        if (imagenUrl case final imagenUrl?) 'imagenUrl': imagenUrl.trim(),
+        'unidad': ?unidad,
         'disponiblePos': disponiblePos,
         'activo': activo,
       },
@@ -168,11 +172,7 @@ class ProductosRepository {
   Future<List<Categoria>> categorias({String? activo = 'true'}) async {
     final r = await _api.get(
       '/categorias',
-      queryParameters: {
-        'pagina': 1,
-        'limite': 100,
-        if (activo != null) 'activo': activo,
-      },
+      queryParameters: {'pagina': 1, 'limite': 100, 'activo': ?activo},
     );
     final json = Map<String, dynamic>.from(r.data as Map);
     return (json['data'] as List? ?? [])

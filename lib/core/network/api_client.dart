@@ -107,6 +107,21 @@ class ApiClient {
     );
   }
 
+  Future<Response<T>> postMultipart<T>(
+    String path, {
+    required FormData data,
+  }) async {
+    final h = await _headers(path);
+    return _execute(
+      () => _dio.post<T>(
+        path,
+        data: data,
+        options: _opts({...?h, 'Content-Type': 'multipart/form-data'}),
+      ),
+      path,
+    );
+  }
+
   Future<Response<T>> patch<T>(String path, {dynamic data}) async {
     final h = await _headers(path);
     return _execute(
@@ -172,7 +187,9 @@ class ApiClient {
         await _expireSession();
         return null;
       }
-      for (final c in _refreshQueue) c.complete(newToken);
+      for (final c in _refreshQueue) {
+        c.complete(newToken);
+      }
       _refreshQueue.clear();
       return newToken;
     } on NetworkException {

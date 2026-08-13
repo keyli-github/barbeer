@@ -194,7 +194,7 @@ class ProductosScreen extends ConsumerWidget {
               onSelect: notifier.setCategoria,
             ),
             loading: () => const SizedBox(height: 40),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
           // ─── KPIs ───────────────────────────────────────────
           if (state.resumen != null && !state.loading)
@@ -589,7 +589,7 @@ class _KpiChip extends StatelessWidget {
     child: Container(
       padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.09),
+        color: color.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusSM),
       ),
       child: Column(
@@ -656,7 +656,7 @@ class _ProductCard extends StatelessWidget {
               child: AspectRatio(
                 aspectRatio: 1.2,
                 child: DSProductImage(
-                  imageUrl: product.imageUrl,
+                  imageUrl: product.imagenUrl,
                   productName: product.nombre,
                   fit: BoxFit.cover,
                   width: double.infinity,
@@ -830,7 +830,7 @@ class _ProductDetailScreen extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: DSProductImage(
-                    imageUrl: product.imageUrl,
+                    imageUrl: product.imagenUrl,
                     productName: product.nombre,
                     width: 120,
                     height: 120,
@@ -1002,6 +1002,7 @@ class _ProductDetailScreen extends StatelessWidget {
                       ),
                     );
                     if (ok == true) {
+                      if (!context.mounted) return;
                       Navigator.pop(context);
                       onDelete();
                     }
@@ -1148,6 +1149,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
   final _ventaCtrl = TextEditingController();
   final _costoCtrl = TextEditingController();
   final _unidadCtrl = TextEditingController();
+  final _imagenUrlCtrl = TextEditingController();
   String _categoriaId = '';
   bool _posEnabled = false, _activo = true, _saving = false;
   String? _error;
@@ -1163,6 +1165,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
       _ventaCtrl.text = p.precioVenta.toString();
       _costoCtrl.text = p.precioCosto.toString();
       _unidadCtrl.text = p.unidad;
+      _imagenUrlCtrl.text = p.imagenUrl ?? '';
       _categoriaId = p.categoriaId;
       _posEnabled = p.disponiblePos;
       _activo = p.activo;
@@ -1179,6 +1182,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
     _ventaCtrl.dispose();
     _costoCtrl.dispose();
     _unidadCtrl.dispose();
+    _imagenUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -1217,6 +1221,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
           descripcion: _descCtrl.text.trim().isEmpty
               ? null
               : _descCtrl.text.trim(),
+          imagenUrl: _imagenUrlCtrl.text.trim(),
           unidad: _unidadCtrl.text.trim().isEmpty
               ? null
               : _unidadCtrl.text.trim(),
@@ -1231,6 +1236,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
           'precioCosto': costo,
           if (_descCtrl.text.trim().isNotEmpty)
             'descripcion': _descCtrl.text.trim(),
+          'imagenUrl': _imagenUrlCtrl.text.trim(),
           'unidad': _unidadCtrl.text.trim().isEmpty
               ? 'un'
               : _unidadCtrl.text.trim(),
@@ -1302,6 +1308,13 @@ class _ProductFormState extends State<_ProductFormScreen> {
               maxLines: 2,
             ),
             const SizedBox(height: 14),
+            AppTextField(
+              label: 'URL de imagen',
+              hint: 'https://ejemplo.com/producto.jpg',
+              controller: _imagenUrlCtrl,
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 14),
             Text(
               'Categoría *',
               style: AppTextStyles.bodySmall.copyWith(
@@ -1310,7 +1323,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
             ),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              value: _categoriaId.isEmpty ? null : _categoriaId,
+              initialValue: _categoriaId.isEmpty ? null : _categoriaId,
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14,
