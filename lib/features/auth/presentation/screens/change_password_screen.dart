@@ -59,27 +59,27 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       appBar: widget.isForced
           ? null
           : AppBar(
-              backgroundColor: AppColors.background,
+              backgroundColor: context.colors.background,
               elevation: 0,
               scrolledUnderElevation: 0,
               leading: IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
                   size: 18,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
                 onPressed: () => Navigator.of(context).pop(),
               ),
-              title: const Text(
+              title: Text(
                 'Cambiar contraseña',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
@@ -99,8 +99,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       child: Container(
                         width: 64,
                         height: 64,
-                        decoration: const BoxDecoration(
-                          color: AppColors.warningLight,
+                        decoration: BoxDecoration(
+                          color: context.colors.warningLight,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -195,7 +195,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   Widget _requirements() => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.backgroundAlt,
+      color: context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(AppRadius.sm),
     ),
     child: Column(
@@ -216,14 +216,14 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         Icon(
           met ? Icons.check_circle_rounded : Icons.circle_outlined,
           size: 16,
-          color: met ? AppColors.success : AppColors.textTertiary,
+          color: met ? AppColors.success : context.colors.textTertiary,
         ),
         const SizedBox(width: 8),
         Text(
           text,
           style: TextStyle(
             fontSize: 12,
-            color: met ? AppColors.success : AppColors.textSecondary,
+            color: met ? AppColors.success : context.colors.textSecondary,
             fontWeight: met ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
@@ -234,7 +234,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   Widget _errBox(String msg) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
-      color: AppColors.errorLight,
+      color: context.colors.errorLight,
       borderRadius: BorderRadius.circular(AppRadius.sm),
     ),
     child: Row(

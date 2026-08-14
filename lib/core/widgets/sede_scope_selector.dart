@@ -36,17 +36,17 @@ class SedeScopeSelector extends ConsumerWidget {
           constraints: BoxConstraints(maxWidth: compact ? 150 : 240),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFAFAFA),
+            color: context.colors.backgroundAlt,
             borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: context.colors.border),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.location_on_outlined,
                 size: 16,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -54,19 +54,19 @@ class SedeScopeSelector extends ConsumerWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ),
               if (user?.isSuperAdmin == true) ...[
                 const SizedBox(width: 3),
-                const Icon(
+                Icon(
                   Icons.keyboard_arrow_down_rounded,
                   size: 16,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
               ],
             ],
@@ -96,7 +96,7 @@ class SedeScopeSelector extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       constraints: const BoxConstraints(maxWidth: 480),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

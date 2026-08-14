@@ -26,8 +26,8 @@ class AppEmptyState extends StatelessWidget {
           Container(
             width: 72,
             height: 72,
-            decoration: const BoxDecoration(
-              color: AppColors.primarySurface,
+            decoration: BoxDecoration(
+              color: context.colors.primarySurface,
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: AppColors.primary, size: 32),
@@ -70,8 +70,8 @@ class AppErrorState extends StatelessWidget {
           Container(
             width: 72,
             height: 72,
-            decoration: const BoxDecoration(
-              color: AppColors.errorLight,
+            decoration: BoxDecoration(
+              color: context.colors.errorLight,
               shape: BoxShape.circle,
             ),
             child: const Icon(

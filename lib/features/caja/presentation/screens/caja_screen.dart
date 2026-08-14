@@ -33,7 +33,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
     // Selector de tabs en una barra debajo del header global
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           // Tabs: Turno actual / Historial
@@ -177,7 +177,7 @@ class _CajaTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    color: Colors.white,
+    color: context.colors.surface,
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
     child: Column(
       children: [
@@ -185,7 +185,7 @@ class _CajaTabs extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: AppColors.backgroundAlt,
+            color: context.colors.backgroundAlt,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -236,7 +236,7 @@ class _Tab extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: AppTextStyles.labelLarge.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
+            color: selected ? Colors.white : context.colors.textSecondary,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -361,7 +361,7 @@ class _Actual extends StatelessWidget {
                       label: 'Apertura',
                       value: session.montoApertura,
                       icon: Icons.play_circle_outline_rounded,
-                      color: AppColors.textSecondary,
+                      color: context.colors.textSecondary,
                     ),
                     _Metric(
                       width: width,
@@ -394,7 +394,7 @@ class _Actual extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.warningLight,
+                color: context.colors.warningLight,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: AppColors.warning.withValues(alpha: 0.25),
@@ -567,8 +567,8 @@ class _Historial extends StatelessWidget {
                     height: 42,
                     decoration: BoxDecoration(
                       color: session.estado == 'ABIERTA'
-                          ? AppColors.successLight
-                          : AppColors.backgroundAlt,
+                          ? context.colors.successLight
+                          : context.colors.backgroundAlt,
                       borderRadius: BorderRadius.circular(11),
                     ),
                     child: Icon(
@@ -577,7 +577,7 @@ class _Historial extends StatelessWidget {
                           : Icons.lock_rounded,
                       color: session.estado == 'ABIERTA'
                           ? AppColors.success
-                          : AppColors.textSecondary,
+                          : context.colors.textSecondary,
                       size: 19,
                     ),
                   ),
@@ -601,7 +601,7 @@ class _Historial extends StatelessWidget {
                         label: session.estado,
                         color: session.estado == 'ABIERTA'
                             ? AppColors.success
-                            : AppColors.textSecondary,
+                            : context.colors.textSecondary,
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -611,7 +611,7 @@ class _Historial extends StatelessWidget {
                               session.montoApertura,
                         ),
                         style: AppTextStyles.labelLarge.copyWith(
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ],
@@ -671,7 +671,7 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: SubPageAppBar(
       title: 'Apertura de caja',
       subtitle: widget.initialCounts.isEmpty
@@ -763,7 +763,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
   Widget build(BuildContext context) {
     final entrada = widget.tipo == 'ENTRADA';
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: entrada ? 'Nueva entrada' : 'Nueva salida',
         subtitle: 'Movimiento manual de efectivo',
@@ -865,7 +865,7 @@ class _DetailSheetState extends State<_DetailSheet> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: SubPageAppBar(
       title: 'Detalle de caja',
       subtitle: 'Resumen y arqueos registrados por el servidor',
@@ -1151,12 +1151,14 @@ class _FilterRow extends StatelessWidget {
             onSelected: (_) => onChanged(values[index]),
             showCheckmark: false,
             visualDensity: VisualDensity.compact,
-            selectedColor: AppColors.primarySurface,
+            selectedColor: context.colors.primarySurface,
             side: BorderSide(
-              color: active ? AppColors.primaryBorder : AppColors.border,
+              color: active
+                  ? context.colors.primaryBorder
+                  : context.colors.border,
             ),
             labelStyle: AppTextStyles.labelSmall.copyWith(
-              color: active ? AppColors.primary : AppColors.textSecondary,
+              color: active ? AppColors.primary : context.colors.textSecondary,
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
@@ -1217,7 +1219,7 @@ class _PrecuadreBanner extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.warningLight,
+      color: context.colors.warningLight,
       borderRadius: BorderRadius.circular(AppRadius.md),
       border: Border.all(color: AppColors.warning.withValues(alpha: 0.28)),
     ),
@@ -1229,7 +1231,7 @@ class _PrecuadreBanner extends StatelessWidget {
           child: Text(
             'Precuadre ${_money(session.montoDeclaradoPrecuadre ?? 0)} · diferencia ${_money(session.diferenciaPrecuadre ?? 0)}',
             style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
         ),
@@ -1248,9 +1250,9 @@ class _TotalBand extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.primarySurface,
+      color: context.colors.primarySurface,
       borderRadius: BorderRadius.circular(AppRadius.md),
-      border: Border.all(color: AppColors.primaryBorder),
+      border: Border.all(color: context.colors.primaryBorder),
     ),
     child: Row(
       children: [
@@ -1274,9 +1276,9 @@ class _ReadOnlyChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
     decoration: BoxDecoration(
-      color: AppColors.backgroundAlt,
+      color: context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: context.colors.border),
     ),
     child: Text(
       label.replaceAll('_', ' '),
@@ -1284,7 +1286,7 @@ class _ReadOnlyChip extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: AppTextStyles.labelSmall.copyWith(
-        color: AppColors.textSecondary,
+        color: context.colors.textSecondary,
         fontWeight: FontWeight.w600,
       ),
     ),
@@ -1331,7 +1333,7 @@ class _DetailRow extends StatelessWidget {
           value,
           textAlign: TextAlign.end,
           style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1399,7 +1401,7 @@ class _SkeletonBox extends StatelessWidget {
     builder: (_, opacity, _) => Container(
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.border.withValues(alpha: opacity),
+        color: context.colors.border.withValues(alpha: opacity),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
     ),

@@ -58,9 +58,9 @@ class CarritoVentaSheet extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -72,7 +72,7 @@ class CarritoVentaSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.borderLight,
+                color: context.colors.borderLight,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -109,11 +109,11 @@ class CarritoVentaSheet extends StatelessWidget {
           const Divider(height: 1),
           // Items
           if (items.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(32),
               child: Text(
                 'Selecciona productos del catálogo',
-                style: TextStyle(color: AppColors.textTertiary),
+                style: TextStyle(color: context.colors.textTertiary),
               ),
             )
           else
@@ -149,7 +149,7 @@ class CarritoVentaSheet extends StatelessWidget {
                                       '${_fmtCurrency(item.precio)} × ${item.cantidad} = ${_fmtCurrency(item.subtotal)}',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: AppColors.textSecondary,
+                                        color: context.colors.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -204,7 +204,7 @@ class CarritoVentaSheet extends StatelessWidget {
                               child: Icon(
                                 Icons.close,
                                 size: 16,
-                                color: AppColors.textTertiary,
+                                color: context.colors.textTertiary,
                               ),
                             ),
                           ],
@@ -338,10 +338,10 @@ class _QtyButton extends StatelessWidget {
         width: 26,
         height: 26,
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: context.colors.borderLight),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(icon, size: 14, color: AppColors.textSecondary),
+        child: Icon(icon, size: 14, color: context.colors.textSecondary),
       ),
     );
   }

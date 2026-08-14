@@ -177,6 +177,13 @@ const appDestinations = <AppDestination>[
     permissions: ['audit:leer'],
   ),
   AppDestination(
+    path: RoutePaths.seguridad,
+    label: 'Seguridad',
+    icon: Icons.shield_outlined,
+    activeIcon: Icons.shield_rounded,
+    section: AppDestinationSection.administration,
+  ),
+  AppDestination(
     path: RoutePaths.perfil,
     label: 'Perfil',
     icon: Icons.person_outline_rounded,

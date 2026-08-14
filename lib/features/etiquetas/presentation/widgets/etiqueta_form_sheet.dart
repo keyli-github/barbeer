@@ -103,7 +103,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: _isEdit ? 'Editar etiqueta' : 'Nueva etiqueta',
       ),
@@ -168,7 +168,7 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
                 padding: const EdgeInsets.all(10),
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.errorLight,
+                  color: context.colors.errorLight,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

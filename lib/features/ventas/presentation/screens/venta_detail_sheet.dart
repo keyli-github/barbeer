@@ -81,8 +81,8 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.90,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.backgroundAlt,
+      decoration: BoxDecoration(
+        color: context.colors.backgroundAlt,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
@@ -94,7 +94,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -102,7 +102,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
 
           // ── Cabecera ───────────────────────────────────────────────
           Container(
-            color: AppColors.background,
+            color: context.colors.background,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
               AppSpacing.xs,
@@ -117,19 +117,19 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                     children: [
                       Text(
                         v.codigo,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                           letterSpacing: -0.3,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         dt != null ? FormatUtils.dateTime(dt) : '—',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ],
@@ -163,7 +163,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
             ),
           ),
 
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: context.colors.border),
 
           // ── Contenido scrollable ───────────────────────────────────
           Expanded(
@@ -285,19 +285,19 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                                           item.productoNombre ??
                                               item.productoCodigo ??
                                               '—',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary,
+                                            color: context.colors.textPrimary,
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
                                           '${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                            color: context.colors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -305,20 +305,20 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                                   ),
                                   Text(
                                     FormatUtils.currency(item.subtotal),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
+                                      color: context.colors.textPrimary,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                             if (idx < v.items.length - 1)
-                              const Divider(
+                              Divider(
                                 height: 1,
                                 indent: 72,
-                                color: AppColors.borderLight,
+                                color: context.colors.borderLight,
                               ),
                           ],
                         );
@@ -364,7 +364,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
-                        color: AppColors.errorLight,
+                        color: context.colors.errorLight,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -441,10 +441,10 @@ class _SectionLabel extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 6),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.textTertiary,
+        color: context.colors.textTertiary,
         letterSpacing: 0.5,
         textBaseline: TextBaseline.alphabetic,
       ),
@@ -460,9 +460,9 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: double.infinity,
     decoration: BoxDecoration(
-      color: AppColors.background,
+      color: context.colors.background,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.border, width: 0.75),
+      border: Border.all(color: context.colors.border, width: 0.75),
     ),
     padding:
         padding ??
@@ -487,7 +487,7 @@ class _InfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
         ),
         const SizedBox(width: AppSpacing.md),
         Flexible(
@@ -497,7 +497,7 @@ class _InfoRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
               fontFamily: mono ? 'monospace' : null,
             ),
             maxLines: 2,
@@ -513,5 +513,5 @@ class _Divider extends StatelessWidget {
   const _Divider();
   @override
   Widget build(BuildContext context) =>
-      const Divider(height: 1, color: AppColors.borderLight);
+      Divider(height: 1, color: context.colors.borderLight);
 }

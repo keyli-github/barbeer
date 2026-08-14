@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,7 @@ import '../../../../core/widgets/ds_states.dart';
 import '../../../productos/data/productos_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
+import '../../data/ventas_repository.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/carrito_venta_sheet.dart';
 
@@ -44,10 +47,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   String? _vendedoraId;
   double? _recargoMonto;
   String? _recargoMotivo;
-  String _codigoOperacion = '';
   Uint8List? _voucherBytes;
   String? _voucherFilename;
+  ComprobanteAnalisis? _comprobanteAnalisis;
+  bool _analizandoComprobante = false;
+  bool _analisisInvalidado = false;
+  String? _comprobanteError;
+  int _voucherRequestToken = 0;
   String? _loadedSedeId;
+  late final VentasRepository _repository;
 
   /// true después de un intento fallido ambiguo (timeout, error de red).
   /// Mientras está congelado, no se puede modificar el carrito.
@@ -57,6 +65,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   @override
   void initState() {
     super.initState();
+    _repository = ref.read(ventasRepositoryProvider);
     _idempotencyKey = ref
         .read(ventasRepositoryProvider)
         .generateIdempotencyKey();
@@ -65,6 +74,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   @override
   void dispose() {
+    _voucherRequestToken++;
+    _cancelAnalysis(_comprobanteAnalisis);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -188,6 +199,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         );
       }
     });
+    _invalidateAnalysisIfAmountChanged();
   }
 
   Future<void> _selectProduct(Producto product) async {
@@ -251,7 +263,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   Future<void> _editPrice(CarritoItem item) async {
     if (_frozen) return;
     final price = await _askPrice(item.nombre, item.precio);
-    if (price != null && mounted) setState(() => item.precio = price);
+    if (price != null && mounted) {
+      setState(() => item.precio = price);
+      _invalidateAnalysisIfAmountChanged();
+    }
   }
 
   void _changeQuantity(String productoId, int delta) {
@@ -277,6 +292,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _carrito.removeWhere((i) => i.productoId == productoId);
       }
     });
+    _invalidateAnalysisIfAmountChanged();
   }
 
   void _removeFromCart(String productoId) {
@@ -284,6 +300,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     setState(() {
       _carrito.removeWhere((i) => i.productoId == productoId);
     });
+    _invalidateAnalysisIfAmountChanged();
   }
 
   /// Descarta el intento fallido y permite modificar el carrito.
@@ -300,6 +317,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   }
 
   void _clearCart() {
+    _cancelAnalysis(_comprobanteAnalisis);
+    _voucherRequestToken++;
     setState(() {
       _carrito.clear();
       _frozen = false;
@@ -308,9 +327,12 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _recargoMonto = null;
       _recargoMotivo = null;
       _payment = EstadoConciliacion.efectivo;
-      _codigoOperacion = '';
       _voucherBytes = null;
       _voucherFilename = null;
+      _comprobanteAnalisis = null;
+      _comprobanteError = null;
+      _analisisInvalidado = false;
+      _analizandoComprobante = false;
       _idempotencyKey = ref
           .read(ventasRepositoryProvider)
           .generateIdempotencyKey();
@@ -321,13 +343,94 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   double get _total => _subtotal + (_recargoMonto ?? 0);
 
   Future<void> _pickVoucher(VoidCallback refresh) async {
-    final file = await ref.read(voucherImagePickerProvider)();
-    if (file == null || !mounted) return;
+    final token = ++_voucherRequestToken;
+    try {
+      final file = await ref.read(voucherImagePickerProvider)();
+      if (file == null || !mounted || token != _voucherRequestToken) return;
+      final auth = ref.read(authProvider);
+      final sedeId = auth.user?.isSuperAdmin == true
+          ? ref.read(globalSedeIdProvider)
+          : auth.user?.sedeId;
+      await _cancelAnalysis(_comprobanteAnalisis);
+      if (!mounted || token != _voucherRequestToken) return;
+      setState(() {
+        _voucherBytes = file.bytes;
+        _voucherFilename = file.filename;
+        _comprobanteAnalisis = null;
+        _comprobanteError = null;
+        _analisisInvalidado = false;
+        _analizandoComprobante = true;
+      });
+      refresh();
+      final analysis = await _repository.analizarComprobante(
+        bytes: file.bytes,
+        filename: file.filename,
+        sedeId: auth.user?.isSuperAdmin == true ? sedeId : null,
+      );
+      if (!mounted || token != _voucherRequestToken) {
+        await _repository
+            .cancelarComprobanteAnalisis(analysis.id)
+            .catchError((_) {});
+        return;
+      }
+      setState(() {
+        _comprobanteAnalisis = analysis;
+        _analizandoComprobante = false;
+        _etiquetaId = analysis.etiquetaSugerida?.id ?? _etiquetaId;
+        if (analysis.posibleDuplicado) {
+          _comprobanteError = 'Posible comprobante duplicado';
+        } else if (!analysis.esApto) {
+          _comprobanteError =
+              'El comprobante requiere revisión y no permite registrar la venta';
+        } else if (!analysis.montoCoincide(_total)) {
+          _comprobanteError =
+              'El monto del comprobante no coincide con el total de la venta';
+          _analisisInvalidado = true;
+        } else if (analysis.etiquetaSugerida?.id != _etiquetaId) {
+          _comprobanteError =
+              'La billetera analizada no coincide con la seleccionada';
+        }
+      });
+      refresh();
+    } catch (e) {
+      if (!mounted || token != _voucherRequestToken) return;
+      setState(() {
+        _analizandoComprobante = false;
+        _comprobanteAnalisis = null;
+        _comprobanteError = e is FormatException
+            ? e.message
+            : e.toString().replaceFirst('AppException: ', '');
+      });
+      refresh();
+    }
+  }
+
+  void _invalidateAnalysisIfAmountChanged() {
+    final analysis = _comprobanteAnalisis;
+    if (analysis == null || analysis.montoCoincide(_total)) return;
     setState(() {
-      _voucherBytes = file.bytes;
-      _voucherFilename = file.filename;
+      _analisisInvalidado = true;
+      _comprobanteError =
+          'El monto cambió. Selecciona y analiza un nuevo comprobante.';
     });
-    refresh();
+  }
+
+  void _clearVoucherAnalysis() {
+    _voucherRequestToken++;
+    _cancelAnalysis(_comprobanteAnalisis);
+    _voucherBytes = null;
+    _voucherFilename = null;
+    _comprobanteAnalisis = null;
+    _comprobanteError = null;
+    _analisisInvalidado = false;
+    _analizandoComprobante = false;
+  }
+
+  Future<void> _cancelAnalysis(ComprobanteAnalisis? analysis) async {
+    if (analysis == null || analysis.id.isEmpty) return;
+    await _repository
+        .cancelarComprobanteAnalisis(analysis.id)
+        .catchError((_) {});
   }
 
   Future<void> _editRecargo(VoidCallback refresh) async {
@@ -395,6 +498,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _recargoMonto = result.$1;
       _recargoMotivo = result.$2;
     });
+    _invalidateAnalysisIfAmountChanged();
     refresh();
   }
 
@@ -413,9 +517,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +559,12 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                     selected: _payment == payment,
                     onSelected: _frozen
                         ? null
-                        : (_) => update(() => _payment = payment),
+                        : (_) => update(() {
+                            if (_payment != payment) {
+                              _payment = payment;
+                              _clearVoucherAnalysis();
+                            }
+                          }),
                     visualDensity: VisualDensity.compact,
                   ),
                 )
@@ -482,41 +591,70 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                   ? null
                   : (value) => update(() {
                       _etiquetaId = value;
-                      _voucherBytes = null;
-                      _voucherFilename = null;
+                      if (_comprobanteAnalisis?.etiquetaSugerida?.id != value) {
+                        _clearVoucherAnalysis();
+                      }
                     }),
             ),
             const SizedBox(height: AppSpacing.xs),
-            TextFormField(
-              key: const Key('sale-operation-code-field'),
-              initialValue: _codigoOperacion,
-              enabled: !_frozen,
-              maxLength: 100,
-              decoration: const InputDecoration(
-                labelText: 'Código de operación (opcional)',
-                isDense: true,
-                counterText: '',
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key('voucher-picker'),
+                onPressed: _frozen || _submitting
+                    ? null
+                    : () => _pickVoucher(refresh),
+                icon: _analizandoComprobante
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _comprobanteAnalisis?.esApto == true &&
+                                !_analisisInvalidado
+                            ? Icons.verified_rounded
+                            : Icons.add_photo_alternate_outlined,
+                        size: 17,
+                      ),
+                label: Text(
+                  _analizandoComprobante
+                      ? 'Analizando comprobante...'
+                      : _voucherFilename ??
+                            (selectedEtiqueta?.requiereComprobante == true
+                                ? 'Seleccionar comprobante *'
+                                : 'Seleccionar comprobante (opcional)'),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              onChanged: (value) => _codigoOperacion = value,
             ),
-            const SizedBox(height: AppSpacing.xs),
-            OutlinedButton.icon(
-              key: const Key('voucher-picker'),
-              onPressed: _frozen ? null : () => _pickVoucher(refresh),
-              icon: Icon(
-                _voucherBytes == null
-                    ? Icons.upload_file_rounded
-                    : Icons.check_circle_rounded,
-                size: 17,
+            if (_voucherBytes != null || _comprobanteAnalisis != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              _buildReceiptPanel(),
+            ],
+            if (_comprobanteError != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Container(
+                key: const Key('receipt-analysis-error'),
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: _comprobanteAnalisis?.posibleDuplicado == true
+                      ? context.colors.errorLight
+                      : context.colors.warningLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSM),
+                ),
+                child: Text(
+                  _comprobanteError!,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _comprobanteAnalisis?.posibleDuplicado == true
+                        ? AppColors.error
+                        : AppColors.warning,
+                  ),
+                ),
               ),
-              label: Text(
-                _voucherFilename ??
-                    (selectedEtiqueta?.requiereComprobante == true
-                        ? 'Subir comprobante *'
-                        : 'Subir comprobante (opcional)'),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            ],
           ],
           const SizedBox(height: AppSpacing.xs),
           Row(
@@ -539,10 +677,13 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                   key: const Key('remove-surcharge'),
                   onPressed: _frozen
                       ? null
-                      : () => update(() {
-                          _recargoMonto = null;
-                          _recargoMotivo = null;
-                        }),
+                      : () {
+                          update(() {
+                            _recargoMonto = null;
+                            _recargoMotivo = null;
+                          });
+                          _invalidateAnalysisIfAmountChanged();
+                        },
                   icon: const Icon(Icons.close_rounded, size: 17),
                 ),
             ],
@@ -551,6 +692,143 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       ),
     );
   }
+
+  Widget _buildReceiptPanel() {
+    final analysis = _comprobanteAnalisis;
+    return Container(
+      key: const Key('receipt-analysis-panel'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
+        border: Border.all(
+          color: analysis?.esApto == true && !_analisisInvalidado
+              ? context.colors.successBorder
+              : context.colors.border,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSM),
+            child: SizedBox(
+              width: 76,
+              height: 96,
+              child: _voucherBytes != null
+                  ? Image.memory(_voucherBytes!, fit: BoxFit.cover)
+                  : Image.network(
+                      analysis?.thumbnailUrl ?? analysis?.imagenUrl ?? '',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: context.colors.surfaceAlt,
+                        child: const Icon(Icons.receipt_long_outlined),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: analysis == null
+                ? Text(
+                    _analizandoComprobante
+                        ? 'Gemini está leyendo la imagen y validando sus datos.'
+                        : 'No se pudo completar el análisis.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.colors.textSecondary,
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              analysis.entidad ?? 'Entidad no identificada',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: context.colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'Conf. ${(analysis.confianza.promedio * 100).round()}%',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      _receiptLine(
+                        'Monto',
+                        analysis.monto == null
+                            ? 'No identificado'
+                            : _fmt(analysis.monto!),
+                      ),
+                      _receiptLine(
+                        'Operación',
+                        analysis.codigoOperacion ?? 'No identificada',
+                      ),
+                      _receiptLine(
+                        'Seguridad',
+                        analysis.codigoSeguridad ?? 'No identificado',
+                      ),
+                      _receiptLine(
+                        'Fecha / hora',
+                        [
+                          analysis.fechaOperacion,
+                          analysis.horaOperacion,
+                        ].whereType<String>().join(' '),
+                      ),
+                      _receiptLine(
+                        'Etiqueta',
+                        analysis.etiquetaSugerida?.nombre ?? 'Sin sugerencia',
+                      ),
+                      if (analysis.advertencias.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            analysis.advertencias.join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _receiptLine(String label, String value) => Padding(
+    padding: const EdgeInsets.only(top: 2),
+    child: Text.rich(
+      TextSpan(
+        style: TextStyle(fontSize: 10, color: context.colors.textSecondary),
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          TextSpan(text: value.isEmpty ? 'No identificada' : value),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
 
   Future<void> _submit() async {
     if (_submitting || _carrito.isEmpty) return;
@@ -573,30 +851,32 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       setState(() => _submitError = 'Selecciona una billetera compatible');
       return;
     }
-    if (_payment == EstadoConciliacion.billetera &&
-        etiqueta?.requiereComprobante == true &&
-        _voucherBytes == null) {
-      setState(
-        () =>
-            _submitError = 'La billetera seleccionada requiere un comprobante',
+    final analysis = _comprobanteAnalisis;
+    if (_payment == EstadoConciliacion.billetera) {
+      if (_analizandoComprobante) {
+        setState(() => _submitError = 'Espera a que termine el análisis');
+        return;
+      }
+      final analysisError = comprobanteAnalysisError(
+        analysis: analysis,
+        total: _total,
+        required: etiqueta!.requiereComprobante,
+        selectedEtiquetaId: _etiquetaId,
       );
-      return;
+      if (analysisError != null || _analisisInvalidado) {
+        setState(
+          () => _submitError = _analisisInvalidado
+              ? 'El monto cambió. Selecciona y analiza un nuevo comprobante.'
+              : analysisError,
+        );
+        return;
+      }
     }
     setState(() {
       _submitting = true;
       _submitError = null;
     });
-    String? comprobante;
     try {
-      if (_payment == EstadoConciliacion.billetera && _voucherBytes != null) {
-        final upload = await ref
-            .read(uploadClientProvider)
-            .uploadImage(
-              bytes: _voucherBytes!,
-              filename: _voucherFilename ?? 'comprobante.jpg',
-            );
-        comprobante = upload.url;
-      }
       final payload = CreateVentaPayload(
         idempotencyKey: _idempotencyKey,
         items: _carrito
@@ -614,11 +894,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         etiquetaId: _payment == EstadoConciliacion.billetera
             ? _etiquetaId
             : null,
-        comprobante: comprobante,
-        codigoOperacion:
-            _payment == EstadoConciliacion.billetera &&
-                _codigoOperacion.trim().isNotEmpty
-            ? _codigoOperacion.trim()
+        comprobanteAnalisisId: _payment == EstadoConciliacion.billetera
+            ? analysis?.id
             : null,
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
@@ -648,6 +925,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         title: 'Venta registrada',
         description: 'La venta se registró correctamente.',
       );
+      _voucherRequestToken++;
       setState(() {
         _carrito.clear();
         _idempotencyKey = repo.generateIdempotencyKey();
@@ -657,9 +935,12 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _recargoMonto = null;
         _recargoMotivo = null;
         _payment = EstadoConciliacion.efectivo;
-        _codigoOperacion = '';
         _voucherBytes = null;
         _voucherFilename = null;
+        _comprobanteAnalisis = null;
+        _comprobanteError = null;
+        _analisisInvalidado = false;
+        _analizandoComprobante = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -798,7 +1079,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   Widget _buildDesktop() {
     return ColoredBox(
       key: const Key('desktop-sales-layout'),
-      color: const Color(0xFFFAFAFA),
+      color: context.colors.backgroundAlt,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final cartWidth = constraints.maxWidth < 900 ? 340.0 : 360.0;
@@ -846,9 +1127,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     return Container(
       key: const Key('desktop-catalog-panel'),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -864,22 +1145,22 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Catálogo de productos',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
                     Text(
                       status,
                       key: const Key('desktop-catalog-status'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textSecondary,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   ],
@@ -898,7 +1179,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             ),
           ),
           _buildPaymentNote(),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: context.colors.border),
           Expanded(child: _buildCatalog(desktop: true)),
         ],
       ),
@@ -911,7 +1192,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       children: [
         // ── Buscador ───────────────────────────────────────────────────
         Container(
-          color: AppColors.background,
+          color: context.colors.background,
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.md,
             AppSpacing.sm,
@@ -946,7 +1227,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Widget _buildPaymentNote() {
     return Container(
-      color: AppColors.brandSurface,
+      color: context.colors.brandSurface,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.xs,
@@ -1059,17 +1340,17 @@ class _ProductoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return desktop ? _buildDesktop() : _buildMobile();
+    return desktop ? _buildDesktop(context) : _buildMobile(context);
   }
 
-  Widget _buildDesktop() {
+  Widget _buildDesktop(BuildContext context) {
     final stock = producto.stockDisponible;
     final agotado = stock != null && stock <= 0;
     final stockBajo = stock != null && stock > 0 && stock <= 5;
 
     return Container(
       key: ValueKey('desktop-product-${producto.id}'),
-      decoration: _decoration,
+      decoration: _decoration(context),
       clipBehavior: Clip.antiAlias,
       child: Row(
         children: [
@@ -1093,9 +1374,9 @@ class _ProductoCard extends StatelessWidget {
                     producto.codigo,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xxs),
@@ -1103,10 +1384,10 @@ class _ProductoCard extends StatelessWidget {
                     producto.nombre,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const Spacer(),
@@ -1136,7 +1417,11 @@ class _ProductoCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xxs),
-                  _buildQuantityControl(agotado: agotado, stock: stock),
+                  _buildQuantityControl(
+                    context,
+                    agotado: agotado,
+                    stock: stock,
+                  ),
                 ],
               ),
             ),
@@ -1146,13 +1431,13 @@ class _ProductoCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMobile() {
+  Widget _buildMobile(BuildContext context) {
     final stock = producto.stockDisponible;
     final agotado = stock != null && stock <= 0;
     final stockBajo = stock != null && stock > 0 && stock <= 5;
 
     return Container(
-      decoration: _decoration,
+      decoration: _decoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1181,10 +1466,10 @@ class _ProductoCard extends StatelessWidget {
                 children: [
                   Text(
                     producto.nombre,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1208,7 +1493,7 @@ class _ProductoCard extends StatelessWidget {
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.warningLight,
+                            color: context.colors.warningLight,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -1223,7 +1508,11 @@ class _ProductoCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xxs),
-                  _buildQuantityControl(agotado: agotado, stock: stock),
+                  _buildQuantityControl(
+                    context,
+                    agotado: agotado,
+                    stock: stock,
+                  ),
                 ],
               ),
             ),
@@ -1233,19 +1522,23 @@ class _ProductoCard extends StatelessWidget {
     );
   }
 
-  BoxDecoration get _decoration => BoxDecoration(
-    color: AppColors.surface,
+  BoxDecoration _decoration(BuildContext context) => BoxDecoration(
+    color: context.colors.surface,
     borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
     border: Border.all(
       color: qty > 0
           ? AppColors.primary.withValues(alpha: 0.3)
-          : AppColors.border,
+          : context.colors.border,
       width: qty > 0 ? 1.5 : 0.75,
     ),
     boxShadow: AppShadows.card,
   );
 
-  Widget _buildQuantityControl({required bool agotado, required int? stock}) {
+  Widget _buildQuantityControl(
+    BuildContext context, {
+    required bool agotado,
+    required int? stock,
+  }) {
     if (qty == 0 || agotado) {
       return SizedBox(
         width: double.infinity,
@@ -1254,10 +1547,10 @@ class _ProductoCard extends StatelessWidget {
           onPressed: (agotado || frozen) ? null : onAdd,
           style: TextButton.styleFrom(
             backgroundColor: agotado
-                ? AppColors.surfaceAlt
-                : AppColors.primarySurface,
+                ? context.colors.surfaceAlt
+                : context.colors.primarySurface,
             foregroundColor: agotado
-                ? AppColors.textTertiary
+                ? context.colors.textTertiary
                 : AppColors.primary,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             shape: RoundedRectangleBorder(
@@ -1319,15 +1612,15 @@ class _QtyBtn extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: (color ?? AppColors.textTertiary).withValues(alpha: 0.1),
+        color: (color ?? context.colors.textTertiary).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         icon,
         size: 18,
         color: onTap != null
-            ? (color ?? AppColors.textSecondary)
-            : AppColors.textDisabled,
+            ? (color ?? context.colors.textSecondary)
+            : context.colors.textDisabled,
       ),
     ),
   );
@@ -1369,9 +1662,9 @@ class _DesktopCartPanel extends StatelessWidget {
     return Container(
       key: const Key('desktop-cart-panel'),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
         boxShadow: AppShadows.card,
       ),
       clipBehavior: Clip.antiAlias,
@@ -1391,8 +1684,8 @@ class _DesktopCartPanel extends StatelessWidget {
                   height: 36,
                   decoration: BoxDecoration(
                     color: frozen
-                        ? AppColors.warningLight
-                        : AppColors.primarySurface,
+                        ? context.colors.warningLight
+                        : context.colors.primarySurface,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
                   ),
                   child: Icon(
@@ -1408,21 +1701,21 @@ class _DesktopCartPanel extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Venta actual',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                       Text(
                         _itemCount == 1
                             ? '1 producto seleccionado'
                             : '$_itemCount productos seleccionados',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textSecondary,
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ],
@@ -1440,7 +1733,7 @@ class _DesktopCartPanel extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: context.colors.border),
           Expanded(
             child: items.isEmpty
                 ? Column(
@@ -1458,7 +1751,7 @@ class _DesktopCartPanel extends StatelessWidget {
                     ),
                     itemCount: items.length,
                     separatorBuilder: (_, _) =>
-                        const Divider(height: 1, color: AppColors.divider),
+                        Divider(height: 1, color: context.colors.divider),
                     itemBuilder: (_, index) {
                       final item = items[index];
                       return _DesktopCartItem(
@@ -1475,7 +1768,7 @@ class _DesktopCartPanel extends StatelessWidget {
                     },
                   ),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: context.colors.border),
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
@@ -1487,13 +1780,13 @@ class _DesktopCartPanel extends StatelessWidget {
                     padding: const EdgeInsets.all(AppSpacing.sm),
                     decoration: BoxDecoration(
                       color: frozen
-                          ? AppColors.warningLight
-                          : AppColors.errorLight,
+                          ? context.colors.warningLight
+                          : context.colors.errorLight,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
                       border: Border.all(
                         color: frozen
-                            ? AppColors.warningBorder
-                            : AppColors.errorBorder,
+                            ? context.colors.warningBorder
+                            : context.colors.errorBorder,
                       ),
                     ),
                     child: Column(
@@ -1509,11 +1802,11 @@ class _DesktopCartPanel extends StatelessWidget {
                         ),
                         if (frozen) ...[
                           const SizedBox(height: AppSpacing.xxs),
-                          const Text(
+                          Text(
                             'Reintenta sin modificar el carrito para conservar la operación.',
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.textSecondary,
+                              color: context.colors.textSecondary,
                             ),
                           ),
                         ],
@@ -1547,11 +1840,11 @@ class _DesktopCartPanel extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Subtotal',
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: context.colors.textSecondary,
                           ),
                         ),
                         Text(
@@ -1566,21 +1859,21 @@ class _DesktopCartPanel extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Total',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                     Text(
                       _fmt(total),
                       key: const Key('desktop-cart-total'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ],
@@ -1595,8 +1888,8 @@ class _DesktopCartPanel extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brand,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.border,
-                      disabledForegroundColor: AppColors.textTertiary,
+                      disabledBackgroundColor: context.colors.border,
+                      disabledForegroundColor: context.colors.textTertiary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
@@ -1646,29 +1939,32 @@ class _DesktopEmptyCart extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.add_shopping_cart_rounded,
                 size: 28,
-                color: AppColors.textTertiary,
+                color: context.colors.textTertiary,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            const Text(
+            Text(
               'Tu carrito está vacío',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: AppSpacing.xxs),
-            const Text(
+            Text(
               'Selecciona productos del catálogo para comenzar.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                color: context.colors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -1712,10 +2008,10 @@ class _DesktopCartItem extends StatelessWidget {
                       item.nombre,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxxs),
@@ -1723,9 +2019,9 @@ class _DesktopCartItem extends StatelessWidget {
                       item.codigo,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textTertiary,
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ],
@@ -1741,7 +2037,7 @@ class _DesktopCartItem extends StatelessWidget {
                 ),
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.close_rounded, size: 17),
-                color: AppColors.textTertiary,
+                color: context.colors.textTertiary,
               ),
             ],
           ),
@@ -1758,10 +2054,10 @@ class _DesktopCartItem extends StatelessWidget {
                 child: Text(
                   '${item.cantidad}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ),
@@ -1782,9 +2078,9 @@ class _DesktopCartItem extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.right,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ),
@@ -1805,10 +2101,10 @@ class _DesktopCartItem extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Text(
                 _fmt(item.subtotal),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ],
@@ -1846,9 +2142,9 @@ class _CartBar extends StatelessWidget {
         AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        border: const Border(
-          top: BorderSide(color: AppColors.border, width: 0.75),
+        color: context.colors.background,
+        border: Border(
+          top: BorderSide(color: context.colors.border, width: 0.75),
         ),
       ),
       child: GestureDetector(

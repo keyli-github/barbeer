@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/navigation/app_destinations.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_header.dart';
 import '../../../../core/widgets/barbeer_wordmark.dart';
@@ -66,16 +67,10 @@ class ShellScreen extends ConsumerWidget {
     final showMore = moreModules.isNotEmpty;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
+      value: AppTheme.systemUiOverlayStyle(context),
       child: Scaffold(
         key: shellScaffoldKey,
-        backgroundColor: AppColors.background,
+        backgroundColor: context.colors.background,
         // ── Header único para toda la app ─────────────────────────────
         appBar: AppHeader(
           subtitle: subtitle,
@@ -139,10 +134,10 @@ class _BottomNavBar extends StatelessWidget {
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.97),
+          color: context.colors.navBackground.withValues(alpha: 0.97),
           borderRadius: BorderRadius.circular(32),
           border: Border.all(
-            color: AppColors.border.withValues(alpha: 0.6),
+            color: context.colors.border.withValues(alpha: 0.6),
             width: 0.75,
           ),
           boxShadow: AppShadows.nav,
@@ -216,9 +211,7 @@ class _NavBarItem extends StatelessWidget {
           width: active ? 52 : 36,
           height: 30,
           decoration: BoxDecoration(
-            color: active
-                ? AppColors.primary.withValues(alpha: 0.1)
-                : Colors.transparent,
+            color: active ? context.colors.primarySurface : Colors.transparent,
             borderRadius: BorderRadius.circular(15),
           ),
           child: Center(
@@ -228,7 +221,9 @@ class _NavBarItem extends StatelessWidget {
                 active ? activeIcon : icon,
                 key: ValueKey(active),
                 size: 22,
-                color: active ? AppColors.navActive : AppColors.navInactive,
+                color: active
+                    ? context.colors.navActive
+                    : context.colors.navInactive,
               ),
             ),
           ),
@@ -239,7 +234,9 @@ class _NavBarItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-            color: active ? AppColors.navActive : AppColors.navInactive,
+            color: active
+                ? context.colors.navActive
+                : context.colors.navInactive,
           ),
         ),
       ],
@@ -272,6 +269,7 @@ List<_Section> _buildSections(List<AppDestination> modules) {
     '/roles',
     '/permisos',
     '/auditoria',
+    '/seguridad',
   ]);
   final classified = {
     ...op,
@@ -333,7 +331,7 @@ class _MorePanelState extends State<_MorePanel> {
     final sections = _buildSections(widget.modules);
 
     return Drawer(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -364,13 +362,13 @@ class _MorePanelState extends State<_MorePanel> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
+                        color: context.colors.surfaceAlt,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         size: 18,
-                        color: AppColors.textTertiary,
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   ),
@@ -394,7 +392,7 @@ class _MorePanelState extends State<_MorePanel> {
                           setState(() => _expanded[sec.title] = !isOpen);
                         },
                         splashColor: Colors.transparent,
-                        highlightColor: AppColors.primarySurface,
+                        highlightColor: context.colors.primarySurface,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
                           child: Row(
@@ -402,10 +400,10 @@ class _MorePanelState extends State<_MorePanel> {
                               Expanded(
                                 child: Text(
                                   sec.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.textTertiary,
+                                    color: context.colors.textTertiary,
                                     letterSpacing: 0.8,
                                   ),
                                 ),
@@ -415,10 +413,10 @@ class _MorePanelState extends State<_MorePanel> {
                                 turns: isOpen ? 0.5 : 0,
                                 duration: const Duration(milliseconds: 250),
                                 curve: Curves.easeOutCubic,
-                                child: const Icon(
+                                child: Icon(
                                   Icons.keyboard_arrow_down_rounded,
                                   size: 18,
-                                  color: AppColors.textTertiary,
+                                  color: context.colors.textTertiary,
                                 ),
                               ),
                             ],
@@ -454,7 +452,7 @@ class _MorePanelState extends State<_MorePanel> {
               ),
             ),
 
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: context.colors.border),
 
             // ── Usuario + Logout ─────────────────────────────────────────
             Padding(
@@ -469,10 +467,10 @@ class _MorePanelState extends State<_MorePanel> {
                       children: [
                         Text(
                           un,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: context.colors.textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -487,7 +485,7 @@ class _MorePanelState extends State<_MorePanel> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.errorLight,
+                        color: context.colors.errorLight,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -522,7 +520,7 @@ class _PanelItem extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
     child: Material(
-      color: active ? AppColors.primarySurface : Colors.transparent,
+      color: active ? context.colors.primarySurface : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
@@ -535,12 +533,14 @@ class _PanelItem extends StatelessWidget {
                 width: 2,
                 height: 16,
                 margin: const EdgeInsets.only(right: 10),
-                color: active ? AppColors.primary : Colors.transparent,
+                color: active ? context.colors.primary : Colors.transparent,
               ),
               Icon(
                 active ? module.activeIcon : module.icon,
                 size: 20,
-                color: active ? AppColors.primary : AppColors.textSecondary,
+                color: active
+                    ? context.colors.primary
+                    : context.colors.textSecondary,
               ),
               const SizedBox(width: 12),
               Text(
@@ -548,7 +548,9 @@ class _PanelItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                  color: active ? AppColors.primary : AppColors.textPrimary,
+                  color: active
+                      ? context.colors.primary
+                      : context.colors.textPrimary,
                 ),
               ),
             ],

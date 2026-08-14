@@ -103,10 +103,12 @@ class _PBtn extends StatelessWidget {
     width: 34,
     height: 34,
     decoration: BoxDecoration(
-      color: enabled ? AppColors.primarySurface : AppColors.backgroundAlt,
+      color: enabled
+          ? context.colors.primarySurface
+          : context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(AppRadius.sm),
       border: Border.all(
-        color: enabled ? AppColors.primaryBorder : AppColors.border,
+        color: enabled ? context.colors.primaryBorder : context.colors.border,
       ),
     ),
     child: IconButton(
@@ -114,7 +116,7 @@ class _PBtn extends StatelessWidget {
       icon: Icon(
         icon,
         size: 18,
-        color: enabled ? AppColors.primary : AppColors.textTertiary,
+        color: enabled ? AppColors.primary : context.colors.textTertiary,
       ),
       onPressed: enabled ? onTap : null,
     ),
@@ -138,9 +140,9 @@ class AppSearchBar extends StatelessWidget {
     style: AppTextStyles.bodyMedium,
     decoration: InputDecoration(
       hintText: hint ?? 'Buscar...',
-      prefixIcon: const Icon(
+      prefixIcon: Icon(
         Icons.search_rounded,
-        color: AppColors.textTertiary,
+        color: context.colors.textTertiary,
         size: 20,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

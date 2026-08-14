@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,7 +8,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../data/models/venta_models.dart';
+import '../../data/ventas_repository.dart';
 import '../providers/ventas_provider.dart';
+import '../widgets/comprobante_analysis_panel.dart';
 
 /// Subpantalla completa para clasificar el pago de una venta.
 /// Uso: AppNav.push(context, ConciliarVentaScreen(venta: v, onDone: ...))
@@ -36,15 +39,22 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
   bool _loadingEtiquetas = false;
   Uint8List? _voucherBytes;
   String? _voucherFilename;
+  ComprobanteAnalisis? _comprobanteAnalisis;
+  bool _analizandoComprobante = false;
+  int _voucherRequestToken = 0;
+  late final VentasRepository _repository;
 
   @override
   void initState() {
     super.initState();
+    _repository = ref.read(ventasRepositoryProvider);
     _loadEtiquetas();
   }
 
   @override
   void dispose() {
+    _voucherRequestToken++;
+    _cancelAnalysis(_comprobanteAnalisis);
     _codOpCtrl.dispose();
     super.dispose();
   }
@@ -54,7 +64,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
     try {
       _etiquetas = await ref
           .read(ventasRepositoryProvider)
-          .listEtiquetasActivas();
+          .listEtiquetasActivas(sedeId: widget.venta.sedeId);
       if (_etiquetas.isNotEmpty) _etiquetaId = _etiquetas.first.id;
     } catch (_) {}
     if (mounted) setState(() => _loadingEtiquetas = false);
@@ -67,12 +77,70 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       _selectedEtiqueta?.requiereComprobante ?? false;
 
   Future<void> _pickVoucher() async {
-    final file = await ref.read(voucherImagePickerProvider)();
-    if (file == null || !mounted) return;
-    setState(() {
-      _voucherBytes = file.bytes;
-      _voucherFilename = file.filename;
-    });
+    final token = ++_voucherRequestToken;
+    try {
+      final file = await ref.read(voucherImagePickerProvider)();
+      if (file == null || !mounted || token != _voucherRequestToken) return;
+      await _cancelAnalysis(_comprobanteAnalisis);
+      if (!mounted || token != _voucherRequestToken) return;
+      setState(() {
+        _voucherBytes = file.bytes;
+        _voucherFilename = file.filename;
+        _comprobanteAnalisis = null;
+        _analizandoComprobante = true;
+        _error = null;
+      });
+      final analysis = await _repository.analizarComprobante(
+        bytes: file.bytes,
+        filename: file.filename,
+        sedeId: widget.venta.sedeId,
+      );
+      if (!mounted || token != _voucherRequestToken) {
+        await _repository
+            .cancelarComprobanteAnalisis(analysis.id)
+            .catchError((_) {});
+        return;
+      }
+      setState(() {
+        _comprobanteAnalisis = analysis;
+        _analizandoComprobante = false;
+        final suggestedId = analysis.etiquetaSugerida?.id;
+        if (_etiquetas.any((item) => item.id == suggestedId)) {
+          _etiquetaId = suggestedId;
+        }
+        _error = comprobanteAnalysisError(
+          analysis: analysis,
+          total: widget.venta.total,
+          required: _requiereComprobante,
+          selectedEtiquetaId: _etiquetaId,
+        );
+      });
+    } catch (e) {
+      if (!mounted || token != _voucherRequestToken) return;
+      setState(() {
+        _analizandoComprobante = false;
+        _comprobanteAnalisis = null;
+        _error = e is FormatException
+            ? e.message
+            : 'No se pudo analizar el comprobante';
+      });
+    }
+  }
+
+  void _clearVoucherAnalysis() {
+    _voucherRequestToken++;
+    _cancelAnalysis(_comprobanteAnalisis);
+    _voucherBytes = null;
+    _voucherFilename = null;
+    _comprobanteAnalisis = null;
+    _analizandoComprobante = false;
+  }
+
+  Future<void> _cancelAnalysis(ComprobanteAnalisis? analysis) async {
+    if (analysis == null || analysis.id.isEmpty) return;
+    await _repository
+        .cancelarComprobanteAnalisis(analysis.id)
+        .catchError((_) {});
   }
 
   Future<void> _submit() async {
@@ -81,41 +149,44 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       setState(() => _error = 'Selecciona una billetera');
       return;
     }
-    if (_estado == 'BILLETERA' &&
-        _requiereComprobante &&
-        _voucherBytes == null) {
-      setState(
-        () => _error = 'Ingresa el comprobante requerido por esta billetera',
+    if (_estado == 'BILLETERA') {
+      if (_analizandoComprobante) {
+        setState(() => _error = 'Espera a que termine el análisis');
+        return;
+      }
+      final analysisError = comprobanteAnalysisError(
+        analysis: _comprobanteAnalisis,
+        total: widget.venta.total,
+        required: _requiereComprobante,
+        selectedEtiquetaId: _etiquetaId,
       );
-      return;
+      if (analysisError != null) {
+        setState(() => _error = analysisError);
+        return;
+      }
     }
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      String? comprobante;
-      if (_estado == 'BILLETERA' && _voucherBytes != null) {
-        final upload = await ref
-            .read(uploadClientProvider)
-            .uploadImage(
-              bytes: _voucherBytes!,
-              filename: _voucherFilename ?? 'comprobante.jpg',
-            );
-        comprobante = upload.url;
-      }
       await ref
           .read(ventasRepositoryProvider)
           .conciliarVenta(
             widget.venta.id,
             estado: _estado,
             etiquetaId: _estado == 'BILLETERA' ? _etiquetaId : null,
-            comprobante: comprobante,
-            codigoOperacion: _codOpCtrl.text.trim().isNotEmpty
+            comprobanteAnalisisId: _estado == 'BILLETERA'
+                ? _comprobanteAnalisis?.id
+                : null,
+            codigoOperacion:
+                _comprobanteAnalisis == null &&
+                    _codOpCtrl.text.trim().isNotEmpty
                 ? _codOpCtrl.text.trim()
                 : null,
           );
       if (!mounted) return;
+      _comprobanteAnalisis = null;
       widget.onDone();
       DSSuccessOverlay.show(
         context,
@@ -125,6 +196,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       );
       Navigator.pop(context);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _saving = false;
         _error = _friendlyError(e);
@@ -153,7 +225,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: 'Clasificar pago',
         subtitle:
@@ -165,12 +237,12 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Método selector
-            const Text(
+            Text(
               'Método de pago',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
             ),
             const SizedBox(height: 10),
@@ -181,7 +253,10 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                     label: 'Efectivo',
                     icon: Icons.payments_rounded,
                     selected: _estado == 'EFECTIVO',
-                    onTap: () => setState(() => _estado = 'EFECTIVO'),
+                    onTap: () => setState(() {
+                      _estado = 'EFECTIVO';
+                      _clearVoucherAnalysis();
+                    }),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -199,12 +274,12 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
             // Campos de billetera
             if (_estado == 'BILLETERA') ...[
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Billetera',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -233,17 +308,23 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                         ),
                       )
                       .toList(),
-                  onChanged: (v) => setState(() => _etiquetaId = v),
+                  onChanged: (v) => setState(() {
+                    if (_etiquetaId != v) _clearVoucherAnalysis();
+                    _etiquetaId = v;
+                    _error = null;
+                  }),
                 ),
 
-              if (_requiereComprobante || _estado == 'BILLETERA') ...[
+              if (_estado == 'BILLETERA') ...[
                 const SizedBox(height: 16),
-                const Text(
-                  'Comprobante / voucher *',
+                Text(
+                  _requiereComprobante
+                      ? 'Comprobante / voucher *'
+                      : 'Comprobante / voucher (opcional)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
+                    color: context.colors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -251,21 +332,35 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                   key: const ValueKey('comprobanteField'),
                   onPressed: _saving ? null : _pickVoucher,
                   icon: Icon(
-                    _voucherBytes == null
+                    _analizandoComprobante
+                        ? Icons.hourglass_top_rounded
+                        : _comprobanteAnalisis == null
                         ? Icons.upload_file_rounded
                         : Icons.check_circle_rounded,
                   ),
-                  label: Text(_voucherFilename ?? 'Seleccionar imagen'),
+                  label: Text(
+                    _analizandoComprobante
+                        ? 'Analizando comprobante...'
+                        : _voucherFilename ?? 'Seleccionar imagen',
+                  ),
                 ),
+                if (_voucherBytes != null || _comprobanteAnalisis != null) ...[
+                  const SizedBox(height: 8),
+                  ComprobanteAnalysisPanel(
+                    analysis: _comprobanteAnalisis,
+                    bytes: _voucherBytes,
+                    analyzing: _analizandoComprobante,
+                  ),
+                ],
               ],
 
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Código de operación (opcional)',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -288,7 +383,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.errorLight,
+                  color: context.colors.errorLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -371,10 +466,10 @@ class _MethodChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected
             ? AppColors.primary.withValues(alpha: 0.08)
-            : AppColors.backgroundAlt,
+            : context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: selected ? AppColors.primary : AppColors.borderLight,
+          color: selected ? AppColors.primary : context.colors.borderLight,
         ),
       ),
       child: Row(
@@ -383,14 +478,16 @@ class _MethodChip extends StatelessWidget {
           Icon(
             icon,
             size: 18,
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected ? AppColors.primary : context.colors.textSecondary,
           ),
           const SizedBox(width: 8),
           Text(
             label,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: selected ? AppColors.primary : AppColors.textSecondary,
+              color: selected
+                  ? AppColors.primary
+                  : context.colors.textSecondary,
             ),
           ),
         ],

@@ -155,7 +155,7 @@ class KardexScreen extends ConsumerWidget {
     final notifier = ref.read(_kardexProvider.notifier);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           _Header(
@@ -247,7 +247,7 @@ class _HeaderState extends State<_Header> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       child: Column(
         children: [
           Padding(
@@ -256,11 +256,11 @@ class _HeaderState extends State<_Header> {
               controller: _ctrl,
               onChanged: widget.onSearch,
               style: AppTextStyles.bodyMedium,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Buscar producto...',
                 prefixIcon: Icon(
                   Icons.search_rounded,
-                  color: AppColors.textTertiary,
+                  color: context.colors.textTertiary,
                   size: 18,
                 ),
                 contentPadding: EdgeInsets.symmetric(
@@ -296,13 +296,13 @@ class _HeaderState extends State<_Header> {
                         ),
                         decoration: BoxDecoration(
                           color: widget.tipoFilter == t.$1
-                              ? AppColors.primarySurface
-                              : AppColors.backgroundAlt,
+                              ? context.colors.primarySurface
+                              : context.colors.backgroundAlt,
                           borderRadius: BorderRadius.circular(AppRadius.full),
                           border: Border.all(
                             color: widget.tipoFilter == t.$1
-                                ? AppColors.primaryBorder
-                                : AppColors.border,
+                                ? context.colors.primaryBorder
+                                : context.colors.border,
                           ),
                         ),
                         child: Text(
@@ -314,7 +314,7 @@ class _HeaderState extends State<_Header> {
                                 : FontWeight.w500,
                             color: widget.tipoFilter == t.$1
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : context.colors.textSecondary,
                           ),
                         ),
                       ),
@@ -402,10 +402,14 @@ class _DateChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: hasValue ? AppColors.primarySurface : AppColors.backgroundAlt,
+          color: hasValue
+              ? context.colors.primarySurface
+              : context.colors.backgroundAlt,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: hasValue ? AppColors.primaryBorder : AppColors.border,
+            color: hasValue
+                ? context.colors.primaryBorder
+                : context.colors.border,
           ),
         ),
         child: Row(
@@ -413,7 +417,7 @@ class _DateChip extends StatelessWidget {
             Icon(
               Icons.calendar_today_rounded,
               size: 14,
-              color: hasValue ? AppColors.primary : AppColors.textTertiary,
+              color: hasValue ? AppColors.primary : context.colors.textTertiary,
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -422,7 +426,9 @@ class _DateChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
-                  color: hasValue ? AppColors.primary : AppColors.textTertiary,
+                  color: hasValue
+                      ? AppColors.primary
+                      : context.colors.textTertiary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -430,10 +436,10 @@ class _DateChip extends StatelessWidget {
             if (hasValue)
               GestureDetector(
                 onTap: onClear,
-                child: const Icon(
+                child: Icon(
                   Icons.close_rounded,
                   size: 14,
-                  color: AppColors.textTertiary,
+                  color: context.colors.textTertiary,
                 ),
               ),
           ],
@@ -556,9 +562,9 @@ class _MovTile extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: context.colors.borderLight),
         boxShadow: AppShadows.card,
       ),
       child: Row(
@@ -617,7 +623,7 @@ class _MovTile extends StatelessWidget {
                 '${mov.stockAnterior.toStringAsFixed(0)} → ${mov.stockNuevo.toStringAsFixed(0)}',
                 style: AppTextStyles.bodySmall.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
               ),
               Text(_cantidad, style: AppTextStyles.labelSmall),

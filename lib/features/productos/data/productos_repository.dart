@@ -1,3 +1,8 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../categorias/data/categorias_repository.dart';
 
@@ -162,6 +167,32 @@ class ProductosRepository {
     return Producto.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
+  Future<String> uploadImage(
+    String id, {
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    final lower = filename.toLowerCase();
+    final mediaType = lower.endsWith('.png')
+        ? MediaType('image', 'png')
+        : lower.endsWith('.webp')
+        ? MediaType('image', 'webp')
+        : MediaType('image', 'jpeg');
+    final response = await _api.postMultipart(
+      '/productos/$id/imagen',
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: mediaType,
+        ),
+      }),
+    );
+    return (response.data as Map)['imagenUrl'] as String? ?? '';
+  }
+
+  Future<void> deleteImage(String id) => _api.delete('/productos/$id/imagen');
+
   Future<void> delete(String id) => _api.delete('/productos/$id');
 
   Future<Producto> toggle(String id, bool activo) async {
@@ -178,5 +209,17 @@ class ProductosRepository {
     return (json['data'] as List? ?? [])
         .map((e) => Categoria.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
+}
+
+class ProductCreationSession {
+  String? createdId;
+
+  Future<void> submit({
+    required Future<Producto> Function() create,
+    required Future<void> Function(String id) uploadImage,
+  }) async {
+    createdId ??= (await create()).id;
+    await uploadImage(createdId!);
   }
 }

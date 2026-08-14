@@ -32,8 +32,8 @@ class ConfirmationDialog {
                   height: 56,
                   decoration: BoxDecoration(
                     color: isDestructive
-                        ? AppColors.errorLight
-                        : AppColors.primarySurface,
+                        ? context.colors.errorLight
+                        : context.colors.primarySurface,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
                   ),
                   child: Icon(
@@ -49,7 +49,7 @@ class ConfirmationDialog {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -58,7 +58,7 @@ class ConfirmationDialog {
                 message,
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -111,7 +111,7 @@ class SuccessMessage {
         message: message,
         icon: icon,
         color: AppColors.success,
-        backgroundColor: AppColors.successLight,
+        backgroundColor: context.colors.successLight,
         duration: duration,
       ),
     );
@@ -134,7 +134,7 @@ class ErrorMessage {
         message: message,
         icon: icon,
         color: AppColors.error,
-        backgroundColor: AppColors.errorLight,
+        backgroundColor: context.colors.errorLight,
         duration: duration,
       ),
     );
@@ -212,7 +212,7 @@ class _AnimatedMessageDialogState extends State<_AnimatedMessageDialog>
           child: Container(
             padding: EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
               boxShadow: AppShadows.sheet,
             ),
@@ -234,7 +234,7 @@ class _AnimatedMessageDialogState extends State<_AnimatedMessageDialog>
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -269,7 +269,7 @@ class AppBottomSheet {
           maxHeight: MediaQuery.of(context).size.height * (heightFactor ?? 0.9),
         ),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppSpacing.radiusXL),
           ),
@@ -286,7 +286,7 @@ class AppBottomSheet {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: context.colors.border,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -306,14 +306,14 @@ class AppBottomSheet {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
                     IconButton(
                       icon: Icon(
                         Icons.close_rounded,
-                        color: AppColors.textSecondary,
+                        color: context.colors.textSecondary,
                       ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
@@ -321,7 +321,8 @@ class AppBottomSheet {
                 ),
               ),
             // Divisor
-            if (title != null) Divider(height: 1, color: AppColors.divider),
+            if (title != null)
+              Divider(height: 1, color: context.colors.divider),
             // Contenido
             Flexible(child: child),
           ],

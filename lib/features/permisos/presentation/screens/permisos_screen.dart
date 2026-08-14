@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
@@ -15,6 +14,7 @@ class PermisosState {
   final bool isLoading;
   final String? error;
   final List<Map<String, dynamic>> permisos;
+  final List<Map<String, dynamic>> catalogo;
   final int total, page, totalPages;
   final String? moduleFilter;
   final String searchQuery;
@@ -22,6 +22,7 @@ class PermisosState {
     this.isLoading = false,
     this.error,
     this.permisos = const [],
+    this.catalogo = const [],
     this.total = 0,
     this.page = 1,
     this.totalPages = 1,
@@ -32,6 +33,7 @@ class PermisosState {
     bool? isLoading,
     String? error,
     List<Map<String, dynamic>>? permisos,
+    List<Map<String, dynamic>>? catalogo,
     int? total,
     int? page,
     int? totalPages,
@@ -42,6 +44,7 @@ class PermisosState {
     isLoading: isLoading ?? this.isLoading,
     error: error,
     permisos: permisos ?? this.permisos,
+    catalogo: catalogo ?? this.catalogo,
     total: total ?? this.total,
     page: page ?? this.page,
     totalPages: totalPages ?? this.totalPages,
@@ -61,17 +64,27 @@ class PermisosNotifier extends StateNotifier<PermisosState> {
     try {
       final params = <String, dynamic>{'pagina': page, 'limite': 50};
       if (modulo != null) params['modulo'] = modulo;
-      final r = await _api.get(
-        ApiConstants.permissions,
-        queryParameters: params,
-      );
-      final d = r.data as Map;
+      final responses = await Future.wait([
+        _api.get(ApiConstants.permissions, queryParameters: params),
+        _api.get(ApiConstants.permissionsGrouped),
+      ]);
+      final d = responses[0].data as Map;
+      final grouped = responses[1].data;
+      final catalogo = <Map<String, dynamic>>[];
+      if (grouped is Map) {
+        for (final value in grouped.values.whereType<List>()) {
+          catalogo.addAll(
+            value.whereType<Map>().map(Map<String, dynamic>.from),
+          );
+        }
+      }
       state = state.copyWith(
         isLoading: false,
         permisos: List<Map<String, dynamic>>.from(d['data'] ?? []),
         total: d['total'] as int? ?? 0,
         page: d['pagina'] as int? ?? 1,
         totalPages: d['totalPaginas'] as int? ?? 1,
+        catalogo: catalogo,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -111,16 +124,16 @@ class PermisosScreen extends ConsumerWidget {
               .toList();
 
     final modules =
-        state.permisos.map((p) => p['modulo'] as String? ?? '').toSet().toList()
+        state.catalogo.map((p) => p['modulo'] as String? ?? '').toSet().toList()
           ..sort();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           // Header compacto sin título duplicado
           Container(
-            color: AppColors.background,
+            color: context.colors.background,
             child: Column(
               children: [
                 Padding(
@@ -134,6 +147,11 @@ class PermisosScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                if (state.catalogo.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: _PermissionKpis(catalogo: state.catalogo),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: AppSearchBar(
@@ -198,10 +216,10 @@ class PermisosScreen extends ConsumerWidget {
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: context.colors.surface,
                               borderRadius: BorderRadius.circular(AppRadius.md),
                               border: Border.all(
-                                color: AppColors.borderLight,
+                                color: context.colors.borderLight,
                                 width: 0.5,
                               ),
                             ),
@@ -217,7 +235,7 @@ class PermisosScreen extends ConsumerWidget {
                                         style: AppTextStyles.bodyMedium
                                             .copyWith(
                                               fontWeight: FontWeight.w600,
-                                              color: AppColors.textPrimary,
+                                              color: context.colors.textPrimary,
                                             ),
                                       ),
                                       if ((perm['descripcion'] as String? ?? '')
@@ -257,6 +275,66 @@ class PermisosScreen extends ConsumerWidget {
   }
 }
 
+class _PermissionKpis extends StatelessWidget {
+  final List<Map<String, dynamic>> catalogo;
+
+  const _PermissionKpis({required this.catalogo});
+
+  @override
+  Widget build(BuildContext context) {
+    final modules = catalogo
+        .map((item) => item['modulo'] as String? ?? '')
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .length;
+    final reads = catalogo
+        .where((item) => (item['nombre'] as String? ?? '').endsWith(':leer'))
+        .length;
+    final values = [
+      ('Permisos', catalogo.length, AppColors.primary),
+      ('Módulos', modules, AppColors.warning),
+      ('Lectura', reads, AppColors.info),
+      ('Operativos', catalogo.length - reads, AppColors.success),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) => GridView.count(
+        crossAxisCount: constraints.maxWidth >= 700 ? 4 : 2,
+        childAspectRatio: 2.8,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          for (final value in values)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: value.$3.withValues(alpha: 0.09),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '${value.$2}',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: value.$3,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(value.$1, style: AppTextStyles.labelSmall),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModuleTab extends StatelessWidget {
   final String label;
   final bool selected;
@@ -274,10 +352,14 @@ class _ModuleTab extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: selected ? AppColors.primarySurface : AppColors.backgroundAlt,
+        color: selected
+            ? context.colors.primarySurface
+            : context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(
-          color: selected ? AppColors.primaryBorder : AppColors.border,
+          color: selected
+              ? context.colors.primaryBorder
+              : context.colors.border,
         ),
       ),
       child: Text(
@@ -285,7 +367,7 @@ class _ModuleTab extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
+          color: selected ? AppColors.primary : context.colors.textSecondary,
         ),
       ),
     ),

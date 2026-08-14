@@ -34,7 +34,7 @@ class VentaListItem extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderLight),
+        side: BorderSide(color: context.colors.borderLight),
       ),
       child: InkWell(
         onTap: onTap,
@@ -76,7 +76,7 @@ class VentaListItem extends StatelessWidget {
                       venta.vendedoraUsername!,
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textSecondary,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                   if (venta.vendedoraUsername != null)
@@ -85,7 +85,7 @@ class VentaListItem extends StatelessWidget {
                     _formatDate(venta.createdAt),
                     style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                 ],
@@ -112,7 +112,7 @@ class VentaListItem extends StatelessWidget {
                         _ActionChip(
                           label: 'Corregir',
                           icon: Icons.edit_rounded,
-                          color: AppColors.textSecondary,
+                          color: context.colors.textSecondary,
                           onTap: onConciliar,
                         ),
                       if (showAnularButton)

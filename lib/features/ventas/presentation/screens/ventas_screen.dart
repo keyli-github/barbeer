@@ -32,8 +32,8 @@ class VentasScreen extends ConsumerWidget {
 class _HistorialView extends StatelessWidget {
   const _HistorialView();
   @override
-  Widget build(BuildContext context) => const Scaffold(
-    backgroundColor: Colors.white,
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: context.colors.surface,
     body: HistorialVentasView(),
   );
 }
@@ -63,7 +63,7 @@ class _VendedoraViewState extends State<_VendedoraView>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     body: Column(
       children: [
         _TabBar(
@@ -109,7 +109,7 @@ class _AdminViewState extends State<_AdminView>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     body: Column(
       children: [
         _TabBar(
@@ -136,11 +136,11 @@ class _TabBar extends StatelessWidget {
   const _TabBar({required this.controller, required this.tabs});
   @override
   Widget build(BuildContext context) => Container(
-    color: Colors.white,
+    color: context.colors.surface,
     child: TabBar(
       controller: controller,
       labelColor: AppColors.primary,
-      unselectedLabelColor: AppColors.textTertiary,
+      unselectedLabelColor: context.colors.textTertiary,
       indicatorColor: AppColors.primary,
       indicatorSize: TabBarIndicatorSize.label,
       labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),

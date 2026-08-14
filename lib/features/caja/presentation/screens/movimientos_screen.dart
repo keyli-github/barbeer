@@ -22,7 +22,7 @@ class MovimientosScreen extends ConsumerWidget {
     final notifier = ref.read(movimientosProvider.notifier);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: notifier.load,

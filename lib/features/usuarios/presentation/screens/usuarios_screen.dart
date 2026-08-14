@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -17,6 +16,40 @@ import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+
+const passwordPolicyHint =
+    'Entre 6 y 72 caracteres, con al menos una letra minúscula y un número.';
+
+bool passwordMeetsBackendPolicy(String value) =>
+    value.length >= 6 &&
+    value.length <= 72 &&
+    RegExp('[a-z]').hasMatch(value) &&
+    RegExp(r'\d').hasMatch(value);
+
+List<Map<String, dynamic>> assignableRoles(
+  List<Map<String, dynamic>> roles,
+  int currentLevel, {
+  required bool isSuperAdmin,
+}) => roles
+    .where(
+      (role) =>
+          role['activo'] == true &&
+          role['nombre'] != 'SUPERADMIN' &&
+          (isSuperAdmin || (role['nivel'] as int? ?? 0) < currentLevel),
+    )
+    .toList();
+
+List<Map<String, dynamic>> editableSedesForUser(
+  List<Map<String, dynamic>> activeSedes,
+  Map<String, dynamic> user,
+) {
+  final current = user['sede'];
+  if (current is! Map || current['id'] is! String) return activeSedes;
+  if (activeSedes.any((sede) => sede['id'] == current['id'])) {
+    return activeSedes;
+  }
+  return [...activeSedes, Map<String, dynamic>.from(current)];
+}
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -126,10 +159,12 @@ class UsuariosNotifier extends StateNotifier<UsuariosState> {
     await load(page: state.page);
   }
 
-  Future<Map<String, dynamic>?> resetPassword(String id) async {
-    final r = await _api.post(ApiConstants.resetUserPassword(id));
+  Future<void> resetPassword(String id, String password) async {
+    await _api.post(
+      ApiConstants.resetUserPassword(id),
+      data: {'password': password},
+    );
     await load(page: state.page);
-    return r.data as Map<String, dynamic>?;
   }
 }
 
@@ -146,15 +181,29 @@ class UsuariosScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(usuariosProvider);
     final auth = ref.watch(authProvider);
+    final availableRoles = assignableRoles(
+      state.roles,
+      auth.user?.nivel ?? 0,
+      isSuperAdmin: auth.user?.isSuperAdmin ?? false,
+    );
+    final activeSedes = state.sedes
+        .where((sede) => sede['activo'] == true)
+        .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       floatingActionButton: auth.hasPermission('usuarios:crear')
           ? FloatingActionButton(
               heroTag: 'usuarios_fab',
               backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
-              onPressed: () => _showCreateModal(context, ref, state),
+              onPressed: () => _showCreateModal(
+                context,
+                ref,
+                state,
+                availableRoles,
+                activeSedes,
+              ),
               child: const Icon(Icons.add_rounded),
             )
           : null,
@@ -207,7 +256,7 @@ class UsuariosScreen extends ConsumerWidget {
                                   label: 'Inactivos',
                                   value:
                                       '${state.users.where((u) => u['activo'] != true).length}',
-                                  color: AppColors.textTertiary,
+                                  color: context.colors.textTertiary,
                                 ),
                               ),
                             ],
@@ -220,8 +269,14 @@ class UsuariosScreen extends ConsumerWidget {
                             auth: auth,
                             onTap: () =>
                                 _showDetail(context, ref, user['id'] as String),
-                            onEdit: () =>
-                                _showEditModal(context, ref, user, state),
+                            onEdit: () => _showEditModal(
+                              context,
+                              ref,
+                              user,
+                              state,
+                              availableRoles,
+                              activeSedes,
+                            ),
                             onDeactivate: () => _deactivate(context, ref, user),
                             onReactivate: () => ref
                                 .read(usuariosProvider.notifier)
@@ -258,29 +313,38 @@ class UsuariosScreen extends ConsumerWidget {
     final user = await ref.read(usuariosProvider.notifier).getUser(id);
     if (user == null || !context.mounted) return;
     final state = ref.read(usuariosProvider);
+    final auth = ref.read(authProvider);
+    final availableRoles = assignableRoles(
+      state.roles,
+      auth.user?.nivel ?? 0,
+      isSuperAdmin: auth.user?.isSuperAdmin ?? false,
+    );
+    final activeSedes = state.sedes
+        .where((sede) => sede['activo'] == true)
+        .toList();
     AppNav.push(
       context,
       _UserDetailScreen(
         user: user,
-        roles: state.roles,
-        sedes: state.sedes,
-        isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
-        onEdit: () => _showEditModal(context, ref, user, state),
+        roles: availableRoles,
+        sedes: activeSedes,
+        isSuperAdmin: auth.user?.isSuperAdmin ?? false,
+        canEdit: auth.hasPermission('usuarios:editar'),
+        canDeactivate: auth.hasPermission('usuarios:eliminar'),
+        canReset: auth.hasPermission('usuarios:resetear-password'),
+        onEdit: () => _showEditModal(
+          context,
+          ref,
+          user,
+          state,
+          availableRoles,
+          activeSedes,
+        ),
         onDeactivate: () => _deactivate(context, ref, user),
-        onResetPassword: (uid) async {
-          try {
-            await ref.read(usuariosProvider.notifier).resetPassword(uid);
-            if (context.mounted)
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Contraseña reseteada')),
-              );
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-          }
-        },
+        onReactivate: () => ref
+            .read(usuariosProvider.notifier)
+            .reactivateUser(user['id'] as String),
+        onResetPassword: (uid) => _resetPassword(context, ref, uid),
       ),
     );
   }
@@ -289,12 +353,14 @@ class UsuariosScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     UsuariosState state,
+    List<Map<String, dynamic>> availableRoles,
+    List<Map<String, dynamic>> activeSedes,
   ) {
     AppNav.push(
       context,
       _UserForm(
-        roles: state.roles,
-        sedes: state.sedes,
+        roles: availableRoles,
+        sedes: activeSedes,
         isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
         onSave: (data) => ref.read(usuariosProvider.notifier).createUser(data),
       ),
@@ -306,13 +372,15 @@ class UsuariosScreen extends ConsumerWidget {
     WidgetRef ref,
     Map<String, dynamic> user,
     UsuariosState state,
+    List<Map<String, dynamic>> availableRoles,
+    List<Map<String, dynamic>> activeSedes,
   ) {
     AppNav.push(
       context,
       _UserEditForm(
         user: user,
-        roles: state.roles,
-        sedes: state.sedes,
+        roles: availableRoles,
+        sedes: editableSedesForUser(activeSedes, user),
         isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
         onSave: (data) => ref
             .read(usuariosProvider.notifier)
@@ -357,57 +425,25 @@ class UsuariosScreen extends ConsumerWidget {
     WidgetRef ref,
     String id,
   ) async {
+    final password = await showDialog<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (_) => const _ResetPasswordDialog(),
+    );
+    if (password == null || !context.mounted) return;
     try {
-      final result = await ref
-          .read(usuariosProvider.notifier)
-          .resetPassword(id);
+      await ref.read(usuariosProvider.notifier).resetPassword(id, password);
       if (context.mounted) {
-        final tempPwd = result?['tempPassword'] as String? ?? '';
-        showDialog(
-          context: context,
-          useRootNavigator: true,
-          builder: (_) => AlertDialog(
-            title: const Text('Contrasena temporal'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('La contrasena temporal es:'),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundAlt,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    tempPwd,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'El usuario debera cambiarla al iniciar sesion.',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cerrar'),
-              ),
-            ],
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Contraseña actualizada')));
       }
     } catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 }
@@ -524,11 +560,12 @@ class _ActionsMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activo = user['activo'] as bool? ?? false;
+    final isSuperAdmin = user['rol']?['nombre'] == 'SUPERADMIN';
     return PopupMenuButton<String>(
-      icon: const Icon(
+      icon: Icon(
         Icons.more_vert_rounded,
         size: 18,
-        color: AppColors.textTertiary,
+        color: context.colors.textTertiary,
       ),
       onSelected: (v) {
         if (v == 'edit')
@@ -541,7 +578,7 @@ class _ActionsMenu extends StatelessWidget {
           onResetPassword();
       },
       itemBuilder: (_) => [
-        if (auth.hasPermission('usuarios:editar'))
+        if (!isSuperAdmin && auth.hasPermission('usuarios:editar'))
           const PopupMenuItem(
             value: 'edit',
             child: Row(
@@ -552,7 +589,7 @@ class _ActionsMenu extends StatelessWidget {
               ],
             ),
           ),
-        if (auth.hasPermission('usuarios:resetear-password'))
+        if (!isSuperAdmin && auth.hasPermission('usuarios:resetear-password'))
           const PopupMenuItem(
             value: 'reset',
             child: Row(
@@ -563,42 +600,32 @@ class _ActionsMenu extends StatelessWidget {
               ],
             ),
           ),
-        if (auth.hasPermission('usuarios:eliminar'))
-          activo
-              ? const PopupMenuItem(
-                  value: 'deactivate',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.block_rounded,
-                        size: 16,
-                        color: AppColors.error,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Desactivar',
-                        style: TextStyle(color: AppColors.error),
-                      ),
-                    ],
-                  ),
-                )
-              : const PopupMenuItem(
-                  value: 'reactivate',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline_rounded,
-                        size: 16,
-                        color: AppColors.success,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Reactivar',
-                        style: TextStyle(color: AppColors.success),
-                      ),
-                    ],
-                  ),
+        if (!isSuperAdmin && activo && auth.hasPermission('usuarios:eliminar'))
+          const PopupMenuItem(
+            value: 'deactivate',
+            child: Row(
+              children: [
+                Icon(Icons.block_rounded, size: 16, color: AppColors.error),
+                SizedBox(width: 8),
+                Text('Desactivar', style: TextStyle(color: AppColors.error)),
+              ],
+            ),
+          ),
+        if (!isSuperAdmin && !activo && auth.hasPermission('usuarios:editar'))
+          const PopupMenuItem(
+            value: 'reactivate',
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 16,
+                  color: AppColors.success,
                 ),
+                SizedBox(width: 8),
+                Text('Reactivar', style: TextStyle(color: AppColors.success)),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -612,7 +639,8 @@ class _UserDetailScreen extends StatelessWidget {
   final Map<String, dynamic> user;
   final List<Map<String, dynamic>> roles, sedes;
   final bool isSuperAdmin;
-  final VoidCallback onEdit, onDeactivate;
+  final bool canEdit, canDeactivate, canReset;
+  final VoidCallback onEdit, onDeactivate, onReactivate;
   final void Function(String) onResetPassword;
 
   const _UserDetailScreen({
@@ -620,8 +648,12 @@ class _UserDetailScreen extends StatelessWidget {
     required this.roles,
     required this.sedes,
     required this.isSuperAdmin,
+    required this.canEdit,
+    required this.canDeactivate,
+    required this.canReset,
     required this.onEdit,
     required this.onDeactivate,
+    required this.onReactivate,
     required this.onResetPassword,
   });
 
@@ -636,20 +668,22 @@ class _UserDetailScreen extends StatelessWidget {
         ? user['sede']['nombre'] as String? ?? 'Sin sede'
         : user['sedeId'] as String? ?? 'Sin sede';
     final mustChange = user['mustChangePassword'] as bool? ?? false;
+    final protected = rol == 'SUPERADMIN';
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: context.colors.backgroundAlt,
       appBar: SubPageAppBar(
         title: 'Detalle de usuario',
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 20),
-            color: AppColors.textSecondary,
-            onPressed: () {
-              Navigator.pop(context);
-              onEdit();
-            },
-          ),
+          if (canEdit && !protected)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              color: context.colors.textSecondary,
+              onPressed: () {
+                Navigator.pop(context);
+                onEdit();
+              },
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -661,9 +695,9 @@ class _UserDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFEEEFF2)),
+                border: Border.all(color: context.colors.borderLight),
               ),
               child: Column(
                 children: [
@@ -701,10 +735,10 @@ class _UserDetailScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     username,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -715,7 +749,9 @@ class _UserDetailScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       _Badge(
                         activo ? 'Activo' : 'Inactivo',
-                        activo ? AppColors.success : AppColors.textTertiary,
+                        activo
+                            ? AppColors.success
+                            : context.colors.textTertiary,
                       ),
                     ],
                   ),
@@ -726,46 +762,47 @@ class _UserDetailScreen extends StatelessWidget {
             // Detalles
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFEEEFF2)),
+                border: Border.all(color: context.colors.borderLight),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Column(
                 children: [
                   _DetailRow('Sede', sede),
-                  const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  Divider(height: 1, color: context.colors.surfaceAlt),
                   _DetailRow(
                     'Cambio de contraseña',
                     mustChange ? 'Requerido' : 'No requerido',
                   ),
-                  const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                  Divider(height: 1, color: context.colors.surfaceAlt),
                   _DetailRow('ID', user['id'] as String? ?? '', mono: true),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             // Acciones
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                onPressed: onResetPassword.call.bind(
-                  user['id'] as String? ?? '',
-                ),
-                icon: const Icon(Icons.lock_reset_rounded, size: 18),
-                label: const Text('Restablecer contraseña'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primaryBorder),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (canReset && !protected)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: onResetPassword.call.bind(
+                    user['id'] as String? ?? '',
+                  ),
+                  icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                  label: const Text('Restablecer contraseña'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: context.colors.primaryBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            if (activo)
+            if (canReset && !protected) const SizedBox(height: 10),
+            if (activo && canDeactivate && !protected)
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -779,6 +816,26 @@ class _UserDetailScreen extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.error,
                     side: const BorderSide(color: AppColors.error),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              )
+            else if (!activo && canEdit && !protected)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    onReactivate();
+                  },
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                  label: const Text('Reactivar usuario'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.success,
+                    side: const BorderSide(color: AppColors.success),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -827,7 +884,7 @@ class _DetailRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
         ),
         Flexible(
           child: Text(
@@ -836,7 +893,7 @@ class _DetailRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
               fontFamily: mono ? 'monospace' : null,
             ),
             maxLines: 2,
@@ -874,7 +931,7 @@ class _UserDetail extends StatelessWidget {
                 child: Text(
                   e.key,
                   style: AppTextStyles.labelLarge.copyWith(
-                    color: AppColors.textTertiary,
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ),
@@ -883,7 +940,7 @@ class _UserDetail extends StatelessWidget {
                 child: Text(
                   e.value,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
               ),
@@ -929,7 +986,7 @@ class _UserFormState extends State<_UserForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: const SubPageAppBar(title: 'Nuevo usuario'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -950,13 +1007,15 @@ class _UserFormState extends State<_UserForm> {
               const SizedBox(height: 14),
               AppTextField(
                 label: 'Contrasena temporal',
-                hint: 'Minimo 12 caracteres',
+                hint: '6-72 caracteres, minúscula y número',
                 controller: _passCtrl,
                 prefixIcon: Icons.lock_outline_rounded,
                 obscureText: true,
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Requerido';
-                  if (v.length < 12) return 'Minimo 12 caracteres';
+                  if (!passwordMeetsBackendPolicy(v)) {
+                    return passwordPolicyHint;
+                  }
                   return null;
                 },
               ),
@@ -981,20 +1040,17 @@ class _UserFormState extends State<_UserForm> {
                 _label('Sede'),
                 DropdownButtonFormField<String>(
                   value: _sedeId,
-                  hint: const Text('Seleccionar sede (opcional)'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Sin sede'),
-                    ),
-                    ...widget.sedes.map(
-                      (s) => DropdownMenuItem(
-                        value: s['id'] as String,
-                        child: Text(s['nombre'] as String? ?? ''),
-                      ),
-                    ),
-                  ],
+                  hint: const Text('Seleccionar sede'),
+                  items: widget.sedes
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s['id'] as String,
+                          child: Text(s['nombre'] as String? ?? ''),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) => setState(() => _sedeId = v),
+                  validator: (v) => v == null ? 'Requerido' : null,
                 ),
               ],
               const SizedBox(height: 24),
@@ -1016,7 +1072,7 @@ class _UserFormState extends State<_UserForm> {
       t,
       style: AppTextStyles.bodySmall.copyWith(
         fontWeight: FontWeight.w500,
-        color: AppColors.textSecondary,
+        color: context.colors.textSecondary,
       ),
     ),
   );
@@ -1071,14 +1127,20 @@ class _UserEditFormState extends State<_UserEditForm> {
   @override
   void initState() {
     super.initState();
-    _rolId = widget.user['rol']?['id'] as String?;
+    final currentRoleId = widget.user['rol']?['id'] as String?;
+    _rolId = widget.roles.any((role) => role['id'] == currentRoleId)
+        ? currentRoleId
+        : null;
     _sedeId = widget.user['sede']?['id'] as String?;
+    if (!widget.sedes.any((sede) => sede['id'] == _sedeId)) {
+      _sedeId = null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: const SubPageAppBar(title: 'Editar usuario'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -1133,7 +1195,7 @@ class _UserEditFormState extends State<_UserEditForm> {
       t,
       style: AppTextStyles.bodySmall.copyWith(
         fontWeight: FontWeight.w500,
-        color: AppColors.textSecondary,
+        color: context.colors.textSecondary,
       ),
     ),
   );
@@ -1160,6 +1222,106 @@ class _UserEditFormState extends State<_UserEditForm> {
       if (mounted) setState(() => _loading = false);
     }
   }
+}
+
+class _ResetPasswordDialog extends StatefulWidget {
+  const _ResetPasswordDialog();
+
+  @override
+  State<_ResetPasswordDialog> createState() => _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
+  final _password = TextEditingController();
+  final _confirmation = TextEditingController();
+  bool _obscure = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirmation.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!passwordMeetsBackendPolicy(_password.text)) {
+      setState(() => _error = passwordPolicyHint);
+      return;
+    }
+    if (_password.text != _confirmation.text) {
+      setState(() => _error = 'Las contraseñas no coinciden.');
+      return;
+    }
+    Navigator.of(context).pop(_password.text);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: const Icon(Icons.lock_reset_rounded, color: AppColors.primary),
+    title: const Text('Nueva contraseña'),
+    content: SizedBox(
+      width: 420,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Asigna una contraseña definitiva. Se cerrarán las sesiones activas del usuario.',
+            style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            key: const Key('reset-password-field'),
+            controller: _password,
+            obscureText: _obscure,
+            maxLength: 72,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Nueva contraseña',
+              counterText: '',
+              suffixIcon: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('reset-password-confirmation-field'),
+            controller: _confirmation,
+            obscureText: _obscure,
+            maxLength: 72,
+            decoration: const InputDecoration(
+              labelText: 'Confirmar contraseña',
+              counterText: '',
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 8),
+          const Text(passwordPolicyHint, style: AppTextStyles.labelSmall),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Actualizar')),
+    ],
+  );
 }
 
 class _StatChip extends StatelessWidget {

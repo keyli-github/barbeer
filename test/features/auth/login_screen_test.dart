@@ -4,6 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('system navigation icons follow the navigation background', () {
+    expect(loginNavigationIconBrightness(Colors.white), Brightness.dark);
+    expect(loginNavigationIconBrightness(Colors.black), Brightness.light);
+  });
+
   Future<void> pumpLogin(WidgetTester tester, Size size) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;

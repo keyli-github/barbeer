@@ -33,10 +33,10 @@ class AppEmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.backgroundAlt,
+                color: context.colors.backgroundAlt,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
               ),
-              child: Icon(icon, size: 40, color: AppColors.textTertiary),
+              child: Icon(icon, size: 40, color: context.colors.textTertiary),
             ),
             SizedBox(height: AppSpacing.lg),
             Text(
@@ -44,7 +44,7 @@ class AppEmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -54,7 +54,7 @@ class AppEmptyState extends StatelessWidget {
                 message!,
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -120,7 +120,7 @@ class AppErrorState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.errorLight,
+                color: context.colors.errorLight,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
               ),
               child: Icon(icon, size: 40, color: AppColors.error),
@@ -131,7 +131,7 @@ class AppErrorState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -141,7 +141,7 @@ class AppErrorState extends StatelessWidget {
                 message!,
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -201,7 +201,10 @@ class AppLoadingIndicator extends StatelessWidget {
             SizedBox(height: AppSpacing.lg),
             Text(
               message!,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: 14,
+                color: context.colors.textSecondary,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -304,7 +307,7 @@ class _SkeletonItemState extends State<_SkeletonItem>
           child: Container(
             height: widget.height,
             decoration: BoxDecoration(
-              color: AppColors.backgroundAlt,
+              color: context.colors.backgroundAlt,
               borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
             ),
           ),

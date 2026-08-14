@@ -34,7 +34,7 @@ class AppBottomSheet extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(AppRadius.xl),
         ),
@@ -49,7 +49,7 @@ class AppBottomSheet extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(top: 12),
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -135,7 +135,9 @@ class ConfirmDialog extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: isDanger ? AppColors.errorLight : AppColors.primarySurface,
+              color: isDanger
+                  ? context.colors.errorLight
+                  : context.colors.primarySurface,
               shape: BoxShape.circle,
             ),
             child: Icon(

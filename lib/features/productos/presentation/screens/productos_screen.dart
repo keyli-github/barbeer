@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -166,7 +169,9 @@ class ProductosScreen extends ConsumerWidget {
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
-      backgroundColor: desktop ? const Color(0xFFFAFAFA) : AppColors.background,
+      backgroundColor: desktop
+          ? context.colors.backgroundAlt
+          : context.colors.background,
       // FAB para crear producto
       floatingActionButton: canCreate
           ? FloatingActionButton(
@@ -307,6 +312,7 @@ class ProductosScreen extends ConsumerWidget {
             cats: ref.read(_categoriasProvider).value ?? [],
             onSaved: () => ref.read(_productosNotifier.notifier).load(),
             repo: ref.read(_repoProvider),
+            canManageImage: canEdit,
           ),
         ),
         onToggle: () async {
@@ -330,6 +336,9 @@ class ProductosScreen extends ConsumerWidget {
         cats: ref.read(_categoriasProvider).value ?? [],
         onSaved: () => ref.read(_productosNotifier.notifier).load(),
         repo: ref.read(_repoProvider),
+        canManageImage: ref
+            .read(authProvider)
+            .hasPermission('productos:editar'),
       ),
     );
   }
@@ -372,7 +381,7 @@ class _FiltersSectionState extends State<_FiltersSection> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
@@ -388,7 +397,7 @@ class _FiltersSectionState extends State<_FiltersSection> {
               hintText: 'Buscar por nombre o código...',
               prefixIcon: Icon(
                 Icons.search_rounded,
-                color: AppColors.textTertiary,
+                color: context.colors.textTertiary,
                 size: 20,
               ),
               contentPadding: EdgeInsets.symmetric(
@@ -396,18 +405,18 @@ class _FiltersSectionState extends State<_FiltersSection> {
                 vertical: AppSpacing.sm,
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: context.colors.surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(
                   spacing.AppSpacing.radiusMD,
                 ),
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: context.colors.border),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(
                   spacing.AppSpacing.radiusMD,
                 ),
-                borderSide: BorderSide(color: AppColors.border),
+                borderSide: BorderSide(color: context.colors.border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(
@@ -438,15 +447,15 @@ class _FiltersSectionState extends State<_FiltersSection> {
                       ),
                       decoration: BoxDecoration(
                         color: widget.estadoFilter == e.$1
-                            ? AppColors.primarySurface
-                            : AppColors.backgroundAlt,
+                            ? context.colors.primarySurface
+                            : context.colors.backgroundAlt,
                         borderRadius: BorderRadius.circular(
                           spacing.AppSpacing.radiusRound,
                         ),
                         border: Border.all(
                           color: widget.estadoFilter == e.$1
-                              ? AppColors.primaryBorder
-                              : AppColors.border,
+                              ? context.colors.primaryBorder
+                              : context.colors.border,
                           width: 1,
                         ),
                       ),
@@ -459,7 +468,7 @@ class _FiltersSectionState extends State<_FiltersSection> {
                               : FontWeight.w500,
                           color: widget.estadoFilter == e.$1
                               ? AppColors.primary
-                              : AppColors.textSecondary,
+                              : context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -488,7 +497,7 @@ class _CatStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -531,10 +540,14 @@ class _Chip extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: selected ? AppColors.primarySurface : AppColors.backgroundAlt,
+        color: selected
+            ? context.colors.primarySurface
+            : context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(
-          color: selected ? AppColors.primaryBorder : AppColors.border,
+          color: selected
+              ? context.colors.primaryBorder
+              : context.colors.border,
         ),
       ),
       child: Text(
@@ -542,7 +555,7 @@ class _Chip extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.primary : AppColors.textSecondary,
+          color: selected ? AppColors.primary : context.colors.textSecondary,
         ),
       ),
     ),
@@ -604,7 +617,7 @@ class _KpiChip extends StatelessWidget {
           ),
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+            style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
           ),
         ],
       ),
@@ -640,9 +653,9 @@ class _ProductCard extends StatelessWidget {
       onTap: onEdit,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEEEFF2)),
+          border: Border.all(color: context.colors.borderLight),
           boxShadow: AppShadows.card,
         ),
         child: Column(
@@ -673,10 +686,10 @@ class _ProductCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         product.nombre,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                           height: 1.2,
                         ),
                         maxLines: 2,
@@ -685,9 +698,9 @@ class _ProductCard extends StatelessWidget {
                     ),
                     Text(
                       product.codigo,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textTertiary,
+                        color: context.colors.textTertiary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -736,15 +749,17 @@ class _ProductCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.textTertiary.withValues(alpha: 0.1),
+                          color: context.colors.textTertiary.withValues(
+                            alpha: 0.1,
+                          ),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Inactivo',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textTertiary,
+                            color: context.colors.textTertiary,
                           ),
                         ),
                       ),
@@ -785,34 +800,34 @@ class _ProductDetailScreen extends StatelessWidget {
         : AppColors.error;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: context.colors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
             size: 18,
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Detalle de producto',
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
           ),
         ),
         actions: [
           if (canEdit)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.settings_outlined,
                 size: 20,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
               onPressed: onEdit,
             ),
@@ -850,8 +865,8 @@ class _ProductDetailScreen extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: product.activo
-                              ? AppColors.successLight
-                              : AppColors.errorLight,
+                              ? context.colors.successLight
+                              : context.colors.errorLight,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -884,10 +899,10 @@ class _ProductDetailScreen extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         product.nombre,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                           height: 1.2,
                         ),
                       ),
@@ -903,9 +918,9 @@ class _ProductDetailScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'SKU: ${product.codigo}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -948,7 +963,7 @@ class _ProductDetailScreen extends StatelessWidget {
                       label: const Text('Editar'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primaryBorder),
+                        side: BorderSide(color: context.colors.primaryBorder),
                       ),
                     ),
                   ),
@@ -967,8 +982,8 @@ class _ProductDetailScreen extends StatelessWidget {
                       ),
                       label: Text(product.activo ? 'Desactivar' : 'Activar'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textSecondary,
-                        side: BorderSide(color: AppColors.border),
+                        foregroundColor: context.colors.textSecondary,
+                        side: BorderSide(color: context.colors.border),
                       ),
                     ),
                   ),
@@ -1040,9 +1055,9 @@ class _ProductDetailScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Text(
                     product.descripcion!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: context.colors.textSecondary,
                       height: 1.5,
                     ),
                   ),
@@ -1066,18 +1081,18 @@ class _InfoSection extends StatelessWidget {
     children: [
       Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: context.colors.textPrimary,
         ),
       ),
       const SizedBox(height: 8),
       Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEEEFF2)),
+          border: Border.all(color: context.colors.borderLight),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: Column(
@@ -1086,7 +1101,7 @@ class _InfoSection extends StatelessWidget {
                 (w) => [
                   w,
                   if (w != children.last)
-                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    Divider(height: 1, color: context.colors.surfaceAlt),
                 ],
               )
               .toList(),
@@ -1107,14 +1122,14 @@ class _InfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
           ),
         ),
       ],
@@ -1131,11 +1146,13 @@ class _ProductFormScreen extends StatefulWidget {
   final List<Categoria> cats;
   final VoidCallback onSaved;
   final ProductosRepository repo;
+  final bool canManageImage;
   const _ProductFormScreen({
     this.product,
     required this.cats,
     required this.onSaved,
     required this.repo,
+    required this.canManageImage,
   });
 
   @override
@@ -1149,10 +1166,13 @@ class _ProductFormState extends State<_ProductFormScreen> {
   final _ventaCtrl = TextEditingController();
   final _costoCtrl = TextEditingController();
   final _unidadCtrl = TextEditingController();
-  final _imagenUrlCtrl = TextEditingController();
+  Uint8List? _imageBytes;
+  String? _imageFilename;
+  bool _removeExistingImage = false;
   String _categoriaId = '';
   bool _posEnabled = false, _activo = true, _saving = false;
   String? _error;
+  final _creationSession = ProductCreationSession();
 
   @override
   void initState() {
@@ -1165,7 +1185,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
       _ventaCtrl.text = p.precioVenta.toString();
       _costoCtrl.text = p.precioCosto.toString();
       _unidadCtrl.text = p.unidad;
-      _imagenUrlCtrl.text = p.imagenUrl ?? '';
       _categoriaId = p.categoriaId;
       _posEnabled = p.disponiblePos;
       _activo = p.activo;
@@ -1182,7 +1201,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
     _ventaCtrl.dispose();
     _costoCtrl.dispose();
     _unidadCtrl.dispose();
-    _imagenUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -1212,21 +1230,30 @@ class _ProductFormState extends State<_ProductFormScreen> {
     });
     try {
       if (widget.product == null) {
-        await widget.repo.create(
-          codigo: codigo,
-          nombre: nombre,
-          categoriaId: _categoriaId,
-          precioVenta: venta,
-          precioCosto: costo,
-          descripcion: _descCtrl.text.trim().isEmpty
-              ? null
-              : _descCtrl.text.trim(),
-          imagenUrl: _imagenUrlCtrl.text.trim(),
-          unidad: _unidadCtrl.text.trim().isEmpty
-              ? null
-              : _unidadCtrl.text.trim(),
-          disponiblePos: _posEnabled,
-          activo: _activo,
+        await _creationSession.submit(
+          create: () => widget.repo.create(
+            codigo: codigo,
+            nombre: nombre,
+            categoriaId: _categoriaId,
+            precioVenta: venta,
+            precioCosto: costo,
+            descripcion: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            unidad: _unidadCtrl.text.trim().isEmpty
+                ? null
+                : _unidadCtrl.text.trim(),
+            disponiblePos: _posEnabled,
+            activo: _activo,
+          ),
+          uploadImage: (id) async {
+            if (_imageBytes == null) return;
+            await widget.repo.uploadImage(
+              id,
+              bytes: _imageBytes!,
+              filename: _imageFilename!,
+            );
+          },
         );
       } else {
         await widget.repo.update(widget.product!.id, {
@@ -1236,30 +1263,70 @@ class _ProductFormState extends State<_ProductFormScreen> {
           'precioCosto': costo,
           if (_descCtrl.text.trim().isNotEmpty)
             'descripcion': _descCtrl.text.trim(),
-          'imagenUrl': _imagenUrlCtrl.text.trim(),
           'unidad': _unidadCtrl.text.trim().isEmpty
               ? 'un'
               : _unidadCtrl.text.trim(),
           'disponiblePos': _posEnabled,
           'activo': _activo,
         });
+        if (_imageBytes != null) {
+          await widget.repo.uploadImage(
+            widget.product!.id,
+            bytes: _imageBytes!,
+            filename: _imageFilename!,
+          );
+        } else if (_removeExistingImage) {
+          await widget.repo.deleteImage(widget.product!.id);
+        }
       }
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSaved();
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString();
+        _error = _creationSession.createdId != null && widget.product == null
+            ? 'El producto ya fue creado, pero la imagen no se pudo subir. '
+                  'El reintento solo subirá la imagen; los demás campos no se reenviarán.'
+            : e.toString();
       });
     }
+  }
+
+  Future<void> _pickImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file == null || file.bytes == null || !mounted) return;
+    if (file.bytes!.lengthInBytes > 5 * 1024 * 1024) {
+      setState(() => _error = 'La imagen no debe superar 5 MB.');
+      return;
+    }
+    setState(() {
+      _imageBytes = file.bytes;
+      _imageFilename = file.name;
+      _removeExistingImage = false;
+      _error = null;
+    });
+  }
+
+  void _removeImage() {
+    setState(() {
+      _imageBytes = null;
+      _imageFilename = null;
+      _removeExistingImage = widget.product?.imagenUrl != null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: widget.product == null ? 'Nuevo producto' : 'Editar producto',
         actions: [
@@ -1308,13 +1375,86 @@ class _ProductFormState extends State<_ProductFormScreen> {
               maxLines: 2,
             ),
             const SizedBox(height: 14),
-            AppTextField(
-              label: 'URL de imagen',
-              hint: 'https://ejemplo.com/producto.jpg',
-              controller: _imagenUrlCtrl,
-              keyboardType: TextInputType.url,
-            ),
-            const SizedBox(height: 14),
+            if (widget.canManageImage) ...[
+              Text(
+                'Imagen del producto',
+                style: AppTextStyles.bodySmall.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Stack(
+                children: [
+                  InkWell(
+                    key: const Key('product-image-picker'),
+                    onTap: _saving ? null : _pickImage,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: Container(
+                      width: double.infinity,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        color: context.colors.backgroundAlt,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        border: Border.all(
+                          color: context.colors.border,
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _imageBytes != null
+                          ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                          : !_removeExistingImage &&
+                                widget.product?.imagenUrl != null
+                          ? DSProductImage(
+                              imageUrl: widget.product!.imagenUrl,
+                              productName: _nombreCtrl.text,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: 150,
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  color: context.colors.textTertiary,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Seleccionar JPG, PNG o WEBP',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.colors.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  'Máximo 5 MB',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: context.colors.textTertiary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                  if (_imageBytes != null ||
+                      (!_removeExistingImage &&
+                          widget.product?.imagenUrl != null))
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton.filled(
+                        key: const Key('product-image-remove'),
+                        tooltip: 'Quitar imagen',
+                        onPressed: _saving ? null : _removeImage,
+                        icon: const Icon(Icons.close_rounded, size: 17),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
             Text(
               'Categoría *',
               style: AppTextStyles.bodySmall.copyWith(
@@ -1369,7 +1509,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.backgroundAlt,
+                color: context.colors.backgroundAlt,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1419,7 +1559,11 @@ class _ProductFormState extends State<_ProductFormScreen> {
             const SizedBox(height: 24),
             PrimaryButton(
               text: widget.product == null
-                  ? 'Crear producto'
+                  ? _creationSession.createdId == null
+                        ? 'Crear producto'
+                        : _imageBytes == null
+                        ? 'Finalizar sin imagen'
+                        : 'Reintentar imagen'
                   : 'Guardar cambios',
               onPressed: _saving ? null : _submit,
               isLoading: _saving,

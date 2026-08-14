@@ -24,30 +24,30 @@ class DSSearchField extends StatelessWidget {
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
+        color: context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
       ),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
-        style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+        style: TextStyle(fontSize: 15, color: context.colors.textPrimary),
         decoration: InputDecoration(
           hintText: placeholder,
-          hintStyle: const TextStyle(
+          hintStyle: TextStyle(
             fontSize: 15,
-            color: AppColors.textTertiary,
+            color: context.colors.textTertiary,
           ),
-          prefixIcon: const Icon(
+          prefixIcon: Icon(
             Icons.search_rounded,
-            color: AppColors.textTertiary,
+            color: context.colors.textTertiary,
             size: 18,
           ),
           suffixIcon: (controller?.text.isNotEmpty ?? false) && onClear != null
               ? GestureDetector(
                   onTap: onClear,
-                  child: const Icon(
+                  child: Icon(
                     Icons.cancel_rounded,
-                    color: AppColors.textTertiary,
+                    color: context.colors.textTertiary,
                     size: 18,
                   ),
                 )
@@ -93,7 +93,7 @@ class DSFilterChip extends StatelessWidget {
           color: selected ? color : Colors.transparent,
           borderRadius: BorderRadius.circular(AppSpacing.radiusRound),
           border: Border.all(
-            color: selected ? color : AppColors.border,
+            color: selected ? color : context.colors.border,
             width: 1,
           ),
         ),
@@ -105,7 +105,7 @@ class DSFilterChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? Colors.white : AppColors.textSecondary,
+                color: selected ? Colors.white : context.colors.textSecondary,
               ),
             ),
             if (count != null) ...[
@@ -115,7 +115,7 @@ class DSFilterChip extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: selected
                       ? Colors.white.withValues(alpha: 0.25)
-                      : AppColors.primarySurface,
+                      : context.colors.primarySurface,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -203,10 +203,10 @@ class DSFormField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: context.colors.textSecondary,
           ),
         ),
         const SizedBox(height: 6),
@@ -222,26 +222,28 @@ class DSFormField extends StatelessWidget {
           onTap: onTap,
           onChanged: onChanged,
           autofocus: autofocus,
-          style: const TextStyle(fontSize: 16, color: AppColors.textPrimary),
+          style: TextStyle(fontSize: 16, color: context.colors.textPrimary),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
+            hintStyle: TextStyle(
               fontSize: 16,
-              color: AppColors.textTertiary,
+              color: context.colors.textTertiary,
             ),
             filled: true,
-            fillColor: readOnly ? AppColors.surfaceAlt : AppColors.surface,
+            fillColor: readOnly
+                ? context.colors.surfaceAlt
+                : context.colors.surface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 12,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: context.colors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: context.colors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMD),

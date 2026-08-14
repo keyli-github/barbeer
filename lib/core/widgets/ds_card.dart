@@ -28,9 +28,9 @@ class DSCard extends StatelessWidget {
     final content = Container(
       padding: padding ?? const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.surface,
+        color: backgroundColor ?? context.colors.surface,
         borderRadius: BorderRadius.circular(radius ?? AppSpacing.radiusLG),
-        border: border ?? Border.all(color: AppColors.border, width: 0.75),
+        border: border ?? Border.all(color: context.colors.border, width: 0.75),
         boxShadow: shadow ?? AppShadows.card,
       ),
       child: child,
@@ -74,19 +74,19 @@ class DSStatCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
+              color: context.colors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
           if (change != null) ...[

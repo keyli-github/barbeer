@@ -135,7 +135,7 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
     final canDeactivate = auth.hasPermission('etiquetas:desactivar');
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       floatingActionButton: canCreate
           ? FloatingActionButton(
               heroTag: 'etiquetas_fab',
@@ -154,9 +154,9 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primarySurface,
+                color: context.colors.primarySurface,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.primaryBorder),
+                border: Border.all(color: context.colors.primaryBorder),
               ),
               child: Text(
                 'Clasifica métodos de pago, ingresos y salidas. '
@@ -199,12 +199,12 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                         Icon(
                           Icons.account_balance_wallet_outlined,
                           size: 48,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'No hay etiquetas configuradas',
-                          style: TextStyle(color: AppColors.textTertiary),
+                          style: TextStyle(color: context.colors.textTertiary),
                         ),
                       ],
                     ),

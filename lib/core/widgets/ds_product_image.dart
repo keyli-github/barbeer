@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/api_constants.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_spacing.dart';
 
 /// Componente unificado de imagen de producto
 /// Maneja: URL remota, caché, loading shimmer, error placeholder, productos sin imagen
@@ -48,29 +47,29 @@ class DSProductImage extends StatelessWidget {
                 fit: fit,
                 width: width,
                 height: height,
-                placeholder: (_, __) => _skeleton(),
-                errorWidget: (_, __, ___) => _placeholder(),
+                placeholder: (_, __) => _skeleton(context),
+                errorWidget: (_, __, ___) => _placeholder(context),
               )
-            : _placeholder(),
+            : _placeholder(context),
       ),
     );
   }
 
-  Widget _skeleton() => Container(
-    color: AppColors.surfaceAlt,
-    child: const Center(
+  Widget _skeleton(BuildContext context) => Container(
+    color: context.colors.surfaceAlt,
+    child: Center(
       child: SizedBox(
         width: 20,
         height: 20,
         child: CircularProgressIndicator(
           strokeWidth: 1.5,
-          valueColor: AlwaysStoppedAnimation(AppColors.textTertiary),
+          valueColor: AlwaysStoppedAnimation(context.colors.textTertiary),
         ),
       ),
     ),
   );
 
-  Widget _placeholder() {
+  Widget _placeholder(BuildContext context) {
     final name = productName ?? '';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     // Color único por nombre del producto

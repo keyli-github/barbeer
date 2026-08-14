@@ -87,10 +87,10 @@ class DSStatusBadge extends StatelessWidget {
       const DSStatusBadge(label: 'PENDIENTE', color: AppColors.warning);
   factory DSStatusBadge.cancelled() =>
       const DSStatusBadge(label: 'ANULADA', color: AppColors.error);
-  factory DSStatusBadge.inactive() =>
-      const DSStatusBadge(label: 'INACTIVO', color: AppColors.textTertiary);
+  factory DSStatusBadge.inactive(BuildContext context) =>
+      DSStatusBadge(label: 'INACTIVO', color: context.colors.textTertiary);
 
-  factory DSStatusBadge.fromString(String status) {
+  factory DSStatusBadge.fromString(BuildContext context, String status) {
     switch (status.toUpperCase()) {
       case 'ACTIVA':
         return DSStatusBadge.active();
@@ -99,9 +99,9 @@ class DSStatusBadge extends StatelessWidget {
       case 'ANULADA':
         return DSStatusBadge.cancelled();
       case 'INACTIVO':
-        return DSStatusBadge.inactive();
+        return DSStatusBadge.inactive(context);
       default:
-        return DSStatusBadge(label: status, color: AppColors.textTertiary);
+        return DSStatusBadge(label: status, color: context.colors.textTertiary);
     }
   }
 
@@ -195,10 +195,10 @@ class DSSectionHeader extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
                 letterSpacing: 0.3,
               ),
             ),

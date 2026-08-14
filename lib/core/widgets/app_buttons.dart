@@ -99,8 +99,8 @@ class SecondaryButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.textPrimary,
-          side: BorderSide(color: AppColors.border),
+          foregroundColor: context.colors.textPrimary,
+          side: BorderSide(color: context.colors.border),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
           ),
@@ -262,7 +262,7 @@ class IconButtonCustom extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: backgroundColor ?? AppColors.backgroundAlt,
+      color: backgroundColor ?? context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(size / 2),
       child: InkWell(
         onTap: onPressed,
@@ -274,7 +274,7 @@ class IconButtonCustom extends StatelessWidget {
           child: Icon(
             icon,
             size: size * 0.5,
-            color: iconColor ?? AppColors.textPrimary,
+            color: iconColor ?? context.colors.textPrimary,
           ),
         ),
       ),

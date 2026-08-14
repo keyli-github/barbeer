@@ -51,5 +51,9 @@ void main() {
         isFalse,
       );
     });
+
+    test('seguridad is available to every authenticated user', () {
+      expect(_authWith([]).canAccess('/seguridad'), isTrue);
+    });
   });
 }

@@ -55,7 +55,7 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: 'Registrar precuadre',
         subtitle: 'Compara el efectivo contado con el saldo esperado',
@@ -179,7 +179,7 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: 'Cerrar caja',
         subtitle: 'El cierre es definitivo para este turno',
@@ -275,11 +275,11 @@ class _DenominationFields extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Align(
+      Align(
         alignment: Alignment.centerLeft,
         child: Text(
           'Cantidad por denominación',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
         ),
       ),
       const SizedBox(height: 8),
@@ -330,9 +330,9 @@ class _TotalBand extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.primarySurface,
+      color: context.colors.primarySurface,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: AppColors.primaryBorder),
+      border: Border.all(color: context.colors.primaryBorder),
     ),
     child: Row(
       children: [
@@ -365,9 +365,9 @@ class _DifferenceRow extends StatelessWidget {
         : AppColors.warning;
     return Row(
       children: [
-        const Text(
+        Text(
           'Diferencia estimada',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
         ),
         const Spacer(),
         Text(
@@ -398,7 +398,7 @@ class _ForzarSection extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.warningLight,
+      color: context.colors.warningLight,
       borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
     ),

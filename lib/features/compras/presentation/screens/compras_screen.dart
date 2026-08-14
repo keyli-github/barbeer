@@ -230,7 +230,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
     final canEdit = auth.hasPermission('compras:editar');
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           // Solo tabs, sin título (el header viene del Shell)
@@ -240,7 +240,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
               controller: _tabs,
               indicatorColor: AppColors.primary,
               labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textSecondary,
+              unselectedLabelColor: context.colors.textSecondary,
               tabs: const [
                 Tab(text: 'Órdenes'),
                 Tab(text: 'Proveedores'),
@@ -393,13 +393,13 @@ class _OrdenesTab extends ConsumerWidget {
                       ),
                       decoration: BoxDecoration(
                         color: state.estadoFilter == e.$1
-                            ? AppColors.primarySurface
-                            : AppColors.backgroundAlt,
+                            ? context.colors.primarySurface
+                            : context.colors.backgroundAlt,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                         border: Border.all(
                           color: state.estadoFilter == e.$1
-                              ? AppColors.primaryBorder
-                              : AppColors.border,
+                              ? context.colors.primaryBorder
+                              : context.colors.border,
                         ),
                       ),
                       child: Text(
@@ -411,7 +411,7 @@ class _OrdenesTab extends ConsumerWidget {
                               : FontWeight.w500,
                           color: state.estadoFilter == e.$1
                               ? AppColors.primary
-                              : AppColors.textSecondary,
+                              : context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -498,14 +498,14 @@ class _OrdenTile extends StatelessWidget {
   final VoidCallback onTap;
   const _OrdenTile({required this.compra, required this.onTap});
 
-  Color get _statusColor {
+  Color _statusColor(BuildContext context) {
     switch (compra.estado) {
       case 'RECIBIDA':
         return AppColors.success;
       case 'ENVIADA':
         return AppColors.primary;
       case 'CANCELADA':
-        return AppColors.textTertiary;
+        return context.colors.textTertiary;
       default:
         return AppColors.warning;
     }
@@ -536,7 +536,7 @@ class _OrdenTile extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: _statusColor.withValues(alpha: 0.12),
+                        color: _statusColor(context).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -544,7 +544,7 @@ class _OrdenTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: _statusColor,
+                          color: _statusColor(context),
                         ),
                       ),
                     ),
@@ -642,7 +642,7 @@ class _ProvTile extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primarySurface,
+              color: context.colors.primarySurface,
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
@@ -771,7 +771,7 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
       case 'ENVIADA':
         return AppColors.primary;
       case 'CANCELADA':
-        return AppColors.textTertiary;
+        return context.colors.textTertiary;
       default:
         return AppColors.warning;
     }
@@ -780,7 +780,7 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: _compra?.orden ?? 'Detalle de orden',
         subtitle: _compra != null
@@ -838,7 +838,7 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
                                 Text(
                                   item.producto,
                                   style: AppTextStyles.bodyMedium.copyWith(
-                                    color: AppColors.textPrimary,
+                                    color: context.colors.textPrimary,
                                   ),
                                 ),
                                 Text(
@@ -852,7 +852,7 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
                             'S/ ${item.subtotal.toStringAsFixed(2)}',
                             style: AppTextStyles.bodySmall.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                              color: context.colors.textPrimary,
                             ),
                           ),
                         ],
@@ -1088,7 +1088,7 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: const SubPageAppBar(title: 'Nueva orden de compra'),
       body: SingleChildScrollView(
         padding: EdgeInsets.only(
@@ -1196,15 +1196,15 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 28),
                   decoration: BoxDecoration(
-                    color: AppColors.backgroundAlt,
+                    color: context.colors.backgroundAlt,
                     borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: context.colors.border),
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
                       Icon(
                         Icons.shopping_bag_outlined,
-                        color: AppColors.textTertiary,
+                        color: context.colors.textTertiary,
                       ),
                       SizedBox(height: 6),
                       Text('Agrega al menos un producto'),
@@ -1224,9 +1224,9 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
                 margin: const EdgeInsets.only(top: 4),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
+                  color: context.colors.primarySurface,
                   borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: AppColors.primaryBorder),
+                  border: Border.all(color: context.colors.primaryBorder),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1506,7 +1506,7 @@ class _ProveedorScreenState extends State<_ProveedorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: widget.proveedor == null
             ? 'Nuevo proveedor'

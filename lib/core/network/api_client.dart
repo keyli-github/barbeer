@@ -110,13 +110,18 @@ class ApiClient {
   Future<Response<T>> postMultipart<T>(
     String path, {
     required FormData data,
+    Duration? receiveTimeout,
+    Duration? sendTimeout,
   }) async {
     final h = await _headers(path);
     return _execute(
       () => _dio.post<T>(
         path,
         data: data,
-        options: _opts({...?h, 'Content-Type': 'multipart/form-data'}),
+        options: _opts({
+          ...?h,
+          'Content-Type': 'multipart/form-data',
+        }).copyWith(receiveTimeout: receiveTimeout, sendTimeout: sendTimeout),
       ),
       path,
     );

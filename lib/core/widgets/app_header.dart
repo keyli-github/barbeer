@@ -38,7 +38,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: context.colors.surface,
       child: SafeArea(
         bottom: false,
         child: SizedBox(
@@ -60,10 +60,10 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                   child: showBackButton
                       ? Text(
                           subtitle ?? '',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: context.colors.textPrimary,
                             letterSpacing: -0.3,
                           ),
                         )
@@ -119,14 +119,14 @@ class _BackBtn extends StatelessWidget {
       onTap();
     },
     behavior: HitTestBehavior.opaque,
-    child: const SizedBox(
+    child: SizedBox(
       width: 44,
       height: 44,
       child: Center(
         child: Icon(
           Icons.arrow_back_ios_new_rounded,
           size: 18,
-          color: AppColors.textPrimary,
+          color: context.colors.textPrimary,
         ),
       ),
     ),

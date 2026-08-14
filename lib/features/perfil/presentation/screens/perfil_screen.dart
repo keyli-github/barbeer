@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -11,10 +11,8 @@ import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_badge.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_loading.dart';
-import '../../../../core/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 final sessionListProvider = FutureProvider<List<Map<String, dynamic>>>((
@@ -35,7 +33,7 @@ class PerfilScreen extends ConsumerWidget {
     final username = user?.username ?? '';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         bottom: false,
         child: CustomScrollView(
@@ -82,10 +80,10 @@ class PerfilScreen extends ConsumerWidget {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.store_rounded,
                                           size: 12,
-                                          color: AppColors.textTertiary,
+                                          color: context.colors.textTertiary,
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
@@ -114,7 +112,7 @@ class PerfilScreen extends ConsumerWidget {
                             _QuickAction(
                               icon: Icons.devices_rounded,
                               label: 'Mis\nsesiones',
-                              onTap: () => _scrollToSessions(context),
+                              onTap: () => context.go('/seguridad'),
                             ),
                             _QuickAction(
                               icon: Icons.logout_rounded,
@@ -159,6 +157,11 @@ class PerfilScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
+
+                  _SectionHeader(title: 'Apariencia'),
+                  const SizedBox(height: 8),
+                  const AppCard(child: _AppearanceSelector()),
                   const SizedBox(height: 20),
 
                   // Sessions
@@ -283,10 +286,6 @@ class PerfilScreen extends ConsumerWidget {
     );
   }
 
-  void _scrollToSessions(BuildContext context) {
-    // Simple scroll — in a real app would use a ScrollController
-  }
-
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
     final ok = await ConfirmDialog.show(
       context: context,
@@ -296,6 +295,66 @@ class PerfilScreen extends ConsumerWidget {
       isDanger: true,
     );
     if (ok && context.mounted) await ref.read(authProvider.notifier).logout();
+  }
+}
+
+class _AppearanceSelector extends ConsumerWidget {
+  const _AppearanceSelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(themeModeProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Tema', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Usa el tema del dispositivo o elige uno.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: Semantics(
+            label: 'Seleccionar apariencia',
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  icon: Icon(Icons.brightness_auto_rounded, size: 17),
+                  label: Text('Sistema'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  icon: Icon(Icons.light_mode_outlined, size: 17),
+                  label: Text('Claro'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  icon: Icon(Icons.dark_mode_outlined, size: 17),
+                  label: Text('Oscuro'),
+                ),
+              ],
+              selected: {selected},
+              onSelectionChanged: (selection) {
+                ref.read(themeModeProvider.notifier).setMode(selection.single);
+              },
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+                textStyle: const WidgetStatePropertyAll(
+                  TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -352,7 +411,7 @@ class _SectionHeader extends StatelessWidget {
       title.toUpperCase(),
       style: AppTextStyles.labelSmall.copyWith(
         letterSpacing: 0.8,
-        color: AppColors.textTertiary,
+        color: context.colors.textTertiary,
       ),
     ),
   );
@@ -371,7 +430,7 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             label,
             style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textTertiary,
+              color: context.colors.textTertiary,
             ),
           ),
         ),
@@ -379,7 +438,7 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             value,
             style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
         ),
@@ -420,7 +479,7 @@ class _SessionRow extends StatelessWidget {
           Icon(
             icon,
             size: 20,
-            color: isCurrent ? AppColors.primary : AppColors.textSecondary,
+            color: isCurrent ? AppColors.primary : context.colors.textSecondary,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -433,7 +492,7 @@ class _SessionRow extends StatelessWidget {
                       device,
                       style: AppTextStyles.bodySmall.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                     if (isCurrent) ...[
@@ -444,7 +503,7 @@ class _SessionRow extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.successLight,
+                          color: context.colors.successLight,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(

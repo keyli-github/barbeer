@@ -22,9 +22,9 @@ class AppCard extends StatelessWidget {
     final r = radius ?? AppRadius.md;
     return Container(
       decoration: BoxDecoration(
-        color: color ?? AppColors.surface,
+        color: color ?? context.colors.surface,
         borderRadius: BorderRadius.circular(r),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: context.colors.borderLight),
         boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
@@ -95,7 +95,7 @@ class StatCard extends StatelessWidget {
           Text(
             value,
             style: AppTextStyles.headlineMedium.copyWith(
-              color: valueColor ?? AppColors.textPrimary,
+              color: valueColor ?? context.colors.textPrimary,
               fontWeight: FontWeight.w700,
             ),
           ),

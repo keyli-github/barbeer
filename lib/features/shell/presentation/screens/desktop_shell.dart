@@ -39,7 +39,7 @@ class _DesktopShellState extends State<DesktopShell> {
     final title = destination?.routeTitle ?? 'BarBeer';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: context.colors.backgroundAlt,
       body: Row(
         children: [
           AnimatedContainer(
@@ -47,7 +47,7 @@ class _DesktopShellState extends State<DesktopShell> {
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
             width: _collapsed ? 68 : 272,
-            color: Colors.white,
+            color: context.colors.surface,
             child: _Sidebar(
               collapsed: _collapsed,
               currentPath: widget.currentPath,
@@ -58,18 +58,14 @@ class _DesktopShellState extends State<DesktopShell> {
               onLogout: widget.onLogout,
             ),
           ),
-          const VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: Color(0xFFEDEDEF),
-          ),
+          VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
           Expanded(
             child: Column(
               children: [
                 Container(
                   key: const Key('desktop-header'),
                   height: 56,
-                  color: Colors.white,
+                  color: context.colors.surface,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   alignment: Alignment.centerLeft,
                   child: Row(
@@ -77,8 +73,8 @@ class _DesktopShellState extends State<DesktopShell> {
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
@@ -88,11 +84,11 @@ class _DesktopShellState extends State<DesktopShell> {
                     ],
                   ),
                 ),
-                const Divider(height: 1, color: Color(0xFFEDEDEF)),
+                Divider(height: 1, color: context.colors.border),
                 Expanded(
                   child: ColoredBox(
                     key: const Key('desktop-content'),
-                    color: const Color(0xFFFAFAFA),
+                    color: context.colors.backgroundAlt,
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Align(
@@ -162,7 +158,7 @@ class _Sidebar extends StatelessWidget {
                   ),
                   if (!collapsed) ...[
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,7 +167,7 @@ class _Sidebar extends StatelessWidget {
                           Text(
                             'ERP SYSTEM',
                             style: TextStyle(
-                              color: AppColors.textTertiary,
+                              color: context.colors.textTertiary,
                               fontSize: 9,
                               letterSpacing: 1.2,
                               fontWeight: FontWeight.w600,
@@ -200,7 +196,7 @@ class _Sidebar extends StatelessWidget {
                       ? Icons.keyboard_double_arrow_right_rounded
                       : Icons.keyboard_double_arrow_left_rounded,
                   size: 18,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
               ),
             ),
@@ -227,8 +223,8 @@ class _Sidebar extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
                         child: Text(
                           section.label,
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
+                          style: TextStyle(
+                            color: context.colors.textTertiary,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.8,
@@ -283,7 +279,7 @@ class _DestinationTile extends StatelessWidget {
     child: Tooltip(
       message: collapsed ? destination.desktopNavigationLabel : '',
       child: Material(
-        color: active ? AppColors.brand : Colors.transparent,
+        color: active ? context.colors.brand : Colors.transparent,
         borderRadius: BorderRadius.circular(9),
         child: InkWell(
           onTap: onTap,
@@ -300,8 +296,8 @@ class _DestinationTile extends StatelessWidget {
                   active ? destination.activeIcon : destination.icon,
                   size: 19,
                   color: active
-                      ? const Color(0xFF191511)
-                      : AppColors.textSecondary,
+                      ? Theme.of(context).colorScheme.onSecondary
+                      : context.colors.textSecondary,
                 ),
                 if (!collapsed) ...[
                   const SizedBox(width: 12),
@@ -312,8 +308,8 @@ class _DestinationTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: active
-                            ? const Color(0xFF191511)
-                            : AppColors.textSecondary,
+                            ? Theme.of(context).colorScheme.onSecondary
+                            : context.colors.textSecondary,
                         fontSize: 14,
                         fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                       ),
@@ -392,8 +388,8 @@ class _ProfileArea extends StatelessWidget {
                           username,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -439,7 +435,7 @@ class _DesktopAvatar extends StatelessWidget {
       color: AppColors.brand,
       shape: BoxShape.circle,
       border: active
-          ? Border.all(color: AppColors.textPrimary, width: 2)
+          ? Border.all(color: context.colors.textPrimary, width: 2)
           : null,
     ),
     child: Text(

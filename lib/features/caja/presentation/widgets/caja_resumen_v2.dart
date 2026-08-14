@@ -40,7 +40,7 @@ class CajaResumenPrincipalV2 extends StatelessWidget {
                   label: 'Apertura',
                   value: montoApertura,
                   icon: Icons.play_circle_outline_rounded,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
                 _MetricCard(
                   width: width,
@@ -71,19 +71,19 @@ class CajaResumenPrincipalV2 extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderLight),
+            border: Border.all(color: context.colors.borderLight),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Detalle del turno',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -100,7 +100,7 @@ class CajaResumenPrincipalV2 extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 8),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.warningLight,
+                    color: context.colors.warningLight,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: AppColors.warning.withValues(alpha: 0.3),
@@ -149,21 +149,21 @@ class CajaBilleteraCard extends StatelessWidget {
     if (porBilletera.isEmpty) return const SizedBox.shrink();
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: context.colors.borderLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(12, 10, 12, 8),
             child: Text(
               'Desglose por billetera',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
             ),
           ),
@@ -198,9 +198,9 @@ class CajaBilleteraCard extends StatelessWidget {
                   ),
                   Text(
                     '$cantidad venta(s)',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                 ],
@@ -289,9 +289,9 @@ class _CajaDataTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: context.colors.borderLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,10 +300,10 @@ class _CajaDataTable extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
             ),
           ),
@@ -316,10 +316,10 @@ class _CajaDataTable extends StatelessWidget {
               dataRowMaxHeight: 36,
               horizontalMargin: 12,
               columnSpacing: 16,
-              headingTextStyle: const TextStyle(
+              headingTextStyle: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textTertiary,
+                color: context.colors.textTertiary,
               ),
               dataTextStyle: const TextStyle(fontSize: 11),
               columns: headers
@@ -363,9 +363,9 @@ class _MetricCard extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: context.colors.borderLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,9 +377,9 @@ class _MetricCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textTertiary,
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ),
@@ -416,7 +416,7 @@ class _InfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+          style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
         ),
         Text(
           value,

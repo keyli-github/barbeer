@@ -81,9 +81,9 @@ class DSButton extends StatelessWidget {
     final fs = _fontSize();
     final px = _padX();
 
-    final bg = _bg();
-    final fg = _fg();
-    final border = _border();
+    final bg = _bg(context);
+    final fg = _fg(context);
+    final border = _border(context);
 
     Widget content = Row(
       mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
@@ -183,12 +183,12 @@ class DSButton extends StatelessWidget {
     }
   }
 
-  Color _bg() {
+  Color _bg(BuildContext context) {
     switch (variant) {
       case DSButtonVariant.primary:
         return AppColors.brand; // naranja
       case DSButtonVariant.secondary:
-        return AppColors.brandSurface;
+        return context.colors.brandSurface;
       case DSButtonVariant.danger:
         return AppColors.error;
       default:
@@ -196,7 +196,7 @@ class DSButton extends StatelessWidget {
     }
   }
 
-  Color _fg() {
+  Color _fg(BuildContext context) {
     switch (variant) {
       case DSButtonVariant.primary:
         return Colors.white;
@@ -205,15 +205,15 @@ class DSButton extends StatelessWidget {
       case DSButtonVariant.danger:
         return Colors.white;
       case DSButtonVariant.ghost:
-        return AppColors.textSecondary;
+        return context.colors.textSecondary;
       default:
         return AppColors.primary;
     }
   }
 
-  Border? _border() {
+  Border? _border(BuildContext context) {
     if (variant == DSButtonVariant.outline) {
-      return Border.all(color: AppColors.border, width: 1.5);
+      return Border.all(color: context.colors.border, width: 1.5);
     }
     return null;
   }
@@ -244,10 +244,14 @@ class DSIconButton extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: backgroundColor ?? AppColors.surfaceAlt,
+        color: backgroundColor ?? context.colors.surfaceAlt,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(icon, size: size, color: color ?? AppColors.textSecondary),
+      child: Icon(
+        icon,
+        size: size,
+        color: color ?? context.colors.textSecondary,
+      ),
     );
 
     return GestureDetector(

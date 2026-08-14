@@ -12,7 +12,7 @@ class AppImage extends StatelessWidget {
   final double borderRadius;
   final Widget? placeholder;
   final Widget? errorWidget;
-  final Color backgroundColor;
+  final Color? backgroundColor;
 
   const AppImage({
     super.key,
@@ -23,14 +23,14 @@ class AppImage extends StatelessWidget {
     this.borderRadius = 0,
     this.placeholder,
     this.errorWidget,
-    this.backgroundColor = AppColors.backgroundAlt,
+    this.backgroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
     // Si no hay URL, mostrar placeholder
     if (imageUrl == null || imageUrl!.isEmpty) {
-      return _buildPlaceholder();
+      return _buildPlaceholder(context);
     }
 
     return ClipRRect(
@@ -41,19 +41,19 @@ class AppImage extends StatelessWidget {
         height: height,
         fit: fit,
         placeholder: (context, url) =>
-            placeholder ?? _buildLoadingPlaceholder(),
+            placeholder ?? _buildLoadingPlaceholder(context),
         errorWidget: (context, url, error) =>
-            errorWidget ?? _buildErrorPlaceholder(),
+            errorWidget ?? _buildErrorPlaceholder(context),
       ),
     );
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildPlaceholder(BuildContext context) {
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: backgroundColor ?? context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: Center(
@@ -62,17 +62,17 @@ class AppImage extends StatelessWidget {
           size: (width != null && height != null)
               ? (width! < height! ? width! * 0.4 : height! * 0.4)
               : AppSpacing.iconLG,
-          color: AppColors.textTertiary,
+          color: context.colors.textTertiary,
         ),
       ),
     );
   }
 
-  Widget _buildLoadingPlaceholder() {
+  Widget _buildLoadingPlaceholder(BuildContext context) {
     return Container(
       width: width,
       height: height,
-      color: backgroundColor,
+      color: backgroundColor ?? context.colors.backgroundAlt,
       child: Center(
         child: SizedBox(
           width: 24,
@@ -86,12 +86,12 @@ class AppImage extends StatelessWidget {
     );
   }
 
-  Widget _buildErrorPlaceholder() {
+  Widget _buildErrorPlaceholder(BuildContext context) {
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: backgroundColor ?? context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: Center(
@@ -100,7 +100,7 @@ class AppImage extends StatelessWidget {
           size: (width != null && height != null)
               ? (width! < height! ? width! * 0.4 : height! * 0.4)
               : AppSpacing.iconLG,
-          color: AppColors.textTertiary,
+          color: context.colors.textTertiary,
         ),
       ),
     );
@@ -112,14 +112,14 @@ class AppCircleImage extends StatelessWidget {
   final String? imageUrl;
   final double size;
   final Widget? placeholder;
-  final Color backgroundColor;
+  final Color? backgroundColor;
 
   const AppCircleImage({
     super.key,
     this.imageUrl,
     this.size = AppSpacing.avatarMD,
     this.placeholder,
-    this.backgroundColor = AppColors.backgroundAlt,
+    this.backgroundColor,
   });
 
   @override

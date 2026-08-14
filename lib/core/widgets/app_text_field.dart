@@ -61,7 +61,7 @@ class _AppTextFieldState extends State<AppTextField> {
         widget.label,
         style: AppTextStyles.bodySmall.copyWith(
           fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
+          color: context.colors.textSecondary,
         ),
       ),
       const SizedBox(height: 6),
@@ -99,7 +99,7 @@ class _AppTextFieldState extends State<AppTextField> {
                     _show
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
-                    color: AppColors.textTertiary,
+                    color: context.colors.textTertiary,
                     size: 20,
                   ),
                   onPressed: () => setState(() => _show = !_show),

@@ -20,12 +20,17 @@ final voucherImagePickerProvider =
     Provider<Future<PickedUploadImage?> Function()>((ref) {
       return () async {
         final result = await FilePicker.platform.pickFiles(
-          type: FileType.image,
+          type: FileType.custom,
+          allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
           withData: true,
         );
         final file = result?.files.single;
-        if (file?.bytes == null) return null;
-        return PickedUploadImage(bytes: file!.bytes!, filename: file.name);
+        if (file == null || file.bytes == null) return null;
+        final bytes = file.bytes!;
+        if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+          throw const FormatException('La imagen no debe superar 5 MB');
+        }
+        return PickedUploadImage(bytes: bytes, filename: file.name);
       };
     });
 

@@ -30,7 +30,7 @@ class ProductoVentaCard extends StatelessWidget {
     return Material(
       color: enCarrito
           ? AppColors.primary.withValues(alpha: 0.06)
-          : AppColors.surface,
+          : context.colors.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -42,7 +42,7 @@ class ProductoVentaCard extends StatelessWidget {
             border: Border.all(
               color: enCarrito
                   ? AppColors.primary.withValues(alpha: 0.4)
-                  : AppColors.borderLight,
+                  : context.colors.borderLight,
             ),
           ),
           child: Column(
@@ -57,7 +57,7 @@ class ProductoVentaCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 10,
                         fontFamily: 'monospace',
-                        color: AppColors.textTertiary,
+                        color: context.colors.textTertiary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

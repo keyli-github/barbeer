@@ -2,6 +2,7 @@ import 'package:barbeer/core/navigation/app_destinations.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/shell/presentation/screens/desktop_shell.dart';
+import 'package:barbeer/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -50,6 +51,46 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getSize(find.byKey(const Key('desktop-sidebar'))).width, 68);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders the desktop shell with dark theme tokens', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(tester.view.reset);
+    final auth = AuthState(
+      status: AuthStatus.authenticated,
+      user: const UserProfile(
+        id: 'user-id',
+        username: 'admin',
+        rol: 'ADMIN',
+        nivel: 10,
+        createdAt: '2026-01-01',
+        permisos: ['productos:leer'],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: DesktopShell(
+          currentPath: '/productos',
+          destinations: appDestinations
+              .where((destination) => destination.canAccess(auth.hasPermission))
+              .toList(),
+          auth: auth,
+          onNavigate: (_) {},
+          onLogout: () {},
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+
+    final context = tester.element(find.byType(DesktopShell));
+    expect(Theme.of(context).brightness, Brightness.dark);
+    expect(find.byKey(const Key('desktop-sidebar')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

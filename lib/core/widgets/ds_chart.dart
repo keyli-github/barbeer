@@ -37,9 +37,9 @@ class DSWeeklySalesChart extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border, width: 0.75),
+        border: Border.all(color: context.colors.border, width: 0.75),
         boxShadow: AppShadows.card,
       ),
       padding: const EdgeInsets.fromLTRB(
@@ -53,10 +53,10 @@ class DSWeeklySalesChart extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
               letterSpacing: -0.2,
             ),
           ),
@@ -72,7 +72,7 @@ class DSWeeklySalesChart extends StatelessWidget {
                   drawVerticalLine: false,
                   horizontalInterval: maxVal == 0 ? 50 : maxVal / 3,
                   getDrawingHorizontalLine: (_) =>
-                      FlLine(color: AppColors.borderLight, strokeWidth: 1),
+                      FlLine(color: context.colors.borderLight, strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
@@ -104,7 +104,7 @@ class DSWeeklySalesChart extends StatelessWidget {
                                   : FontWeight.w400,
                               color: i == todayIdx
                                   ? barColor
-                                  : AppColors.textTertiary,
+                                  : context.colors.textTertiary,
                             ),
                           ),
                         );
@@ -129,7 +129,7 @@ class DSWeeklySalesChart extends StatelessWidget {
                         backDrawRodData: BackgroundBarChartRodData(
                           show: true,
                           toY: maxVal == 0 ? 100 : maxVal * 1.25,
-                          color: AppColors.surfaceAlt,
+                          color: context.colors.surfaceAlt,
                         ),
                       ),
                     ],
@@ -137,11 +137,12 @@ class DSWeeklySalesChart extends StatelessWidget {
                 }),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => AppColors.textPrimary,
+                    getTooltipColor: (_) =>
+                        Theme.of(context).colorScheme.inverseSurface,
                     getTooltipItem: (group, _, rod, __) => BarTooltipItem(
                       'S/ ${rod.toY.toStringAsFixed(0)}',
-                      const TextStyle(
-                        color: Colors.white,
+                      TextStyle(
+                        color: Theme.of(context).colorScheme.onInverseSurface,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),

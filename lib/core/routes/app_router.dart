@@ -12,6 +12,7 @@ import '../../features/permisos/presentation/screens/permisos_screen.dart';
 import '../../features/sucursales/presentation/screens/sucursales_screen.dart';
 import '../../features/auditoria/presentation/screens/auditoria_screen.dart';
 import '../../features/perfil/presentation/screens/perfil_screen.dart';
+import '../../features/seguridad/presentation/screens/seguridad_screen.dart';
 import '../../features/productos/presentation/screens/productos_screen.dart';
 import '../../features/ventas/presentation/screens/ventas_screen.dart';
 import '../../features/caja/presentation/screens/caja_screen.dart';
@@ -114,6 +115,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const PerfilScreen(),
           ),
           GoRoute(
+            path: RoutePaths.seguridad,
+            builder: (_, __) => const SeguridadScreen(),
+          ),
+          GoRoute(
             path: RoutePaths.productos,
             builder: (_, __) => const ProductosScreen(),
           ),
@@ -176,7 +181,7 @@ class _SplashState extends ConsumerState<_SplashScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.background,
     body: Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -191,7 +196,7 @@ class _SplashState extends ConsumerState<_SplashScreen> {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: AppColors.brandSurface,
+                color: context.colors.brandSurface,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Icon(

@@ -95,7 +95,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
     } catch (_) {}
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: context.colors.backgroundAlt,
       appBar: SubPageAppBar(
         title: 'Detalle de venta',
         subtitle: 'Información completa',
@@ -126,9 +126,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
             ),
           if (canAnular)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.more_vert_rounded,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
               onPressed: _anular,
             ),
@@ -264,9 +264,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
             _SectionLabel('Productos (${_venta.items.length})'),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFEEEFF2)),
+                border: Border.all(color: context.colors.borderLight),
               ),
               child: Column(
                 children: _venta.items.asMap().entries.map((e) {
@@ -302,9 +302,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                                   ),
                                   Text(
                                     '${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                      color: context.colors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -312,20 +312,20 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                             ),
                             Text(
                               FormatUtils.currency(item.subtotal),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
+                                color: context.colors.textPrimary,
                               ),
                             ),
                           ],
                         ),
                       ),
                       if (idx < _venta.items.length - 1)
-                        const Divider(
+                        Divider(
                           height: 1,
                           indent: 72,
-                          color: Color(0xFFF3F4F6),
+                          color: context.colors.surfaceAlt,
                         ),
                     ],
                   );
@@ -339,9 +339,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.primarySurface,
+                color: context.colors.primarySurface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primaryBorder),
+                border: Border.all(color: context.colors.primaryBorder),
               ),
               child: Column(
                 children: [
@@ -388,7 +388,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.errorLight,
+                  color: context.colors.errorLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -479,10 +479,10 @@ class _SectionLabel extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 6),
     child: Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: context.colors.textSecondary,
         letterSpacing: 0.2,
       ),
     ),
@@ -502,9 +502,9 @@ class _Section extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFEEEFF2)),
+          border: Border.all(color: context.colors.borderLight),
         ),
         child: Column(
           children: children
@@ -514,7 +514,7 @@ class _Section extends StatelessWidget {
                 (e) => [
                   e.value,
                   if (e.key < children.length - 1)
-                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    Divider(height: 1, color: context.colors.surfaceAlt),
                 ],
               )
               .toList(),
@@ -536,7 +536,7 @@ class _InfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
         ),
         const SizedBox(width: 16),
         Flexible(
@@ -546,7 +546,7 @@ class _InfoRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
               fontFamily: mono ? 'monospace' : null,
             ),
             maxLines: 2,

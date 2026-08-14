@@ -6,6 +6,11 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/barbeer_wordmark.dart';
 import '../providers/auth_provider.dart';
 
+Brightness loginNavigationIconBrightness(Color background) =>
+    ThemeData.estimateBrightnessForColor(background) == Brightness.dark
+    ? Brightness.light
+    : Brightness.dark;
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -86,12 +91,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final navigationBackground = context.colors.background;
+    final navigationIcons = loginNavigationIconBrightness(navigationBackground);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: navigationBackground,
+        systemNavigationBarIconBrightness: navigationIcons,
       ),
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -194,8 +201,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     key: const Key('login-panel-bump'),
                                     width: 88,
                                     height: 88,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
+                                    decoration: BoxDecoration(
+                                      color: context.colors.surface,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -206,8 +213,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   constraints: BoxConstraints(
                                     minHeight: panelMinHeight,
                                   ),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
+                                  decoration: BoxDecoration(
+                                    color: context.colors.surface,
                                     borderRadius: BorderRadius.vertical(
                                       top: Radius.circular(32),
                                     ),
@@ -259,7 +266,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           style: TextStyle(
             fontSize: desktop ? 30 : 23,
             fontWeight: FontWeight.w800,
-            color: desktop ? Colors.white : AppColors.textPrimary,
+            color: desktop ? Colors.white : context.colors.textPrimary,
           ),
         ),
         const SizedBox(height: 3),
@@ -271,7 +278,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             fontSize: desktop ? 15 : 13,
             color: desktop
                 ? Colors.white.withValues(alpha: 0.48)
-                : AppColors.textSecondary,
+                : context.colors.textSecondary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -281,9 +288,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: AppColors.errorLight,
+              color: context.colors.errorLight,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.errorBorder),
+              border: Border.all(color: context.colors.errorBorder),
             ),
             child: Row(
               children: [
@@ -335,7 +342,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               _showPass
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
-              color: AppColors.textTertiary,
+              color: context.colors.textTertiary,
               size: 20,
             ),
           ),
@@ -420,9 +427,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ],
           )
         else
-          const Text(
+          Text(
             'BarBeer © 2026',
-            style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+            style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
           ),
       ],
     ),
@@ -588,9 +595,9 @@ class _LoginLogo extends StatelessWidget {
     width: 60,
     height: 60,
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: context.colors.surface,
       shape: BoxShape.circle,
-      border: Border.all(color: AppColors.border, width: 2),
+      border: Border.all(color: context.colors.border, width: 2),
     ),
     clipBehavior: Clip.antiAlias,
     child: Padding(
@@ -698,28 +705,28 @@ class _LoginField extends StatelessWidget {
     textInputAction: textInputAction,
     onFieldSubmitted: onSubmitted,
     validator: validator,
-    style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+    style: TextStyle(fontSize: 15, color: context.colors.textPrimary),
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(
+      hintStyle: TextStyle(
         fontSize: 15,
-        color: AppColors.textTertiary,
+        color: context.colors.textTertiary,
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(icon, color: AppColors.textTertiary, size: 20),
+      prefixIcon: Icon(icon, color: context.colors.textTertiary, size: 20),
       suffixIcon: trailing,
       suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       filled: true,
-      fillColor: AppColors.backgroundAlt,
+      fillColor: context.colors.backgroundAlt,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: context.colors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: context.colors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

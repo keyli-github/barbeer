@@ -53,7 +53,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
-      backgroundColor: desktop ? const Color(0xFFFAFAFA) : Colors.white,
+      backgroundColor: desktop ? context.colors.backgroundAlt : Colors.white,
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
@@ -238,7 +238,7 @@ class _Sede extends StatelessWidget {
     showModalBottomSheet(
       context: ctx,
       useRootNavigator: true,
-      backgroundColor: Colors.white,
+      backgroundColor: ctx.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -251,7 +251,7 @@ class _Sede extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: ctx.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -381,7 +381,7 @@ class _Kpis extends StatelessWidget {
         _KD(
           Icons.liquor_rounded,
           AppColors.primary,
-          AppColors.primarySurface,
+          context.colors.primarySurface,
           'Productos',
           value('productos', '${data.productos?.total ?? 0}'),
           detail('productos', '${data.productos?.activos ?? 0} activos'),
@@ -409,7 +409,9 @@ class _Kpis extends StatelessWidget {
         _KD(
           Icons.inventory_2_rounded,
           data.stockBajo > 0 ? AppColors.error : AppColors.success,
-          data.stockBajo > 0 ? AppColors.errorLight : AppColors.successLight,
+          data.stockBajo > 0
+              ? context.colors.errorLight
+              : context.colors.successLight,
           'Stock bajo',
           value('inventario', '${data.inventario?.totalItems ?? 0}'),
           detail('inventario', '${data.stockBajo} con alerta'),
@@ -440,7 +442,7 @@ class _Kpis extends StatelessWidget {
         _KD(
           Icons.store_rounded,
           AppColors.success,
-          AppColors.successLight,
+          context.colors.successLight,
           'Sedes activas',
           value('sedes', '${data.sedesActivas} / ${data.sedesTotal}'),
           detail('sedes', 'Sedes operativas'),
@@ -454,7 +456,7 @@ class _Kpis extends StatelessWidget {
         _KD(
           Icons.calendar_month_rounded,
           AppColors.info,
-          AppColors.infoLight,
+          context.colors.infoLight,
           'Total mes',
           FormatUtils.currency(data.misTotalesMes),
           '${data.misVentasMes} ventas',
@@ -501,8 +503,8 @@ class _Kpis extends StatelessWidget {
       items.addAll([
         _KD(
           Icons.people_rounded,
-          AppColors.textPrimary,
-          AppColors.backgroundAlt,
+          context.colors.textPrimary,
+          context.colors.backgroundAlt,
           'Usuarios',
           value('roles', '${data.usuariosTotal ?? 0}'),
           detail('roles', '${data.rolesTotal ?? 0} roles activos'),
@@ -511,8 +513,8 @@ class _Kpis extends StatelessWidget {
         ),
         _KD(
           Icons.shield_rounded,
-          AppColors.textPrimary,
-          AppColors.backgroundAlt,
+          context.colors.textPrimary,
+          context.colors.backgroundAlt,
           'Roles',
           value('roles', '${data.rolesTotal ?? 0}'),
           detail('roles', 'Niveles de acceso'),
@@ -524,8 +526,8 @@ class _Kpis extends StatelessWidget {
     items.add(
       _KD(
         Icons.devices_rounded,
-        AppColors.textPrimary,
-        AppColors.backgroundAlt,
+        context.colors.textPrimary,
+        context.colors.backgroundAlt,
         'Sesiones',
         value('sesiones', '${data.sesionesTotal ?? 0}'),
         detail('sesiones', 'Dispositivos conectados'),
@@ -588,9 +590,9 @@ class _KpiCard extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEFF2)),
+        border: Border.all(color: context.colors.borderLight),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -618,9 +620,9 @@ class _KpiCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   k.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10.5,
-                    color: AppColors.textSecondary,
+                    color: context.colors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
@@ -632,10 +634,10 @@ class _KpiCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             k.value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
               letterSpacing: -0.3,
             ),
             maxLines: 1,
@@ -699,7 +701,7 @@ class _DashboardErrors extends StatelessWidget {
     width: double.infinity,
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: AppColors.errorLight,
+      color: context.colors.errorLight,
       borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
     ),
@@ -801,9 +803,9 @@ class _ChartState extends ConsumerState<_Chart> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEEEFF2)),
+        border: Border.all(color: context.colors.borderLight),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -821,9 +823,9 @@ class _ChartState extends ConsumerState<_Chart> {
               Expanded(
                 child: Text(
                   'Ventas ${_period == '7D' ? 'últimos 7 días' : _period}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ),
@@ -853,10 +855,10 @@ class _ChartState extends ConsumerState<_Chart> {
                 )
               : Text(
                   FormatUtils.currency(total),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -903,9 +905,9 @@ class _ChartState extends ConsumerState<_Chart> {
                         v >= 1000
                             ? '${(v / 1000).toStringAsFixed(0)}K'
                             : v.toStringAsFixed(0),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ),
@@ -934,7 +936,7 @@ class _ChartState extends ConsumerState<_Chart> {
                                   : FontWeight.w400,
                               color: i == 6
                                   ? AppColors.primary
-                                  : AppColors.textTertiary,
+                                  : context.colors.textTertiary,
                             ),
                           ),
                         );
@@ -972,7 +974,7 @@ class _ChartState extends ConsumerState<_Chart> {
                 ),
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => AppColors.textPrimary,
+                    getTooltipColor: (_) => context.colors.textPrimary,
                     getTooltipItem: (_, __, rod, ___) => BarTooltipItem(
                       'S/ ${rod.toY.toStringAsFixed(0)}',
                       const TextStyle(
@@ -1016,7 +1018,9 @@ class _PeriodSelector extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: value == o ? FontWeight.w700 : FontWeight.w400,
-                color: value == o ? AppColors.primary : AppColors.textPrimary,
+                color: value == o
+                    ? AppColors.primary
+                    : context.colors.textPrimary,
               ),
             ),
           ),
@@ -1025,26 +1029,26 @@ class _PeriodSelector extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFDDDFE3)),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
           const SizedBox(width: 2),
-          const Icon(
+          Icon(
             Icons.keyboard_arrow_down_rounded,
             size: 14,
-            color: AppColors.textTertiary,
+            color: context.colors.textTertiary,
           ),
         ],
       ),
@@ -1066,13 +1070,13 @@ class _Activity extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Actividad reciente',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: context.colors.textPrimary,
                 ),
               ),
             ),
@@ -1124,19 +1128,19 @@ class _Activity extends StatelessWidget {
                     children: [
                       Text(
                         accion,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         user,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                     ],
@@ -1145,9 +1149,9 @@ class _Activity extends StatelessWidget {
                 if (dt != null)
                   Text(
                     FormatUtils.timeAgo(dt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                   ),
               ],

@@ -157,7 +157,7 @@ class InventarioScreen extends ConsumerWidget {
     final selectedSedeId = ref.watch(globalSedeIdProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       floatingActionButton: canCreate
           ? FloatingActionButton.extended(
               heroTag: 'inventario_config_fab',
@@ -287,7 +287,7 @@ class _SearchBarState extends State<_SearchBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       child: Column(
         children: [
           Padding(
@@ -295,11 +295,11 @@ class _SearchBarState extends State<_SearchBar> {
             child: TextField(
               controller: _ctrl,
               onChanged: widget.onSearch,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Buscar por nombre o código...',
                 prefixIcon: Icon(
                   Icons.search_rounded,
-                  color: AppColors.textTertiary,
+                  color: context.colors.textTertiary,
                   size: 18,
                 ),
                 contentPadding: EdgeInsets.symmetric(
@@ -331,13 +331,13 @@ class _SearchBarState extends State<_SearchBar> {
                         ),
                         decoration: BoxDecoration(
                           color: widget.estadoFilter == e.$1
-                              ? AppColors.primarySurface
-                              : AppColors.backgroundAlt,
+                              ? context.colors.primarySurface
+                              : context.colors.backgroundAlt,
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
                             color: widget.estadoFilter == e.$1
-                                ? AppColors.primaryBorder
-                                : AppColors.border,
+                                ? context.colors.primaryBorder
+                                : context.colors.border,
                           ),
                         ),
                         child: Text(
@@ -349,7 +349,7 @@ class _SearchBarState extends State<_SearchBar> {
                                 : FontWeight.w500,
                             color: widget.estadoFilter == e.$1
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : context.colors.textSecondary,
                           ),
                         ),
                       ),
@@ -392,7 +392,7 @@ class _HeaderState extends State<_Header> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       child: Column(
         children: [
           Padding(
@@ -401,11 +401,11 @@ class _HeaderState extends State<_Header> {
               controller: _ctrl,
               onChanged: widget.onSearch,
               style: AppTextStyles.bodyMedium,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Buscar por nombre o código...',
                 prefixIcon: Icon(
                   Icons.search_rounded,
-                  color: AppColors.textTertiary,
+                  color: context.colors.textTertiary,
                   size: 18,
                 ),
                 contentPadding: EdgeInsets.symmetric(
@@ -437,13 +437,13 @@ class _HeaderState extends State<_Header> {
                         ),
                         decoration: BoxDecoration(
                           color: widget.estadoFilter == e.$1
-                              ? AppColors.primarySurface
-                              : AppColors.backgroundAlt,
+                              ? context.colors.primarySurface
+                              : context.colors.backgroundAlt,
                           borderRadius: BorderRadius.circular(AppRadius.full),
                           border: Border.all(
                             color: widget.estadoFilter == e.$1
-                                ? AppColors.primaryBorder
-                                : AppColors.border,
+                                ? context.colors.primaryBorder
+                                : context.colors.border,
                           ),
                         ),
                         child: Text(
@@ -455,7 +455,7 @@ class _HeaderState extends State<_Header> {
                                 : FontWeight.w500,
                             color: widget.estadoFilter == e.$1
                                 ? AppColors.primary
-                                : AppColors.textSecondary,
+                                : context.colors.textSecondary,
                           ),
                         ),
                       ),
@@ -546,9 +546,9 @@ class _InventarioTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: context.colors.borderLight),
           boxShadow: AppShadows.card,
         ),
         child: Column(
@@ -614,7 +614,7 @@ class _InventarioTile extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: pct.toDouble(),
                           minHeight: 5,
-                          backgroundColor: AppColors.background,
+                          backgroundColor: context.colors.background,
                           valueColor: AlwaysStoppedAnimation(_statusColor),
                         ),
                       ),
@@ -818,7 +818,7 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
     final sedeLocked = item?.sedeId.isNotEmpty == true;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: item == null ? 'Agregar al inventario' : 'Configurar inventario',
         subtitle: 'Mínimos, objetivo y ubicación',
@@ -1008,7 +1008,7 @@ class _AdjustSheetState extends State<_AdjustSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: 'Ajuste de stock',
         subtitle: '${widget.item.producto} · Stock: ${widget.item.stock}',
@@ -1037,13 +1037,13 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: _tipo == t.$1
-                                ? AppColors.primarySurface
-                                : AppColors.backgroundAlt,
+                                ? context.colors.primarySurface
+                                : context.colors.backgroundAlt,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: _tipo == t.$1
-                                  ? AppColors.primaryBorder
-                                  : AppColors.border,
+                                  ? context.colors.primaryBorder
+                                  : context.colors.border,
                             ),
                           ),
                           child: Text(
@@ -1056,7 +1056,7 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                                   : FontWeight.w500,
                               color: _tipo == t.$1
                                   ? AppColors.primary
-                                  : AppColors.textSecondary,
+                                  : context.colors.textSecondary,
                             ),
                           ),
                         ),
@@ -1075,9 +1075,9 @@ class _AdjustSheetState extends State<_AdjustSheet> {
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 hintText: '0',
-                hintStyle: const TextStyle(
+                hintStyle: TextStyle(
                   fontSize: 28,
-                  color: AppColors.textDisabled,
+                  color: context.colors.textDisabled,
                 ),
                 labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),

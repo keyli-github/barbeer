@@ -160,12 +160,12 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     final canDelete = auth.hasPermission('asistencia:eliminar');
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           // Barra compacta: fecha + toggle (sin título duplicado)
           Container(
-            color: Colors.white,
+            color: context.colors.surface,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Column(
               children: [
@@ -173,9 +173,9 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                   children: [
                     Text(
                       state.fecha,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textSecondary,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                     const Spacer(),
@@ -200,9 +200,11 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primarySurface,
+                          color: context.colors.primarySurface,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.primaryBorder),
+                          border: Border.all(
+                            color: context.colors.primaryBorder,
+                          ),
                         ),
                         child: const Row(
                           children: [
@@ -232,7 +234,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                   margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: AppColors.backgroundAlt,
+                    color: context.colors.backgroundAlt,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -244,7 +246,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
                               color: !_showHistorial
-                                  ? AppColors.surface
+                                  ? context.colors.surface
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: !_showHistorial
@@ -264,7 +266,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                                 fontWeight: FontWeight.w600,
                                 color: !_showHistorial
                                     ? AppColors.primary
-                                    : AppColors.textSecondary,
+                                    : context.colors.textSecondary,
                               ),
                             ),
                           ),
@@ -277,7 +279,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
                               color: _showHistorial
-                                  ? AppColors.surface
+                                  ? context.colors.surface
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: _showHistorial
@@ -297,7 +299,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                                 fontWeight: FontWeight.w600,
                                 color: _showHistorial
                                     ? AppColors.primary
-                                    : AppColors.textSecondary,
+                                    : context.colors.textSecondary,
                               ),
                             ),
                           ),
@@ -318,7 +320,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                   _Chip(
                     'Total',
                     '${state.resumen!.totalEmpleados}',
-                    AppColors.textSecondary,
+                    context.colors.textSecondary,
                   ),
                   const SizedBox(width: 8),
                   _Chip(
@@ -476,9 +478,9 @@ class _PlanillaView extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.borderLight),
+            border: Border.all(color: context.colors.borderLight),
             boxShadow: AppShadows.card,
           ),
           child: Row(
@@ -653,9 +655,9 @@ class _MarcajesView extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.borderLight),
+              border: Border.all(color: context.colors.borderLight),
               boxShadow: AppShadows.card,
             ),
             child: Row(
@@ -683,7 +685,7 @@ class _MarcajesView extends StatelessWidget {
                       Text(
                         m['empleado']!,
                         style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -720,7 +722,7 @@ class _MarcajesView extends StatelessWidget {
                       _fmtHour(m['hora']!),
                       style: AppTextStyles.bodySmall.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ],
@@ -766,11 +768,11 @@ class _StatusBadge extends StatelessWidget {
         label = 'Ausente';
         break;
       case 'DIA_LIBRE':
-        c = AppColors.textTertiary;
+        c = context.colors.textTertiary;
         label = 'Día libre';
         break;
       default:
-        c = AppColors.textTertiary;
+        c = context.colors.textTertiary;
         label = estado;
     }
     return Container(
@@ -880,7 +882,7 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: widget.isEdit ? 'Editar asistencia' : 'Registrar asistencia',
         subtitle: widget.emp.username,
@@ -915,13 +917,13 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: _estado == e.$1
-                            ? AppColors.primarySurface
-                            : AppColors.backgroundAlt,
+                            ? context.colors.primarySurface
+                            : context.colors.backgroundAlt,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                         border: Border.all(
                           color: _estado == e.$1
-                              ? AppColors.primaryBorder
-                              : AppColors.border,
+                              ? context.colors.primaryBorder
+                              : context.colors.border,
                         ),
                       ),
                       child: Text(
@@ -933,7 +935,7 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
                               : FontWeight.w500,
                           color: _estado == e.$1
                               ? AppColors.primary
-                              : AppColors.textSecondary,
+                              : context.colors.textSecondary,
                         ),
                       ),
                     ),

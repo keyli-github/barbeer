@@ -26,9 +26,9 @@ class EtiquetaTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderLight),
+          border: Border.all(color: context.colors.borderLight),
         ),
         child: Row(
           children: [
@@ -39,14 +39,14 @@ class EtiquetaTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: etiqueta.activo
                     ? AppColors.primary.withValues(alpha: 0.1)
-                    : AppColors.backgroundAlt,
+                    : context.colors.backgroundAlt,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 Icons.account_balance_wallet_rounded,
                 color: etiqueta.activo
                     ? AppColors.primary
-                    : AppColors.textTertiary,
+                    : context.colors.textTertiary,
                 size: 20,
               ),
             ),
@@ -76,16 +76,18 @@ class EtiquetaTile extends StatelessWidget {
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.backgroundAlt,
+                            color: context.colors.backgroundAlt,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: AppColors.borderLight),
+                            border: Border.all(
+                              color: context.colors.borderLight,
+                            ),
                           ),
                           child: Text(
                             'INACTIVA',
                             style: TextStyle(
                               fontSize: 8,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textTertiary,
+                              color: context.colors.textTertiary,
                             ),
                           ),
                         ),
@@ -115,7 +117,7 @@ class EtiquetaTile extends StatelessWidget {
                         size: 12,
                         color: etiqueta.requiereComprobante
                             ? AppColors.success
-                            : AppColors.textTertiary,
+                            : context.colors.textTertiary,
                       ),
                       const SizedBox(width: 3),
                       Text(
@@ -124,7 +126,7 @@ class EtiquetaTile extends StatelessWidget {
                             : 'Sin comprobante',
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                       ),
                       if (etiqueta.sedeId != null) ...[
@@ -153,7 +155,7 @@ class EtiquetaTile extends StatelessWidget {
               IconButton(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_rounded, size: 18),
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
             if (canDeactivate && !etiqueta.esSistema)
@@ -167,7 +169,7 @@ class EtiquetaTile extends StatelessWidget {
                 ),
                 color: etiqueta.activo
                     ? AppColors.success
-                    : AppColors.textTertiary,
+                    : context.colors.textTertiary,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
           ],

@@ -9,6 +9,7 @@ class Etiqueta {
   final bool activo;
   final String? sedeId;
   final bool requiereComprobante;
+  final bool esSistema;
   final String tipo;
   final int orden;
 
@@ -18,6 +19,7 @@ class Etiqueta {
     required this.activo,
     this.sedeId,
     required this.requiereComprobante,
+    this.esSistema = false,
     this.tipo = 'ENTRADA',
     required this.orden,
   });
@@ -28,9 +30,149 @@ class Etiqueta {
     activo: j['activo'] as bool? ?? true,
     sedeId: j['sedeId'] as String?,
     requiereComprobante: j['requiereComprobante'] as bool? ?? true,
+    esSistema: j['esSistema'] as bool? ?? false,
     tipo: j['tipo'] as String? ?? 'ENTRADA',
     orden: (j['orden'] as num?)?.toInt() ?? 0,
   );
+}
+
+bool isBilleteraEtiqueta(Etiqueta etiqueta) {
+  final nombre = etiqueta.nombre.trim().toUpperCase();
+  return etiqueta.activo &&
+      !etiqueta.esSistema &&
+      nombre != 'TOTAL DE VENTAS' &&
+      (etiqueta.tipo == 'ENTRADA' || etiqueta.tipo == 'AMBOS');
+}
+
+// ─── Analisis de comprobante ────────────────────────────────────────────────
+
+class ComprobanteConfianza {
+  final double documento;
+  final double entidad;
+  final double monto;
+  final double operacion;
+  final double fecha;
+
+  const ComprobanteConfianza({
+    required this.documento,
+    required this.entidad,
+    required this.monto,
+    required this.operacion,
+    required this.fecha,
+  });
+
+  factory ComprobanteConfianza.fromJson(Map<String, dynamic> json) =>
+      ComprobanteConfianza(
+        documento: (json['documento'] as num?)?.toDouble() ?? 0,
+        entidad: (json['entidad'] as num?)?.toDouble() ?? 0,
+        monto: (json['monto'] as num?)?.toDouble() ?? 0,
+        operacion: (json['operacion'] as num?)?.toDouble() ?? 0,
+        fecha: (json['fecha'] as num?)?.toDouble() ?? 0,
+      );
+
+  double get promedio => (documento + entidad + monto + operacion + fecha) / 5;
+}
+
+class ComprobanteAnalisis {
+  final String id;
+  final String estado;
+  final bool posibleDuplicado;
+  final List<String> coincidencias;
+  final String? entidad;
+  final Etiqueta? etiquetaSugerida;
+  final double? monto;
+  final String? codigoOperacion;
+  final String? codigoSeguridad;
+  final String? fechaOperacion;
+  final String? horaOperacion;
+  final String imagenUrl;
+  final String thumbnailUrl;
+  final ComprobanteConfianza confianza;
+  final List<String> advertencias;
+  final DateTime? expiraAt;
+
+  const ComprobanteAnalisis({
+    required this.id,
+    required this.estado,
+    required this.posibleDuplicado,
+    required this.coincidencias,
+    this.entidad,
+    this.etiquetaSugerida,
+    this.monto,
+    this.codigoOperacion,
+    this.codigoSeguridad,
+    this.fechaOperacion,
+    this.horaOperacion,
+    required this.imagenUrl,
+    required this.thumbnailUrl,
+    required this.confianza,
+    required this.advertencias,
+    this.expiraAt,
+  });
+
+  factory ComprobanteAnalisis.fromJson(Map<String, dynamic> json) {
+    final etiqueta = json['etiquetaSugerida'];
+    return ComprobanteAnalisis(
+      id: json['id'] as String? ?? '',
+      estado: json['estado'] as String? ?? 'REVISION',
+      posibleDuplicado: json['posibleDuplicado'] as bool? ?? false,
+      coincidencias: (json['coincidencias'] as List? ?? const [])
+          .whereType<String>()
+          .toList(),
+      entidad: json['entidad'] as String?,
+      etiquetaSugerida: etiqueta is Map
+          ? Etiqueta.fromJson(Map<String, dynamic>.from(etiqueta))
+          : null,
+      monto: (json['monto'] as num?)?.toDouble(),
+      codigoOperacion: json['codigoOperacion'] as String?,
+      codigoSeguridad: json['codigoSeguridad'] as String?,
+      fechaOperacion: json['fechaOperacion'] as String?,
+      horaOperacion: json['horaOperacion'] as String?,
+      imagenUrl: json['imagenUrl'] as String? ?? '',
+      thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
+      confianza: ComprobanteConfianza.fromJson(
+        Map<String, dynamic>.from(json['confianza'] as Map? ?? const {}),
+      ),
+      advertencias: (json['advertencias'] as List? ?? const [])
+          .whereType<String>()
+          .toList(),
+      expiraAt: DateTime.tryParse(json['expiraAt'] as String? ?? ''),
+    );
+  }
+
+  bool get esApto => estado == 'APTO' && !posibleDuplicado;
+  bool get expirado => expiraAt?.isBefore(DateTime.now()) ?? false;
+
+  bool montoCoincide(double total) =>
+      monto != null && (monto! * 100).round() == (total * 100).round();
+}
+
+String? comprobanteAnalysisError({
+  required ComprobanteAnalisis? analysis,
+  required double total,
+  required bool required,
+  String? selectedEtiquetaId,
+}) {
+  if (analysis == null) {
+    return required
+        ? 'Analiza el comprobante requerido por esta billetera'
+        : null;
+  }
+  if (analysis.posibleDuplicado) return 'Posible comprobante duplicado';
+  if (analysis.expirado) {
+    return 'El análisis expiró. Selecciona nuevamente el comprobante.';
+  }
+  if (!analysis.esApto) {
+    return 'El comprobante requiere revisión y no permite continuar';
+  }
+  if (!analysis.montoCoincide(total)) {
+    return 'El monto del comprobante no coincide con el total de la venta';
+  }
+  if (selectedEtiquetaId != null &&
+      analysis.etiquetaSugerida?.id != selectedEtiquetaId) {
+    return 'La billetera analizada no coincide con la seleccionada';
+  }
+  return null;
 }
 
 // ─── Conciliación ──────────────────────────────────────────────────────────
@@ -227,6 +369,7 @@ class CreateVentaPayload {
     String? etiquetaId,
     String? comprobante,
     String? codigoOperacion,
+    String? comprobanteAnalisisId,
     double? recargoMonto,
     String? recargoMotivo,
   }) : json = Map.unmodifiable({
@@ -238,8 +381,9 @@ class CreateVentaPayload {
          'vendedoraId': ?vendedoraId,
          'estadoConciliacion': estadoConciliacion.name.toUpperCase(),
          'etiquetaId': ?etiquetaId,
-         'comprobante': ?comprobante,
-         'codigoOperacion': ?codigoOperacion,
+         'comprobanteAnalisisId': ?comprobanteAnalisisId,
+         if (comprobanteAnalisisId == null) 'comprobante': ?comprobante,
+         if (comprobanteAnalisisId == null) 'codigoOperacion': ?codigoOperacion,
          'recargoMonto': ?recargoMonto,
          'recargoMotivo': ?recargoMotivo,
        });

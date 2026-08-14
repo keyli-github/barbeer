@@ -26,7 +26,7 @@ class StatusBadge extends StatelessWidget {
   const StatusBadge({super.key, required this.activo});
   @override
   Widget build(BuildContext context) {
-    final c = activo ? AppColors.success : AppColors.textTertiary;
+    final c = activo ? AppColors.success : context.colors.textTertiary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(

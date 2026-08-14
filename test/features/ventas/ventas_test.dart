@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
 import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_screen.dart';
+import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_sheet.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/anular_venta_dialog.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/carrito_venta_sheet.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
@@ -64,10 +66,19 @@ class _FakeVentasRepository extends VentasRepository {
           String id,
           String estado,
           String? etiquetaId,
-          String? comprobante,
+          String? comprobanteAnalisisId,
           String? codigoOperacion,
         })
       >[];
+  List<Etiqueta> etiquetas = const [
+    Etiqueta(
+      id: 'etiqueta-1',
+      nombre: 'Yape',
+      activo: true,
+      requiereComprobante: true,
+      orden: 1,
+    ),
+  ];
 
   @override
   Future<({List<Venta> data, int total, int totalPaginas})> listVentas({
@@ -100,47 +111,71 @@ class _FakeVentasRepository extends VentasRepository {
   );
 
   @override
-  Future<List<Etiqueta>> listEtiquetasActivas({String? sedeId}) async => const [
-    Etiqueta(
-      id: 'etiqueta-1',
-      nombre: 'Yape',
-      activo: true,
-      requiereComprobante: true,
-      orden: 1,
-    ),
-  ];
+  Future<List<Etiqueta>> listEtiquetasActivas({String? sedeId}) async =>
+      etiquetas;
+
+  @override
+  Future<ComprobanteAnalisis> analizarComprobante({
+    required Uint8List bytes,
+    required String filename,
+    String? sedeId,
+  }) async => _analysis(id: 'analysis-1', amount: 10);
+
+  @override
+  Future<void> cancelarComprobanteAnalisis(String id) async {}
 
   @override
   Future<Venta> conciliarVenta(
     String id, {
     required String estado,
     String? etiquetaId,
-    String? comprobante,
+    String? comprobanteAnalisisId,
     String? codigoOperacion,
   }) async {
     conciliaciones.add((
       id: id,
       estado: estado,
       etiquetaId: etiquetaId,
-      comprobante: comprobante,
+      comprobanteAnalisisId: comprobanteAnalisisId,
       codigoOperacion: codigoOperacion,
     ));
     return _venta(id);
   }
 }
 
-class _FakeUploadClient extends UploadClient {
-  _FakeUploadClient() : super(ApiClient.instance);
-
-  @override
-  Future<UploadResult> uploadImage({
-    required Uint8List bytes,
-    required String filename,
-  }) async => const UploadResult(
-    url: '/api/uploads/voucher.jpg?token=test',
-    filename: 'voucher.jpg',
-  );
-}
+ComprobanteAnalisis _analysis({
+  required String id,
+  required double amount,
+  String entity = 'Yape',
+  bool duplicate = false,
+}) => ComprobanteAnalisis(
+  id: id,
+  estado: duplicate ? 'REVISION' : 'APTO',
+  posibleDuplicado: duplicate,
+  coincidencias: duplicate ? const ['IMAGEN_EXACTA'] : const [],
+  entidad: entity,
+  etiquetaSugerida: const Etiqueta(
+    id: 'etiqueta-1',
+    nombre: 'Yape',
+    activo: true,
+    requiereComprobante: true,
+    orden: 1,
+  ),
+  monto: amount,
+  codigoOperacion: 'GEMINI-1',
+  fechaOperacion: '2026-08-13',
+  imagenUrl: '/receipt.jpg',
+  thumbnailUrl: '/receipt-thumb.jpg',
+  confianza: const ComprobanteConfianza(
+    documento: .9,
+    entidad: .9,
+    monto: .9,
+    operacion: .9,
+    fecha: .9,
+  ),
+  advertencias: const [],
+  expiraAt: DateTime(2099),
+);
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -312,6 +347,47 @@ void main() {
   });
 
   group('Modelos', () {
+    test('solo ENTRADA/AMBOS no sistema califican como billetera', () {
+      Etiqueta etiqueta(
+        String tipo, {
+        String nombre = 'Yape',
+        bool system = false,
+      }) => Etiqueta(
+        id: tipo,
+        nombre: nombre,
+        activo: true,
+        requiereComprobante: false,
+        esSistema: system,
+        tipo: tipo,
+        orden: 1,
+      );
+
+      expect(isBilleteraEtiqueta(etiqueta('ENTRADA')), isTrue);
+      expect(isBilleteraEtiqueta(etiqueta('AMBOS')), isTrue);
+      expect(isBilleteraEtiqueta(etiqueta('SALIDA')), isFalse);
+      expect(
+        isBilleteraEtiqueta(etiqueta('ENTRADA', nombre: 'TOTAL DE VENTAS')),
+        isFalse,
+      );
+      expect(isBilleteraEtiqueta(etiqueta('ENTRADA', system: true)), isFalse);
+    });
+
+    test('un duplicado bloquea aunque el comprobante sea opcional', () {
+      expect(
+        comprobanteAnalysisError(
+          analysis: _analysis(id: 'duplicate', amount: 10, duplicate: true),
+          total: 10,
+          required: false,
+          selectedEtiquetaId: 'etiqueta-1',
+        ),
+        'Posible comprobante duplicado',
+      );
+      expect(
+        comprobanteAnalysisError(analysis: null, total: 10, required: false),
+        isNull,
+      );
+    });
+
     test('17. Venta.fromJson parsea correctamente', () {
       final venta = Venta.fromJson({
         'id': 'v1',
@@ -399,6 +475,57 @@ void main() {
         () => (payload.json['items'] as List).add(<String, dynamic>{}),
         throwsUnsupportedError,
       );
+    });
+
+    test('comprobante analizado excludes simultaneous legacy fields', () {
+      final payload = CreateVentaPayload(
+        idempotencyKey: 'key-analysis',
+        items: const [
+          {'productoId': 'p1', 'cantidad': 1},
+        ],
+        estadoConciliacion: EstadoConciliacion.billetera,
+        etiquetaId: 'et-1',
+        comprobanteAnalisisId: 'analysis-1',
+        comprobante: '/legacy.jpg',
+        codigoOperacion: 'LEGACY-1',
+      );
+
+      expect(payload.json['comprobanteAnalisisId'], 'analysis-1');
+      expect(payload.json.containsKey('comprobante'), isFalse);
+      expect(payload.json.containsKey('codigoOperacion'), isFalse);
+    });
+
+    test('parsea el contrato completo del análisis Gemini', () {
+      final analysis = ComprobanteAnalisis.fromJson({
+        'id': 'analysis-1',
+        'estado': 'APTO',
+        'posibleDuplicado': false,
+        'coincidencias': [],
+        'entidad': 'Yape',
+        'etiquetaSugerida': {'id': 'et-1', 'nombre': 'Yape'},
+        'monto': 25.5,
+        'codigoOperacion': 'OP-1',
+        'codigoSeguridad': 'SEC-1',
+        'fechaOperacion': '2026-08-13',
+        'horaOperacion': '12:30:00',
+        'imagenUrl': '/receipts/1.jpg',
+        'thumbnailUrl': '/receipts/1-thumb.jpg',
+        'confianza': {
+          'documento': .9,
+          'entidad': .8,
+          'monto': .95,
+          'operacion': .7,
+          'fecha': .85,
+        },
+        'advertencias': ['Verificar hora'],
+        'expiraAt': '2099-08-13T12:45:00.000Z',
+      });
+
+      expect(analysis.esApto, isTrue);
+      expect(analysis.etiquetaSugerida?.nombre, 'Yape');
+      expect(analysis.montoCoincide(25.50), isTrue);
+      expect(analysis.confianza.promedio, closeTo(.84, .001));
+      expect(analysis.advertencias, ['Verificar hora']);
     });
 
     test('Venta.fromJson expone recargo y subtotal', () {
@@ -522,11 +649,12 @@ void main() {
         ProviderScope(
           overrides: [
             ventasRepositoryProvider.overrideWithValue(repo),
-            uploadClientProvider.overrideWithValue(_FakeUploadClient()),
             voucherImagePickerProvider.overrideWithValue(
               () async => PickedUploadImage(
-                bytes: Uint8List.fromList([0xff, 0xd8, 0xff]),
-                filename: 'voucher.jpg',
+                bytes: base64Decode(
+                  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+                ),
+                filename: 'voucher.png',
               ),
             ),
           ],
@@ -551,27 +679,106 @@ void main() {
       await tester.tap(find.text('Confirmar clasificación'));
       await tester.pump();
       expect(
-        find.text('Ingresa el comprobante requerido por esta billetera'),
+        find.text('Analiza el comprobante requerido por esta billetera'),
         findsOneWidget,
       );
       expect(repo.conciliaciones, isEmpty);
 
       await tester.tap(find.byKey(const ValueKey('comprobanteField')));
-      await tester.pump();
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('codigoOperacionField')),
         'op-456',
       );
+      await tester.ensureVisible(find.text('Confirmar clasificación'));
+      await tester.pump();
       await tester.tap(find.text('Confirmar clasificación'));
       await tester.pump();
 
       expect(completed, isTrue);
       expect(repo.conciliaciones, hasLength(1));
-      expect(
-        repo.conciliaciones.single.comprobante,
-        '/api/uploads/voucher.jpg?token=test',
+      expect(repo.conciliaciones.single.comprobanteAnalisisId, 'analysis-1');
+      expect(repo.conciliaciones.single.codigoOperacion, isNull);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('billetera sin requisito permite conciliar sin Gemini', (
+      tester,
+    ) async {
+      final repo = _FakeVentasRepository()
+        ..etiquetas = const [
+          Etiqueta(
+            id: 'etiqueta-1',
+            nombre: 'Transferencia',
+            activo: true,
+            requiereComprobante: false,
+            orden: 1,
+          ),
+        ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [ventasRepositoryProvider.overrideWithValue(repo)],
+          child: MaterialApp(
+            home: ConciliarVentaScreen(
+              venta: _venta('optional', pendiente: true),
+              onDone: () {},
+            ),
+          ),
+        ),
       );
-      expect(repo.conciliaciones.single.codigoOperacion, 'op-456');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Billetera').first);
+      await tester.pump();
+      expect(find.text('Comprobante / voucher (opcional)'), findsOneWidget);
+
+      await tester.tap(find.text('Confirmar clasificación'));
+      await tester.pump();
+
+      expect(repo.conciliaciones, hasLength(1));
+      expect(repo.conciliaciones.single.comprobanteAnalisisId, isNull);
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('sheet posterior usa análisis Gemini y no URL legacy', (
+      tester,
+    ) async {
+      final repo = _FakeVentasRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ventasRepositoryProvider.overrideWithValue(repo),
+            voucherImagePickerProvider.overrideWithValue(
+              () async => PickedUploadImage(
+                bytes: base64Decode(
+                  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+                ),
+                filename: 'voucher.png',
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: ConciliarVentaSheet(
+                venta: _venta('sheet', pendiente: true),
+                onDone: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Billetera').first);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('comprobanteField')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('receipt-analysis-panel')), findsOneWidget);
+      expect(find.text('Análisis apto'), findsOneWidget);
+      await tester.ensureVisible(find.text('Confirmar'));
+      await tester.tap(find.text('Confirmar'));
+      await tester.pump();
+
+      expect(repo.conciliaciones.single.comprobanteAnalisisId, 'analysis-1');
       await tester.pump(const Duration(seconds: 3));
     });
 

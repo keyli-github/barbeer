@@ -28,7 +28,7 @@ class CategoriasSheet extends ConsumerWidget {
     final canCreate = auth.hasPermission('categorias:crear');
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: context.colors.backgroundAlt,
       appBar: SubPageAppBar(
         title: 'Categorias',
         subtitle: 'Organiza el catalogo global',
@@ -47,7 +47,7 @@ class CategoriasSheet extends ConsumerWidget {
       body: Column(
         children: [
           Container(
-            color: AppColors.surface,
+            color: context.colors.surface,
             child: Column(
               children: [
                 Padding(
@@ -128,8 +128,8 @@ class CategoriasSheet extends ConsumerWidget {
                       height: 38,
                       decoration: BoxDecoration(
                         color: categoria.activo
-                            ? AppColors.primarySurface
-                            : AppColors.backgroundAlt,
+                            ? context.colors.primarySurface
+                            : context.colors.backgroundAlt,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -137,7 +137,7 @@ class CategoriasSheet extends ConsumerWidget {
                         size: 19,
                         color: categoria.activo
                             ? AppColors.primary
-                            : AppColors.textTertiary,
+                            : context.colors.textTertiary,
                       ),
                     ),
                     const SizedBox(width: 11),
@@ -160,10 +160,10 @@ class CategoriasSheet extends ConsumerWidget {
                     if (auth.hasPermission('categorias:editar') ||
                         auth.hasPermission('categorias:eliminar'))
                       PopupMenuButton<String>(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.more_vert_rounded,
                           size: 19,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                         onSelected: (value) {
                           if (value == 'edit') {
@@ -378,7 +378,7 @@ class _CategoriaFormState extends State<_CategoriaForm> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: SubPageAppBar(
       title: widget.categoria == null ? 'Nueva categoria' : 'Editar categoria',
     ),
@@ -478,16 +478,20 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primarySurface : AppColors.backgroundAlt,
+          color: selected
+              ? context.colors.primarySurface
+              : context.colors.backgroundAlt,
           borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
-            color: selected ? AppColors.primaryBorder : AppColors.border,
+            color: selected
+                ? context.colors.primaryBorder
+                : context.colors.border,
           ),
         ),
         child: Text(
           label,
           style: AppTextStyles.labelLarge.copyWith(
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected ? AppColors.primary : context.colors.textSecondary,
           ),
         ),
       ),
@@ -504,13 +508,15 @@ class _ActivePill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
     decoration: BoxDecoration(
-      color: active ? AppColors.successLight : AppColors.backgroundAlt,
+      color: active
+          ? context.colors.successLight
+          : context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(AppRadius.full),
     ),
     child: Text(
       active ? 'Activa' : 'Inactiva',
       style: AppTextStyles.labelSmall.copyWith(
-        color: active ? AppColors.success : AppColors.textTertiary,
+        color: active ? AppColors.success : context.colors.textTertiary,
       ),
     ),
   );
@@ -536,7 +542,7 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             value,
             style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
           ),
         ),
@@ -593,9 +599,9 @@ class _CategorySkeleton extends StatelessWidget {
       height: 68,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.borderLight),
+        border: Border.all(color: context.colors.borderLight),
       ),
     ),
   );

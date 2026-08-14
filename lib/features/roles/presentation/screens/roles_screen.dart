@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/app_header.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -7,7 +6,6 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_badge.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -17,6 +15,17 @@ import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+
+Set<String> rolePermissionIds(Map<String, dynamic> role) {
+  final result = <String>{};
+  for (final item in role['permisos'] as List? ?? const []) {
+    if (item is! Map) continue;
+    final nested = item['permiso'];
+    final id = nested is Map ? nested['id'] : item['id'];
+    if (id is String && id.isNotEmpty) result.add(id);
+  }
+  return result;
+}
 
 class RolesState {
   final bool isLoading;
@@ -132,7 +141,7 @@ class RolesScreen extends ConsumerWidget {
     final isSuperAdmin = auth.user?.isSuperAdmin ?? false;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       floatingActionButton: isSuperAdmin
           ? FloatingActionButton(
               heroTag: 'roles_fab',
@@ -327,7 +336,7 @@ class _RoleTile extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.warningLight,
+                                color: context.colors.warningLight,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -355,10 +364,10 @@ class _RoleTile extends StatelessWidget {
                 StatusBadge(activo: activo),
                 if (isSuperAdmin)
                   PopupMenuButton<String>(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.more_vert_rounded,
                       size: 18,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                     onSelected: (v) {
                       if (v == 'edit')
@@ -445,13 +454,13 @@ class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: AppColors.backgroundAlt,
+      color: context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(AppRadius.full),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppColors.textTertiary),
+        Icon(icon, size: 12, color: context.colors.textTertiary),
         const SizedBox(width: 4),
         Text(label, style: AppTextStyles.labelSmall),
       ],
@@ -482,7 +491,7 @@ class _RoleFormState extends State<_RoleForm> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: const SubPageAppBar(title: 'Nuevo rol'),
     body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -518,7 +527,7 @@ class _RoleFormState extends State<_RoleForm> {
               'Nivel (1-99)',
               style: AppTextStyles.bodySmall.copyWith(
                 fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
             ),
             const SizedBox(height: 6),
@@ -614,7 +623,7 @@ class _RoleEditFormState extends State<_RoleEditForm> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: const SubPageAppBar(title: 'Editar rol'),
     body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -726,12 +735,7 @@ class _PermissionsAssignState extends State<_PermissionsAssign> {
   @override
   void initState() {
     super.initState();
-    final current =
-        (widget.role['permisos'] as List?)
-            ?.map((p) => p['id'] as String? ?? '')
-            .toSet() ??
-        {};
-    _selected = current;
+    _selected = rolePermissionIds(widget.role);
   }
 
   Map<String, List<Map<String, dynamic>>> get _grouped {
@@ -745,7 +749,7 @@ class _PermissionsAssignState extends State<_PermissionsAssign> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: SubPageAppBar(title: 'Permisos: ${widget.role['nombre']}'),
     body: ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),

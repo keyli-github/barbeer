@@ -27,6 +27,7 @@ class AuditoriaState {
   final List<Map<String, dynamic>> logs;
   final int total, page, totalPages;
   final String? accionFilter, entidadFilter, desdeFilter, hastaFilter;
+  final Map<String, String> sedeNames;
   const AuditoriaState({
     this.isLoading = false,
     this.error,
@@ -38,6 +39,7 @@ class AuditoriaState {
     this.entidadFilter,
     this.desdeFilter,
     this.hastaFilter,
+    this.sedeNames = const {},
   });
   AuditoriaState copyWith({
     bool? isLoading,
@@ -50,6 +52,7 @@ class AuditoriaState {
     String? entidadFilter,
     String? desdeFilter,
     String? hastaFilter,
+    Map<String, String>? sedeNames,
   }) => AuditoriaState(
     isLoading: isLoading ?? this.isLoading,
     error: error,
@@ -61,6 +64,7 @@ class AuditoriaState {
     entidadFilter: entidadFilter ?? this.entidadFilter,
     desdeFilter: desdeFilter ?? this.desdeFilter,
     hastaFilter: hastaFilter ?? this.hastaFilter,
+    sedeNames: sedeNames ?? this.sedeNames,
   );
 }
 
@@ -78,16 +82,42 @@ class AuditoriaNotifier extends StateNotifier<AuditoriaState> {
         params['accion'] = state.accionFilter;
       if (state.entidadFilter != null && state.entidadFilter!.isNotEmpty)
         params['entidad'] = state.entidadFilter;
-      if (state.desdeFilter != null) params['desde'] = state.desdeFilter;
-      if (state.hastaFilter != null) params['hasta'] = state.hastaFilter;
+      if (state.desdeFilter case final value?) {
+        final date = auditCivilDate(value);
+        if (date != null) params['desde'] = auditApiDate(date);
+      }
+      if (state.hastaFilter case final value?) {
+        final date = auditCivilDate(value);
+        if (date != null) {
+          params['hasta'] = auditApiDate(date, endOfDay: true);
+        }
+      }
       final r = await _api.get(ApiConstants.audit, queryParameters: params);
       final d = r.data as Map;
+      var sedeNames = state.sedeNames;
+      if (sedeNames.isEmpty) {
+        try {
+          final response = await _api.get(
+            ApiConstants.establishments,
+            queryParameters: {'pagina': 1, 'limite': 100},
+          );
+          final sedes = (response.data as Map)['data'] as List? ?? const [];
+          sedeNames = {
+            for (final sede in sedes.whereType<Map>())
+              if (sede['id'] is String && sede['nombre'] is String)
+                sede['id'] as String: sede['nombre'] as String,
+          };
+        } catch (_) {
+          // La auditoria sigue siendo util aunque el catalogo no sea accesible.
+        }
+      }
       state = state.copyWith(
         isLoading: false,
         logs: List<Map<String, dynamic>>.from(d['data'] ?? []),
         total: d['total'] as int? ?? 0,
         page: d['pagina'] as int? ?? 1,
         totalPages: d['totalPaginas'] as int? ?? 1,
+        sedeNames: sedeNames,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -100,11 +130,16 @@ class AuditoriaNotifier extends StateNotifier<AuditoriaState> {
     String? desde,
     String? hasta,
   }) {
-    state = state.copyWith(
-      accionFilter: accion,
-      entidadFilter: entidad,
+    state = AuditoriaState(
+      logs: state.logs,
+      total: state.total,
+      page: state.page,
+      totalPages: state.totalPages,
+      accionFilter: accion?.trim().isEmpty == true ? null : accion,
+      entidadFilter: entidad?.trim().isEmpty == true ? null : entidad,
       desdeFilter: desde,
       hastaFilter: hasta,
+      sedeNames: state.sedeNames,
     );
     load(page: 1);
   }
@@ -123,11 +158,11 @@ class AuditoriaScreen extends ConsumerWidget {
     final state = ref.watch(auditoriaProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       body: Column(
         children: [
           Container(
-            color: AppColors.background,
+            color: context.colors.background,
             child: Column(
               children: [
                 Padding(
@@ -149,10 +184,14 @@ class AuditoriaScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                if (state.accionFilter != null || state.entidadFilter != null)
+                if (state.accionFilter != null ||
+                    state.entidadFilter != null ||
+                    state.desdeFilter != null ||
+                    state.hastaFilter != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Row(
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text(
                           'Filtros activos: ',
@@ -163,14 +202,44 @@ class AuditoriaScreen extends ConsumerWidget {
                             label: state.accionFilter!,
                             onRemove: () => ref
                                 .read(auditoriaProvider.notifier)
-                                .setFilters(entidad: state.entidadFilter),
+                                .setFilters(
+                                  entidad: state.entidadFilter,
+                                  desde: state.desdeFilter,
+                                  hasta: state.hastaFilter,
+                                ),
                           ),
                         if (state.entidadFilter != null)
                           _FilterChip(
                             label: state.entidadFilter!,
                             onRemove: () => ref
                                 .read(auditoriaProvider.notifier)
-                                .setFilters(accion: state.accionFilter),
+                                .setFilters(
+                                  accion: state.accionFilter,
+                                  desde: state.desdeFilter,
+                                  hasta: state.hastaFilter,
+                                ),
+                          ),
+                        if (state.desdeFilter != null)
+                          _FilterChip(
+                            label: 'Desde ${state.desdeFilter}',
+                            onRemove: () => ref
+                                .read(auditoriaProvider.notifier)
+                                .setFilters(
+                                  accion: state.accionFilter,
+                                  entidad: state.entidadFilter,
+                                  hasta: state.hastaFilter,
+                                ),
+                          ),
+                        if (state.hastaFilter != null)
+                          _FilterChip(
+                            label: 'Hasta ${state.hastaFilter}',
+                            onRemove: () => ref
+                                .read(auditoriaProvider.notifier)
+                                .setFilters(
+                                  accion: state.accionFilter,
+                                  entidad: state.entidadFilter,
+                                  desde: state.desdeFilter,
+                                ),
                           ),
                       ],
                     ),
@@ -201,21 +270,19 @@ class AuditoriaScreen extends ConsumerWidget {
                         for (final log in state.logs)
                           _LogTile(
                             log: log,
-                            onTap: () => _showDetail(context, log),
+                            sedeName: state.sedeNames[log['sedeId']],
+                            onTap: () => _showDetail(context, {
+                              ...log,
+                              'sedeNombre': state.sedeNames[log['sedeId']],
+                            }),
                           ),
                         AppPagination(
                           page: state.page,
                           totalPages: state.totalPages,
                           total: state.total,
-                          onPageChange: (p) {
-                            final s = ref.read(auditoriaProvider);
-                            ref
-                                .read(auditoriaProvider.notifier)
-                                .setFilters(
-                                  accion: s.accionFilter,
-                                  entidad: s.entidadFilter,
-                                );
-                          },
+                          onPageChange: (p) => ref
+                              .read(auditoriaProvider.notifier)
+                              .load(page: p),
                         ),
                         const SizedBox(height: 80),
                       ],
@@ -230,91 +297,150 @@ class AuditoriaScreen extends ConsumerWidget {
   void _showFilters(BuildContext context, WidgetRef ref, AuditoriaState state) {
     final accionCtrl = TextEditingController(text: state.accionFilter ?? '');
     final entidadCtrl = TextEditingController(text: state.entidadFilter ?? '');
+    DateTime? desde = auditCivilDate(state.desdeFilter);
+    DateTime? hasta = auditCivilDate(state.hastaFilter);
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xl),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    'Filtrar auditoria',
-                    style: AppTextStyles.headlineMedium,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: accionCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Accion (ej: LOGIN_EXITOSO)',
-                ),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: entidadCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Entidad (ej: Usuario)',
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        accionCtrl.clear();
-                        entidadCtrl.clear();
-                        Navigator.of(context).pop();
-                        ref.read(auditoriaProvider.notifier).setFilters();
-                      },
-                      child: const Text('Limpiar filtros'),
+          decoration: BoxDecoration(
+            color: context.colors.surface,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppRadius.xl),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Filtrar auditoria',
+                      style: AppTextStyles.headlineMedium,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        ref
-                            .read(auditoriaProvider.notifier)
-                            .setFilters(
-                              accion: accionCtrl.text.isEmpty
-                                  ? null
-                                  : accionCtrl.text,
-                              entidad: entidadCtrl.text.isEmpty
-                                  ? null
-                                  : entidadCtrl.text,
-                            );
-                      },
-                      child: const Text('Aplicar'),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: accionCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Accion (ej: LOGIN_EXITOSO)',
                   ),
-                ],
-              ),
-            ],
+                  textCapitalization: TextCapitalization.characters,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: entidadCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Entidad (ej: Usuario)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('audit-date-from'),
+                        onPressed: () async {
+                          final value = await showDatePicker(
+                            context: sheetContext,
+                            initialDate: desde ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (value != null) {
+                            setSheetState(() => desde = value);
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          desde == null ? 'Desde' : FormatUtils.date(desde!),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('audit-date-to'),
+                        onPressed: () async {
+                          final value = await showDatePicker(
+                            context: sheetContext,
+                            initialDate: hasta ?? DateTime.now(),
+                            firstDate: desde ?? DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (value != null) {
+                            setSheetState(() => hasta = value);
+                          }
+                        },
+                        icon: const Icon(Icons.event_outlined, size: 16),
+                        label: Text(
+                          hasta == null ? 'Hasta' : FormatUtils.date(hasta!),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          accionCtrl.clear();
+                          entidadCtrl.clear();
+                          Navigator.of(context).pop();
+                          ref.read(auditoriaProvider.notifier).setFilters();
+                        },
+                        child: const Text('Limpiar filtros'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          ref
+                              .read(auditoriaProvider.notifier)
+                              .setFilters(
+                                accion: accionCtrl.text.isEmpty
+                                    ? null
+                                    : accionCtrl.text,
+                                entidad: entidadCtrl.text.isEmpty
+                                    ? null
+                                    : entidadCtrl.text,
+                                desde: desde == null
+                                    ? null
+                                    : auditCivilDateString(desde!),
+                                hasta: hasta == null
+                                    ? null
+                                    : auditCivilDateString(hasta!),
+                              );
+                        },
+                        child: const Text('Aplicar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -328,8 +454,9 @@ class AuditoriaScreen extends ConsumerWidget {
 
 class _LogTile extends StatelessWidget {
   final Map<String, dynamic> log;
+  final String? sedeName;
   final VoidCallback onTap;
-  const _LogTile({required this.log, required this.onTap});
+  const _LogTile({required this.log, this.sedeName, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -349,9 +476,9 @@ class _LogTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.borderLight, width: 0.5),
+            border: Border.all(color: context.colors.borderLight, width: 0.5),
           ),
           child: Row(
             children: [
@@ -363,19 +490,19 @@ class _LogTile extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.person_outline_rounded,
                           size: 12,
-                          color: AppColors.textTertiary,
+                          color: context.colors.textTertiary,
                         ),
                         const SizedBox(width: 4),
                         Text(username, style: AppTextStyles.labelSmall),
                         if (entidad != null) ...[
                           const SizedBox(width: 8),
-                          const Icon(
+                          Icon(
                             Icons.data_object_rounded,
                             size: 12,
-                            color: AppColors.textTertiary,
+                            color: context.colors.textTertiary,
                           ),
                           const SizedBox(width: 4),
                           Text(entidad, style: AppTextStyles.labelSmall),
@@ -385,13 +512,25 @@ class _LogTile extends StatelessWidget {
                     if (ip != null)
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.language_rounded,
                             size: 12,
-                            color: AppColors.textTertiary,
+                            color: context.colors.textTertiary,
                           ),
                           const SizedBox(width: 4),
                           Text(ip, style: AppTextStyles.labelSmall),
+                        ],
+                      ),
+                    if (sedeName != null)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.store_outlined,
+                            size: 12,
+                            color: context.colors.textTertiary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(sedeName!, style: AppTextStyles.labelSmall),
                         ],
                       ),
                   ],
@@ -409,6 +548,44 @@ class _LogTile extends StatelessWidget {
   }
 }
 
+DateTime? auditCivilDate(String? value) {
+  if (value == null || value.length < 10) return null;
+  final parts = value.substring(0, 10).split('-');
+  if (parts.length != 3) return null;
+  final year = int.tryParse(parts[0]);
+  final month = int.tryParse(parts[1]);
+  final day = int.tryParse(parts[2]);
+  if (year == null || month == null || day == null) return null;
+  final date = DateTime(year, month, day);
+  return date.year == year && date.month == month && date.day == day
+      ? date
+      : null;
+}
+
+String auditCivilDateString(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+String auditApiDate(
+  DateTime date, {
+  bool endOfDay = false,
+  Duration? utcOffset,
+}) {
+  final civilAsUtc = DateTime.utc(
+    date.year,
+    date.month,
+    date.day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  );
+  return civilAsUtc
+      .subtract(utcOffset ?? date.timeZoneOffset)
+      .toIso8601String();
+}
+
 // ─── Subpantalla: Detalle del evento de auditoría ────────────────────────────
 
 class _LogDetailScreen extends StatelessWidget {
@@ -423,7 +600,8 @@ class _LogDetailScreen extends StatelessWidget {
     final entidadId = log['entidadId'] as String? ?? '';
     final ip = log['ip'] as String? ?? '';
     final ua = log['userAgent'] as String? ?? '';
-    final sedeId = log['sedeId'] as String? ?? '';
+    final sedeId =
+        log['sedeNombre'] as String? ?? log['sedeId'] as String? ?? '';
     final fecha = log['createdAt'] as String? ?? '';
     final detalle = log['detalle'];
 
@@ -433,7 +611,7 @@ class _LogDetailScreen extends StatelessWidget {
     } catch (_) {}
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: context.colors.backgroundAlt,
       appBar: SubPageAppBar(
         title: 'Detalle del evento',
         subtitle: dt != null ? FormatUtils.dateTime(dt) : null,
@@ -447,9 +625,9 @@ class _LogDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFEEEFF2)),
+                border: Border.all(color: context.colors.borderLight),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,19 +650,19 @@ class _LogDetailScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFEEEFF2)),
+                  border: Border.all(color: context.colors.borderLight),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Detalle',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: context.colors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -492,15 +670,15 @@ class _LogDetailScreen extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.backgroundAlt,
+                        color: context.colors.backgroundAlt,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: SelectableText(
                         detalle.toString(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 12,
-                          color: AppColors.textPrimary,
+                          color: context.colors.textPrimary,
                         ),
                       ),
                     ),
@@ -529,7 +707,7 @@ class _ARow extends StatelessWidget {
           width: 90,
           child: Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+            style: TextStyle(fontSize: 12, color: context.colors.textTertiary),
           ),
         ),
         Expanded(
@@ -537,7 +715,7 @@ class _ARow extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
               fontFamily: mono ? 'monospace' : null,
             ),
             maxLines: 3,
@@ -580,7 +758,7 @@ class _LogDetail extends StatelessWidget {
                   child: Text(
                     e.key,
                     style: AppTextStyles.labelLarge.copyWith(
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                 ),
@@ -588,7 +766,7 @@ class _LogDetail extends StatelessWidget {
                   child: Text(
                     e.value,
                     style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -603,15 +781,15 @@ class _LogDetail extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.backgroundAlt,
+              color: context.colors.backgroundAlt,
               borderRadius: BorderRadius.circular(8),
             ),
             child: SelectableText(
               detalle.toString(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 12,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
             ),
           ),
@@ -630,7 +808,7 @@ class _FilterChip extends StatelessWidget {
     margin: const EdgeInsets.only(right: 6),
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: AppColors.primarySurface,
+      color: context.colors.primarySurface,
       borderRadius: BorderRadius.circular(100),
     ),
     child: Row(

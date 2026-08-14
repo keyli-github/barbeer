@@ -112,7 +112,7 @@ class SucursalesScreen extends ConsumerWidget {
     final canCreate = auth.hasPermission('establecimientos:crear');
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.background,
       floatingActionButton: canCreate
           ? FloatingActionButton(
               heroTag: 'sucursales_fab',
@@ -170,7 +170,7 @@ class SucursalesScreen extends ConsumerWidget {
                                   label: 'Inactivas',
                                   value:
                                       '${state.sedes.where((s) => s['activo'] != true).length}',
-                                  color: AppColors.textTertiary,
+                                  color: context.colors.textTertiary,
                                 ),
                               ),
                             ],
@@ -219,7 +219,7 @@ class SucursalesScreen extends ConsumerWidget {
             .hasPermission('establecimientos:editar'),
         canDelete: ref
             .read(authProvider)
-            .hasPermission('establecimientos:eliminar'),
+            .hasPermission('establecimientos:editar'),
         onEdit: () => _showForm(context, ref, sede),
         onDelete: () => _deleteSede(context, ref, sede),
       ),
@@ -324,7 +324,7 @@ class _SedeTile extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
+                    color: context.colors.primarySurface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -357,10 +357,10 @@ class _SedeTile extends StatelessWidget {
                 StatusBadge(activo: activo),
                 if (auth.hasPermission('establecimientos:editar'))
                   PopupMenuButton<String>(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.more_vert_rounded,
                       size: 18,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                     onSelected: (v) {
                       if (v == 'edit')
@@ -432,13 +432,13 @@ class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: AppColors.backgroundAlt,
+      color: context.colors.backgroundAlt,
       borderRadius: BorderRadius.circular(AppRadius.full),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppColors.textTertiary),
+        Icon(icon, size: 12, color: context.colors.textTertiary),
         const SizedBox(width: 4),
         Text(label, style: AppTextStyles.labelSmall),
       ],
@@ -473,14 +473,14 @@ class _SedeDetailScreen extends StatelessWidget {
     final users = (sede['_count'] as Map?)?['usuarios'] as int? ?? 0;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundAlt,
+      backgroundColor: context.colors.backgroundAlt,
       appBar: SubPageAppBar(
         title: 'Detalle de sucursal',
         actions: [
           if (canEdit)
             IconButton(
               icon: const Icon(Icons.edit_outlined, size: 20),
-              color: AppColors.textSecondary,
+              color: context.colors.textSecondary,
               onPressed: () {
                 Navigator.pop(context);
                 onEdit();
@@ -497,9 +497,9 @@ class _SedeDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFEEEFF2)),
+                border: Border.all(color: context.colors.borderLight),
               ),
               child: Column(
                 children: [
@@ -507,7 +507,7 @@ class _SedeDetailScreen extends StatelessWidget {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: AppColors.primarySurface,
+                      color: context.colors.primarySurface,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(
@@ -519,19 +519,19 @@ class _SedeDetailScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     nombre,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   if (codigo.isNotEmpty)
                     Text(
                       'Código: $codigo',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textTertiary,
+                        color: context.colors.textTertiary,
                       ),
                     ),
                   const SizedBox(height: 8),
@@ -542,7 +542,9 @@ class _SedeDetailScreen extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color:
-                          (activo ? AppColors.success : AppColors.textTertiary)
+                          (activo
+                                  ? AppColors.success
+                                  : context.colors.textTertiary)
                               .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -553,7 +555,7 @@ class _SedeDetailScreen extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: activo
                             ? AppColors.success
-                            : AppColors.textTertiary,
+                            : context.colors.textTertiary,
                       ),
                     ),
                   ),
@@ -563,24 +565,24 @@ class _SedeDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFEEEFF2)),
+                border: Border.all(color: context.colors.borderLight),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Column(
                 children: [
                   if (dir.isNotEmpty) ...[
                     _SRow('Dirección', dir),
-                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    Divider(height: 1, color: context.colors.surfaceAlt),
                   ],
                   if (tel.isNotEmpty) ...[
                     _SRow('Teléfono', tel),
-                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    Divider(height: 1, color: context.colors.surfaceAlt),
                   ],
                   if (ruc.isNotEmpty) ...[
                     _SRow('RUC', ruc),
-                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    Divider(height: 1, color: context.colors.surfaceAlt),
                   ],
                   _SRow('Usuarios', '$users'),
                 ],
@@ -626,16 +628,16 @@ class _SRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
         ),
         Flexible(
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.colors.textPrimary,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -671,7 +673,7 @@ class _SedeDetail extends StatelessWidget {
                   child: Text(
                     e.key,
                     style: AppTextStyles.labelLarge.copyWith(
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                   ),
                 ),
@@ -680,7 +682,7 @@ class _SedeDetail extends StatelessWidget {
                   child: Text(
                     e.value,
                     style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                 ),
@@ -709,6 +711,9 @@ class _SedeFormState extends State<_SedeForm> {
       _telCtrl,
       _rucCtrl;
   bool _activo = true, _loading = false;
+
+  int get _assignedUsers =>
+      (widget.sede?['_count'] as Map?)?['usuarios'] as int? ?? 0;
 
   @override
   void initState() {
@@ -743,7 +748,7 @@ class _SedeFormState extends State<_SedeForm> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: context.colors.surface,
     appBar: SubPageAppBar(
       title: widget.sede == null ? 'Nueva sucursal' : 'Editar sucursal',
     ),
@@ -822,10 +827,20 @@ class _SedeFormState extends State<_SedeForm> {
                   ),
                   Switch(
                     value: _activo,
-                    onChanged: (v) => setState(() => _activo = v),
+                    onChanged: _activo && _assignedUsers > 0
+                        ? null
+                        : (v) => setState(() => _activo = v),
                   ),
                 ],
               ),
+              if (_activo && _assignedUsers > 0)
+                Text(
+                  'No se puede desactivar mientras haya $_assignedUsers usuario(s) asignado(s).',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.warning,
+                  ),
+                ),
             ],
             const SizedBox(height: 24),
             PrimaryButton(
@@ -841,6 +856,14 @@ class _SedeFormState extends State<_SedeForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_activo && _assignedUsers > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se puede desactivar una sede con usuarios'),
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       final data = <String, dynamic>{'nombre': _nameCtrl.text.trim()};

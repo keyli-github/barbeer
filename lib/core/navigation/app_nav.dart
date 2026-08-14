@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 /// Navegación hacia subpantallas usando el navegador RAÍZ.
 ///
 /// Usando el navegador raíz (rootNavigator: true) la subpantalla se muestra
@@ -85,20 +87,20 @@ class SubPageAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.surface,
       elevation: 0,
       scrolledUnderElevation: 0,
       leading: GestureDetector(
         onTap: onBack ?? () => Navigator.of(context).pop(),
         behavior: HitTestBehavior.opaque,
-        child: const SizedBox(
+        child: SizedBox(
           width: 44,
           height: 44,
           child: Center(
             child: Icon(
               Icons.arrow_back_ios_new_rounded,
               size: 18,
-              color: Color(0xFF111827),
+              color: context.colors.textPrimary,
             ),
           ),
         ),
@@ -109,18 +111,18 @@ class SubPageAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111827),
+                    color: context.colors.textPrimary,
                     letterSpacing: -0.3,
                   ),
                 ),
                 Text(
                   subtitle!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF6B7280),
+                    color: context.colors.textSecondary,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -128,10 +130,10 @@ class SubPageAppBar extends StatelessWidget implements PreferredSizeWidget {
             )
           : Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF111827),
+                color: context.colors.textPrimary,
                 letterSpacing: -0.3,
               ),
             ),

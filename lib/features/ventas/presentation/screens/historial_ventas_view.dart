@@ -101,16 +101,16 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                   color: AppColors.primary,
                   onRefresh: _refresh,
                   child: Container(
-                    color: AppColors.background,
+                    color: context.colors.background,
                     child: ListView.separated(
                       padding: const EdgeInsets.only(bottom: 120),
                       itemCount:
                           ventas.length +
                           (state.totalPaginas > state.pagina ? 1 : 0),
-                      separatorBuilder: (_, _) => const Divider(
+                      separatorBuilder: (_, _) => Divider(
                         height: 1,
                         indent: 71,
-                        color: AppColors.borderLight,
+                        color: context.colors.borderLight,
                       ),
                       itemBuilder: (_, i) {
                         if (i == ventas.length) {
@@ -164,7 +164,7 @@ class _FiltersBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.sm,
@@ -230,7 +230,7 @@ class _KpiRow extends StatelessWidget {
     final pendientes = ventas.where((v) => v.isPendiente).length;
 
     return Container(
-      color: AppColors.background,
+      color: context.colors.background,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         0,
@@ -268,7 +268,7 @@ class _Kpi extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+          style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
         ),
       ],
     ),
@@ -278,7 +278,7 @@ class _Kpi extends StatelessWidget {
 class _KpiDiv extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
-      Container(width: 1, height: 28, color: AppColors.border);
+      Container(width: 1, height: 28, color: context.colors.border);
 }
 
 // ─── Venta card — compacta estilo iOS ────────────────────────────────────────
@@ -348,10 +348,10 @@ class _VentaCard extends StatelessWidget {
                 children: [
                   Text(
                     venta.codigo,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -361,9 +361,9 @@ class _VentaCard extends StatelessWidget {
                         venta.vendedoraUsername!,
                       if (dt != null) FormatUtils.timeAgo(dt),
                     ].join(' · '),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textTertiary,
+                      color: context.colors.textTertiary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -377,10 +377,10 @@ class _VentaCard extends StatelessWidget {
               children: [
                 Text(
                   FormatUtils.currency(venta.total),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -423,7 +423,7 @@ class _VentaCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
+                    color: context.colors.primarySurface,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
@@ -437,10 +437,10 @@ class _VentaCard extends StatelessWidget {
                 ),
               )
             else
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
-                color: AppColors.textTertiary,
+                color: context.colors.textTertiary,
               ),
           ],
         ),

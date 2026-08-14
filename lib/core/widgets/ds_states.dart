@@ -26,9 +26,9 @@ class DSLoading extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               message!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: context.colors.textSecondary,
               ),
             ),
           ],
@@ -90,13 +90,13 @@ class _DSSkeletonState extends State<DSSkeleton>
             end: Alignment.centerRight,
             colors: [
               Color.lerp(
-                AppColors.borderLight,
-                AppColors.surfaceAlt,
+                context.colors.borderLight,
+                context.colors.surfaceAlt,
                 _anim.value,
               )!,
               Color.lerp(
-                AppColors.surfaceAlt,
-                AppColors.borderLight,
+                context.colors.surfaceAlt,
+                context.colors.borderLight,
                 _anim.value,
               )!,
             ],
@@ -184,18 +184,18 @@ class DSEmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
+                color: context.colors.surfaceAlt,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Icon(icon, size: 36, color: AppColors.textTertiary),
+              child: Icon(icon, size: 36, color: context.colors.textTertiary),
             ),
             const SizedBox(height: AppSpacing.lg),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -203,9 +203,9 @@ class DSEmptyState extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 message!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -251,7 +251,7 @@ class DSErrorState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppColors.errorLight,
+                color: context.colors.errorLight,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -261,21 +261,21 @@ class DSErrorState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            const Text(
+            Text(
               'Algo salió mal',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
             ),
             if (message != null) ...[
               const SizedBox(height: 8),
               Text(
                 message!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: context.colors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -375,7 +375,7 @@ class _DSSuccessOverlayState extends State<DSSuccessOverlay>
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.inverseSurface,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: AppShadows.cardElevated,
                 ),
@@ -398,10 +398,10 @@ class _DSSuccessOverlayState extends State<DSSuccessOverlay>
                     const SizedBox(height: 12),
                     Text(
                       widget.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onInverseSurface,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -411,7 +411,9 @@ class _DSSuccessOverlayState extends State<DSSuccessOverlay>
                         widget.description!,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.white.withValues(alpha: 0.7),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onInverseSurface.withValues(alpha: 0.8),
                         ),
                         textAlign: TextAlign.center,
                       ),

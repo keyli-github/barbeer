@@ -88,8 +88,8 @@ class _AppSkeletonState extends State<AppSkeleton>
         height: widget.height,
         decoration: BoxDecoration(
           color: Color.lerp(
-            AppColors.borderLight,
-            AppColors.backgroundAlt,
+            context.colors.borderLight,
+            context.colors.backgroundAlt,
             _controller.value,
           ),
           borderRadius: widget.borderRadius,

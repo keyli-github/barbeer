@@ -5,13 +5,9 @@ import '../theme/app_colors.dart';
 /// The joined BarBeer brand treatment. Pacifico is bundled in pubspec.yaml.
 class BarBeerWordmark extends StatelessWidget {
   final double fontSize;
-  final Color beerColor;
+  final Color? beerColor;
 
-  const BarBeerWordmark({
-    super.key,
-    this.fontSize = 24,
-    this.beerColor = AppColors.textPrimary,
-  });
+  const BarBeerWordmark({super.key, this.fontSize = 24, this.beerColor});
 
   @override
   Widget build(BuildContext context) => RichText(
@@ -29,7 +25,7 @@ class BarBeerWordmark extends StatelessWidget {
         ),
         TextSpan(
           text: 'Beer',
-          style: TextStyle(color: beerColor),
+          style: TextStyle(color: beerColor ?? context.colors.textPrimary),
         ),
       ],
     ),

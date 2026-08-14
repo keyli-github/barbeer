@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -24,6 +28,32 @@ class VentasRepository {
     final response = await _api.post(ApiConstants.ventas, data: payload.json);
     return Venta.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
+
+  Future<ComprobanteAnalisis> analizarComprobante({
+    required Uint8List bytes,
+    required String filename,
+    String? sedeId,
+  }) async {
+    final response = await _api.postMultipart(
+      ApiConstants.analizarComprobante,
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: _imageMediaType(filename),
+        ),
+        'sedeId': ?sedeId,
+      }),
+      receiveTimeout: const Duration(seconds: 150),
+      sendTimeout: const Duration(seconds: 150),
+    );
+    return ComprobanteAnalisis.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<void> cancelarComprobanteAnalisis(String id) =>
+      _api.delete(ApiConstants.comprobanteAnalisis(id));
 
   /// Lista todas las ventas de la sede (CAJERO, ADMIN, SUPERADMIN).
   Future<({List<Venta> data, int total, int totalPaginas})> listVentas({
@@ -101,7 +131,7 @@ class VentasRepository {
     String id, {
     required String estado,
     String? etiquetaId,
-    String? comprobante,
+    String? comprobanteAnalisisId,
     String? codigoOperacion,
   }) async {
     final response = await _api.patch(
@@ -109,9 +139,10 @@ class VentasRepository {
       data: {
         'estado': estado,
         'etiquetaId': ?etiquetaId,
-        if (comprobante != null && comprobante.isNotEmpty)
-          'comprobante': comprobante,
-        if (codigoOperacion != null && codigoOperacion.isNotEmpty)
+        'comprobanteAnalisisId': ?comprobanteAnalisisId,
+        if (comprobanteAnalisisId == null &&
+            codigoOperacion != null &&
+            codigoOperacion.isNotEmpty)
           'codigoOperacion': codigoOperacion,
       },
     );
@@ -134,7 +165,7 @@ class VentasRepository {
     final json = Map<String, dynamic>.from(response.data as Map);
     return (json['data'] as List? ?? [])
         .map((e) => Etiqueta.fromJson(Map<String, dynamic>.from(e as Map)))
-        .where((e) => e.tipo == 'ENTRADA' || e.tipo == 'AMBOS')
+        .where(isBilleteraEtiqueta)
         .toList();
   }
 
@@ -208,4 +239,11 @@ class VentasRepository {
     );
     return Etiqueta.fromJson(Map<String, dynamic>.from(response.data as Map));
   }
+}
+
+MediaType _imageMediaType(String filename) {
+  final lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return MediaType('image', 'png');
+  if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+  return MediaType('image', 'jpeg');
 }
