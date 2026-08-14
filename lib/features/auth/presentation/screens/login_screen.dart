@@ -103,6 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               final pageHeight =
                   constraints.maxHeight + media.viewInsets.bottom;
               if (constraints.maxWidth >= 1024) {
+                final panelPadding = constraints.maxWidth >= 1600 ? 96.0 : 48.0;
                 return Row(
                   key: const Key('login-desktop-composition'),
                   children: [
@@ -113,11 +114,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       child: Container(
                         key: const Key('login-desktop-panel'),
                         height: pageHeight,
-                        color: const Color(0xFF0B0A08),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF090806), Color(0xFF160C07)],
+                          ),
+                        ),
                         child: SingleChildScrollView(
                           key: const Key('login-desktop-scroll-view'),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 48,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: panelPadding,
                             vertical: 32,
                           ),
                           child: ConstrainedBox(
@@ -127,10 +134,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 double.infinity,
                               ),
                             ),
-                            child: Center(
+                            child: Align(
+                              alignment: const Alignment(0, -0.18),
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(
-                                  maxWidth: 520,
+                                  maxWidth: 716,
                                 ),
                                 child: FadeTransition(
                                   opacity: _fade,
@@ -139,12 +147,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     children: [
                                       Image.asset(
                                         'assets/images/barbeer_Log.png',
-                                        width: 88,
-                                        height: 72,
+                                        key: const Key('login-gold-monogram'),
+                                        width: 72,
+                                        height: 76,
                                         fit: BoxFit.contain,
                                         semanticLabel: 'Logo de BarBeer',
                                       ),
-                                      const SizedBox(height: 18),
+                                      const SizedBox(height: 24),
                                       _buildForm(desktop: true),
                                     ],
                                   ),
@@ -257,12 +266,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         Text(
           'Iniciar sesión',
           style: TextStyle(
-            fontSize: desktop ? 30 : 23,
+            fontSize: desktop ? 32 : 23,
             fontWeight: FontWeight.w800,
             color: desktop ? Colors.white : AppColors.textPrimary,
+            letterSpacing: desktop ? -0.7 : null,
           ),
         ),
-        const SizedBox(height: 3),
+        SizedBox(height: desktop ? 10 : 3),
         Text(
           desktop
               ? 'Ingresa tus credenciales para acceder al sistema interno'
@@ -275,7 +285,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
           textAlign: TextAlign.center,
         ),
-        SizedBox(height: desktop ? 24 : 16),
+        SizedBox(height: desktop ? 32 : 16),
         if (_error != null) ...[
           Container(
             width: double.infinity,
@@ -317,7 +327,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           validator: (value) =>
               value == null || value.trim().isEmpty ? 'Requerido' : null,
         ),
-        SizedBox(height: desktop ? 14 : 10),
+        SizedBox(height: desktop ? 20 : 10),
         _LoginField(
           controller: _passCtrl,
           hint: 'Contraseña',
@@ -340,53 +350,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: _showPasswordHelp,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.brand,
-              minimumSize: const Size(44, 38),
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              '¿Olvidaste tu contraseña?',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        TextButton(
+          onPressed: _showPasswordHelp,
+          style: TextButton.styleFrom(
+            foregroundColor: desktop
+                ? const Color(0xFFFF4F1F)
+                : AppColors.brand,
+            minimumSize: const Size(44, 38),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(
+            desktop
+                ? '¿Olvidaste tu contraseña? Solicita a un administrador que la restablezca.'
+                : '¿Olvidaste tu contraseña?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: desktop ? 14 : 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        SizedBox(height: desktop ? 14 : 10),
+        SizedBox(height: desktop ? 16 : 10),
         SizedBox(
           width: double.infinity,
-          height: desktop ? 54 : 50,
-          child: ElevatedButton(
-            onPressed: _loading ? null : _login,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.brand,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.brand.withValues(alpha: 0.6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          height: desktop ? 70 : 50,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _loading
+                    ? const [Color(0x99FF7200), Color(0x99FF4B00)]
+                    : const [Color(0xFFFF7200), Color(0xFFFF4B00)],
               ),
-              elevation: 0,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: desktop
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFFF5B00).withValues(alpha: 0.18),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
             ),
-            child: _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _login,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Ingresar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  )
-                : const Text(
-                    'Ingresar',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
+            ),
           ),
         ),
-        SizedBox(height: desktop ? 20 : 10),
+        SizedBox(height: desktop ? 34 : 10),
         if (desktop)
           Row(
             children: [
@@ -455,7 +493,7 @@ class _LoginHero extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
-                colors: [Color(0xD9000000), Color(0x66000000)],
+                colors: [Color(0xE6000000), Color(0x52000000)],
               ),
             ),
           ),
@@ -473,74 +511,87 @@ class _LoginHero extends StatelessWidget {
           : const EdgeInsets.fromLTRB(20, 32, 20, 12),
       child: desktop
           ? LayoutBuilder(
-              builder: (_, constraints) =>
-                  _desktopContent(compact: constraints.maxHeight < 600),
+              builder: (_, constraints) => _desktopContent(constraints),
             )
           : _mobileContent(),
     ),
   );
 
-  Widget _desktopContent({required bool compact}) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const BarBeerWordmark(fontSize: 30, beerColor: Colors.white),
-      const Spacer(),
-      const Text(
-        'SISTEMA INTERNO',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: AppColors.brand,
-          letterSpacing: 2.2,
+  Widget _desktopContent(BoxConstraints constraints) {
+    final compact = constraints.maxHeight < 800;
+    final topSpace = compact
+        ? 12.0
+        : (constraints.maxHeight - 700).clamp(36.0, 130.0);
+    final featureHeight = compact ? 56.0 : 72.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: topSpace),
+        BarBeerWordmark(fontSize: compact ? 30 : 34, beerColor: Colors.white),
+        SizedBox(height: compact ? 16 : 32),
+        const Text(
+          'SISTEMA INTERNO',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: AppColors.brand,
+            letterSpacing: 2.2,
+          ),
         ),
-      ),
-      const SizedBox(height: 10),
-      const Text(
-        'Sistema interno\nde gestión',
-        style: TextStyle(
-          fontSize: 42,
-          height: 1.05,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-          letterSpacing: -1,
+        SizedBox(height: compact ? 8 : 14),
+        Text(
+          'Sistema interno\nde gestión',
+          style: TextStyle(
+            fontSize: compact ? 42 : 52,
+            height: 1.05,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -1,
+          ),
         ),
-      ),
-      const SizedBox(height: 14),
-      const Text(
-        'Accede de forma segura a la plataforma\n'
-        'de administración de BarBeer.',
-        style: TextStyle(fontSize: 14, color: Color(0xE6FFFFFF), height: 1.5),
-      ),
-      if (!compact) ...[
-        const SizedBox(height: 22),
-        const _FeatureRow(
+        SizedBox(height: compact ? 12 : 20),
+        Text(
+          'Accede de forma segura a la plataforma\n'
+          'de administración de BarBeer.',
+          style: TextStyle(
+            fontSize: compact ? 14 : 16,
+            color: const Color(0xE6FFFFFF),
+            height: 1.55,
+          ),
+        ),
+        SizedBox(height: compact ? 16 : 28),
+        _FeatureRow(
           icon: Icons.bar_chart_rounded,
           title: 'Ventas',
           description: 'Consulta y analiza el rendimiento.',
           desktop: true,
+          desktopHeight: featureHeight,
         ),
-        const SizedBox(height: 8),
-        const _FeatureRow(
+        SizedBox(height: compact ? 8 : 10),
+        _FeatureRow(
           icon: Icons.inventory_2_outlined,
           title: 'Inventario',
           description: 'Controla stock y movimientos.',
           desktop: true,
+          desktopHeight: featureHeight,
         ),
-        const SizedBox(height: 8),
-        const _FeatureRow(
+        SizedBox(height: compact ? 8 : 10),
+        _FeatureRow(
           icon: Icons.receipt_long_outlined,
           title: 'Caja y reportes',
           description: 'Cierres, reportes y conciliaciones.',
           desktop: true,
+          desktopHeight: featureHeight,
+        ),
+        const Spacer(),
+        Text(
+          '© ${DateTime.now().year} BarBeer ERP. Todos los derechos reservados.',
+          style: const TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
         ),
       ],
-      const Spacer(),
-      Text(
-        '© ${DateTime.now().year} BarBeer ERP. Todos los derechos reservados.',
-        style: const TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
-      ),
-    ],
-  );
+    );
+  }
 
   Widget _mobileContent() => const Column(
     mainAxisSize: MainAxisSize.min,
@@ -609,19 +660,22 @@ class _FeatureRow extends StatelessWidget {
   final String title;
   final String description;
   final bool desktop;
+  final double desktopHeight;
 
   const _FeatureRow({
     required this.icon,
     required this.title,
     required this.description,
     this.desktop = false,
+    this.desktopHeight = 72,
   });
 
   @override
   Widget build(BuildContext context) => Container(
+    constraints: BoxConstraints(minHeight: desktop ? desktopHeight : 0),
     padding: EdgeInsets.symmetric(
-      horizontal: desktop ? 14 : 11,
-      vertical: desktop ? 10 : 7,
+      horizontal: desktop ? 16 : 11,
+      vertical: desktop ? 11 : 7,
     ),
     decoration: BoxDecoration(
       color: Colors.black.withValues(alpha: 0.27),
@@ -631,11 +685,21 @@ class _FeatureRow extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-          width: 27,
-          child: Icon(icon, color: AppColors.brand, size: 19),
+        Container(
+          width: desktop ? 48 : 27,
+          height: desktop ? 48 : 27,
+          decoration: desktop
+              ? BoxDecoration(
+                  color: const Color(0xFF3A1900).withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.brand.withValues(alpha: 0.28),
+                  ),
+                )
+              : null,
+          child: Icon(icon, color: AppColors.brand, size: desktop ? 23 : 19),
         ),
-        const SizedBox(width: 9),
+        SizedBox(width: desktop ? 14 : 9),
         Expanded(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -644,7 +708,7 @@ class _FeatureRow extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                   height: 1.15,
@@ -654,7 +718,7 @@ class _FeatureRow extends StatelessWidget {
               Text(
                 description,
                 style: const TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   color: Color(0xCCFFFFFF),
                   height: 1.2,
                 ),
@@ -691,48 +755,61 @@ class _LoginField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => TextFormField(
-    controller: controller,
-    obscureText: obscureText,
-    autofillHints: autofillHints,
-    textInputAction: textInputAction,
-    onFieldSubmitted: onSubmitted,
-    validator: validator,
-    style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
-    decoration: InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(
-        fontSize: 15,
-        color: AppColors.textTertiary,
-        fontWeight: FontWeight.w400,
+  Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
+
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      autofillHints: autofillHints,
+      textInputAction: textInputAction,
+      onFieldSubmitted: onSubmitted,
+      validator: validator,
+      style: TextStyle(
+        fontSize: desktop ? 16 : 15,
+        color: AppColors.textPrimary,
       ),
-      prefixIcon: Icon(icon, color: AppColors.textTertiary, size: 20),
-      suffixIcon: trailing,
-      suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-      filled: true,
-      fillColor: AppColors.backgroundAlt,
-      isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.border),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(
+          fontSize: 15,
+          color: AppColors.textTertiary,
+          fontWeight: FontWeight.w400,
+        ),
+        prefixIcon: Icon(icon, color: AppColors.textTertiary, size: 20),
+        suffixIcon: trailing,
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 48,
+          minHeight: 48,
+        ),
+        filled: true,
+        fillColor: desktop ? const Color(0xFFF8F9FB) : AppColors.backgroundAlt,
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: desktop ? 23 : 15,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.error),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-      ),
-    ),
-  );
+    );
+  }
 }

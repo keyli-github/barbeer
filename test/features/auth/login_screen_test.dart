@@ -59,9 +59,25 @@ void main() {
       640,
     );
     expect(find.byKey(const Key('login-panel')), findsNothing);
+    expect(
+      find.image(const AssetImage('assets/images/bebb1.webp')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('login-gold-monogram')), findsOneWidget);
+    expect(find.text('BarBeer', findRichText: true), findsOneWidget);
     expect(find.text('Sistema interno\nde gestión'), findsOneWidget);
     expect(find.text('SOLO PERSONAL AUTORIZADO'), findsOneWidget);
+    expect(find.text('Ventas'), findsOneWidget);
+    expect(find.text('Inventario'), findsOneWidget);
     expect(find.text('Caja y reportes'), findsOneWidget);
+    expect(
+      find.text(
+        '¿Olvidaste tu contraseña? Solicita a un administrador que la restablezca.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Bienvenido a'), findsNothing);
+    expect(find.textContaining('Gestiona tu bar'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
