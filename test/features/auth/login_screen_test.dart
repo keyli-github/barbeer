@@ -4,11 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('system navigation icons follow the navigation background', () {
-    expect(loginNavigationIconBrightness(Colors.white), Brightness.dark);
-    expect(loginNavigationIconBrightness(Colors.black), Brightness.light);
-  });
-
   Future<void> pumpLogin(WidgetTester tester, Size size) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -30,22 +25,20 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.image(const AssetImage('assets/images/barbeer_launcher.png')),
+      find.image(const AssetImage('assets/images/barbeer_Log.png')),
       findsOneWidget,
     );
     final panel = tester.widget<Container>(
       find.byKey(const Key('login-panel')),
     );
     final panelDecoration = panel.decoration as BoxDecoration;
-    expect((panelDecoration.borderRadius! as BorderRadius).topLeft.x, 32);
-    expect(
-      tester.getSize(find.byKey(const Key('login-panel-bump'))),
-      const Size.square(88),
-    );
+    expect(panelDecoration.color, const Color(0xFF0B0A08));
+    expect((panelDecoration.borderRadius! as BorderRadius).topLeft.x, 28);
+    expect((panelDecoration.borderRadius! as BorderRadius).topRight.x, 28);
     final logoCircle = tester.widget<Container>(
       find.byKey(const Key('login-logo-circle')),
     );
-    expect((logoCircle.decoration as BoxDecoration).color, Colors.white);
+    expect((logoCircle.decoration as BoxDecoration).color, const Color(0xFF171512));
     expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
     expect(find.byKey(const Key('login-scroll-view')), findsOneWidget);
@@ -70,12 +63,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('extends the white panel to the bottom of the viewport', (
+  testWidgets('extends the dark panel to the bottom of the viewport', (
     tester,
   ) async {
     await pumpLogin(tester, const Size(390, 844));
 
     expect(tester.getBottomRight(find.byKey(const Key('login-panel'))).dy, 844);
+    final panel = tester.widget<Container>(
+      find.byKey(const Key('login-panel')),
+    );
+    expect((panel.margin as EdgeInsets).bottom, 24);
     expect(tester.takeException(), isNull);
   });
 

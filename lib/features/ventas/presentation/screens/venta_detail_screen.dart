@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format_utils.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/ds_product_image.dart';
-import '../../../../core/widgets/ds_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
@@ -49,7 +49,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
           .anularVenta(_venta.id, motivo: motivo);
       if (mounted) {
         widget.onChanged?.call();
-        DSSuccessOverlay.show(context, title: 'Venta anulada');
+        AppFeedback.success(context, 'Venta anulada');
         Navigator.pop(context);
       }
     } catch (e) {
@@ -414,7 +414,7 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
             ],
 
             // ── Botones de acción
-            if (puedeClasificar || canAnular) ...[
+            if (puedeClasificar || puedeCorregir || canAnular) ...[
               const SizedBox(height: 20),
               if (puedeClasificar)
                 SizedBox(
@@ -433,6 +433,28 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                     ),
                   ),
                 ),
+              if (puedeCorregir) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _openConciliar,
+                    icon: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      size: 18,
+                    ),
+                    label: const Text('Corregir pago'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               if (canAnular) ...[
                 const SizedBox(height: 10),
                 SizedBox(

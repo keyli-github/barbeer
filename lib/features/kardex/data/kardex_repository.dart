@@ -13,6 +13,7 @@ String kardexTipoLabel(String tipo) => switch (tipo) {
 
 class KardexMovimiento {
   final String id,
+      productoId,
       producto,
       codigo,
       tipo,
@@ -22,9 +23,12 @@ class KardexMovimiento {
       fecha,
       hora;
   final double cantidad, stockAnterior, stockNuevo, valor;
+  final String? imagenUrl;
+  final DateTime? updatedAt;
 
   const KardexMovimiento({
     required this.id,
+    required this.productoId,
     required this.producto,
     required this.codigo,
     required this.tipo,
@@ -37,10 +41,13 @@ class KardexMovimiento {
     required this.stockAnterior,
     required this.stockNuevo,
     required this.valor,
+    this.imagenUrl,
+    this.updatedAt,
   });
 
   factory KardexMovimiento.fromJson(Map<String, dynamic> j) => KardexMovimiento(
     id: j['id'] as String? ?? '',
+    productoId: j['productoId'] as String? ?? '',
     producto: j['producto'] as String? ?? '',
     codigo: j['codigo'] as String? ?? '',
     tipo: j['tipo'] as String? ?? '',
@@ -53,6 +60,10 @@ class KardexMovimiento {
     stockAnterior: (j['stockAnterior'] as num?)?.toDouble() ?? 0,
     stockNuevo: (j['stockNuevo'] as num?)?.toDouble() ?? 0,
     valor: (j['valor'] as num?)?.toDouble() ?? 0,
+    imagenUrl: j['imagenUrl'] as String?,
+    updatedAt: j['updatedAt'] is String
+        ? DateTime.tryParse(j['updatedAt'] as String)
+        : null,
   );
 }
 
@@ -126,6 +137,7 @@ class KardexRepository {
   }
 
   Future<KardexResumen> resumen({
+    String? q,
     String? tipo,
     String? productoId,
     String? desde,
@@ -135,6 +147,7 @@ class KardexRepository {
     final r = await _api.get(
       '/kardex/resumen',
       queryParameters: {
+        if (q != null && q.isNotEmpty) 'q': q,
         if (tipo != null) 'tipo': tipo,
         if (productoId != null) 'productoId': productoId,
         if (desde != null) 'desde': desde,

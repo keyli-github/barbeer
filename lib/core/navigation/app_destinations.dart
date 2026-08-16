@@ -17,6 +17,7 @@ class AppDestination {
   final String label;
   final String title;
   final String? desktopLabel;
+  final String shortLabel;
   final IconData icon;
   final IconData activeIcon;
   final AppDestinationSection? section;
@@ -30,6 +31,7 @@ class AppDestination {
     required this.activeIcon,
     this.title = '',
     this.desktopLabel,
+    this.shortLabel = '',
     this.section,
     this.permissions = const [],
     this.showInDesktopSidebar = true,
@@ -43,12 +45,13 @@ class AppDestination {
 
   String get routeTitle => title.isEmpty ? label : title;
   String get desktopNavigationLabel => desktopLabel ?? label;
+  String get navigationLabel => shortLabel.isEmpty ? label : shortLabel;
 }
 
 const appDestinations = <AppDestination>[
   AppDestination(
     path: RoutePaths.dashboard,
-    label: 'Inicio',
+    label: 'Dashboard',
     title: 'Dashboard',
     desktopLabel: 'Dashboard',
     icon: Icons.home_outlined,
@@ -64,7 +67,9 @@ const appDestinations = <AppDestination>[
   ),
   AppDestination(
     path: RoutePaths.caja,
-    label: 'Caja',
+    label: 'Cuadre de Caja',
+    title: 'Cuadre de Caja',
+    shortLabel: 'Caja',
     icon: Icons.account_balance_wallet_outlined,
     activeIcon: Icons.account_balance_wallet_rounded,
     section: AppDestinationSection.operations,
@@ -88,7 +93,7 @@ const appDestinations = <AppDestination>[
   ),
   AppDestination(
     path: RoutePaths.categorias,
-    label: 'Categorias',
+    label: 'Categorías',
     icon: Icons.category_outlined,
     activeIcon: Icons.category_rounded,
     section: AppDestinationSection.inventory,
@@ -124,12 +129,14 @@ const appDestinations = <AppDestination>[
     icon: Icons.badge_outlined,
     activeIcon: Icons.badge_rounded,
     section: AppDestinationSection.staff,
-    permissions: ['asistencia:leer'],
+    // Todo empleado autenticado debe poder abrir el escáner QR. La pantalla
+    // muestra la administración completa solo con asistencia:leer.
+    permissions: [],
   ),
   AppDestination(
     path: RoutePaths.etiquetas,
-    label: 'Billeteras',
-    title: 'Billeteras Digitales',
+    label: 'Etiquetas',
+    title: 'Gestión de Etiquetas',
     icon: Icons.payment_outlined,
     activeIcon: Icons.payment_rounded,
     section: AppDestinationSection.administration,

@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.barbeer.barbeer"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requiere compileSdk >= 37
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

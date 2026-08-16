@@ -126,6 +126,8 @@ void main() {
     2: 7,
     1: 8,
     0.5: 9,
+    0.2: 10,
+    0.1: 11,
   };
 
   group('Permisos de Caja', () {
@@ -245,15 +247,27 @@ void main() {
     });
 
     test('10. Denominaciones y payload de precuadre cumplen contrato', () {
-      expect(cajaDenominaciones, const [200, 100, 50, 20, 10, 5, 2, 1, 0.5]);
+      expect(cajaDenominaciones, const [
+        200,
+        100,
+        50,
+        20,
+        10,
+        5,
+        2,
+        1,
+        0.5,
+        0.2,
+        0.1,
+      ]);
       final payload = {'denominaciones': cajaDenominacionesPayload(cantidades)};
       expect(payload.containsKey('montoDeclarado'), isFalse);
-      expect(payload['denominaciones'], hasLength(9));
+      expect(payload['denominaciones'], hasLength(11));
       expect((payload['denominaciones'] as List).last, {
-        'denominacion': 0.5,
-        'cantidad': 9,
+        'denominacion': 0.1,
+        'cantidad': 11,
       });
-      expect(cajaDenominacionesTotal(cantidades), 736.5);
+      expect(cajaDenominacionesTotal(cantidades), 739.6);
     });
 
     test('11. Cierre normal no envía monto declarado ni forzado', () {
@@ -264,7 +278,7 @@ void main() {
       expect(payload.containsKey('montoDeclarado'), isFalse);
       expect(payload.containsKey('forzarPendientes'), isFalse);
       expect(payload['observaciones'], 'Cierre sin novedades');
-      expect(payload['denominaciones'], hasLength(9));
+      expect(payload['denominaciones'], hasLength(11));
     });
 
     test('12. Cierre bloqueado: ventas pendientes', () {
@@ -338,7 +352,7 @@ void main() {
         {'denominacion': 0.5, 'cantidad': 3, 'subtotal': 1.5},
         {'denominacion': 0.2, 'cantidad': 99, 'subtotal': 19.8},
       ]);
-      expect(parsed, {200.0: 2, 0.5: 3});
+      expect(parsed, {200.0: 2, 0.5: 3, 0.2: 99});
       expect(cajaCantidadesFromResponse(null), isEmpty);
     });
 

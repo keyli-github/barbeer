@@ -5,18 +5,23 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../caja/data/caja_repository.dart';
+import '../../../compras/data/compras_repository.dart';
 import '../../../inventario/data/models/inventario.dart';
 import '../../../kardex/data/kardex_repository.dart';
 import '../../../productos/data/productos_repository.dart';
 
 class DashboardSede {
   final String id, nombre, codigoSede;
+  final String? direccion;
+  final int usuarios;
   final bool activo;
 
   const DashboardSede({
     required this.id,
     required this.nombre,
     required this.codigoSede,
+    this.direccion,
+    this.usuarios = 0,
     required this.activo,
   });
 
@@ -24,8 +29,22 @@ class DashboardSede {
     id: map['id'] as String? ?? '',
     nombre: map['nombre'] as String? ?? '',
     codigoSede: map['codigoSede'] as String? ?? map['codigo'] as String? ?? '',
+    direccion: map['direccion'] as String?,
+    usuarios: ((map['_count'] as Map?)?['usuarios'] as num?)?.toInt() ?? 0,
     activo: map['activo'] as bool? ?? true,
   );
+}
+
+class DashboardKardexPoint {
+  final String label;
+  final int entradas;
+  final int salidas;
+
+  const DashboardKardexPoint({
+    required this.label,
+    required this.entradas,
+    required this.salidas,
+  });
 }
 
 class DashboardData {
@@ -42,10 +61,12 @@ class DashboardData {
   final int ventasCountHoy;
   final double ventasAyer;
   final CajaSesion? cajaActual;
+  final CajaSesion? cajaConDiferencia;
   final int stockBajo;
   final int sedesActivas;
   final int sedesTotal;
   final List<double> ventasSemana;
+  final List<DashboardKardexPoint> kardexSemana;
   final double ventasSemanaAnterior;
   final List<double> chartPoints;
   final List<String> chartLabels;
@@ -59,10 +80,13 @@ class DashboardData {
   final double misTotalesMes;
   final int comprasPendientes;
   final double comprasMontoTotal;
+  final ComprasResumen? compras;
   final int asistenciaPresentes;
   final int asistenciaTotal;
   final int asistenciaTardanzas;
   final int asistenciaAusentes;
+  final int asistenciaDiaLibre;
+  final Map<String, int> usuariosPorRol;
 
   const DashboardData({
     this.sedes = const [],
@@ -78,10 +102,12 @@ class DashboardData {
     this.ventasCountHoy = 0,
     this.ventasAyer = 0,
     this.cajaActual,
+    this.cajaConDiferencia,
     this.stockBajo = 0,
     this.sedesActivas = 0,
     this.sedesTotal = 0,
     this.ventasSemana = const [0, 0, 0, 0, 0, 0, 0],
+    this.kardexSemana = const [],
     this.ventasSemanaAnterior = 0,
     this.chartPoints = const [],
     this.chartLabels = const [],
@@ -95,10 +121,13 @@ class DashboardData {
     this.misTotalesMes = 0,
     this.comprasPendientes = 0,
     this.comprasMontoTotal = 0,
+    this.compras,
     this.asistenciaPresentes = 0,
     this.asistenciaTotal = 0,
     this.asistenciaTardanzas = 0,
     this.asistenciaAusentes = 0,
+    this.asistenciaDiaLibre = 0,
+    this.usuariosPorRol = const {},
   });
 
   DashboardData copyWith({
@@ -117,10 +146,13 @@ class DashboardData {
     double? ventasAyer,
     CajaSesion? cajaActual,
     bool clearCaja = false,
+    CajaSesion? cajaConDiferencia,
+    bool clearCajaConDiferencia = false,
     int? stockBajo,
     int? sedesActivas,
     int? sedesTotal,
     List<double>? ventasSemana,
+    List<DashboardKardexPoint>? kardexSemana,
     double? ventasSemanaAnterior,
     List<double>? chartPoints,
     List<String>? chartLabels,
@@ -134,10 +166,13 @@ class DashboardData {
     double? misTotalesMes,
     int? comprasPendientes,
     double? comprasMontoTotal,
+    ComprasResumen? compras,
     int? asistenciaPresentes,
     int? asistenciaTotal,
     int? asistenciaTardanzas,
     int? asistenciaAusentes,
+    int? asistenciaDiaLibre,
+    Map<String, int>? usuariosPorRol,
   }) => DashboardData(
     sedes: sedes ?? this.sedes,
     selectedSedeId: clearSede ? null : selectedSedeId ?? this.selectedSedeId,
@@ -152,10 +187,14 @@ class DashboardData {
     ventasCountHoy: ventasCountHoy ?? this.ventasCountHoy,
     ventasAyer: ventasAyer ?? this.ventasAyer,
     cajaActual: clearCaja ? null : cajaActual ?? this.cajaActual,
+    cajaConDiferencia: clearCajaConDiferencia
+        ? null
+        : cajaConDiferencia ?? this.cajaConDiferencia,
     stockBajo: stockBajo ?? this.stockBajo,
     sedesActivas: sedesActivas ?? this.sedesActivas,
     sedesTotal: sedesTotal ?? this.sedesTotal,
     ventasSemana: ventasSemana ?? this.ventasSemana,
+    kardexSemana: kardexSemana ?? this.kardexSemana,
     ventasSemanaAnterior: ventasSemanaAnterior ?? this.ventasSemanaAnterior,
     chartPoints: chartPoints ?? this.chartPoints,
     chartLabels: chartLabels ?? this.chartLabels,
@@ -169,10 +208,13 @@ class DashboardData {
     misTotalesMes: misTotalesMes ?? this.misTotalesMes,
     comprasPendientes: comprasPendientes ?? this.comprasPendientes,
     comprasMontoTotal: comprasMontoTotal ?? this.comprasMontoTotal,
+    compras: compras ?? this.compras,
     asistenciaPresentes: asistenciaPresentes ?? this.asistenciaPresentes,
     asistenciaTotal: asistenciaTotal ?? this.asistenciaTotal,
     asistenciaTardanzas: asistenciaTardanzas ?? this.asistenciaTardanzas,
     asistenciaAusentes: asistenciaAusentes ?? this.asistenciaAusentes,
+    asistenciaDiaLibre: asistenciaDiaLibre ?? this.asistenciaDiaLibre,
+    usuariosPorRol: usuariosPorRol ?? this.usuariosPorRol,
   );
 
   double get variacionVsAyer =>
@@ -217,6 +259,7 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
     int? usuariosTotal;
     int? sesionesTotal;
     CajaSesion? cajaActual;
+    CajaSesion? cajaConDiferencia;
     var ventasHoy = 0.0;
     var ventasAyer = 0.0;
     var ventasCountHoy = 0;
@@ -224,12 +267,16 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
     var misTotalesMes = 0.0;
     var comprasPendientes = 0;
     var comprasMontoTotal = 0.0;
+    ComprasResumen? compras;
     var asistenciaPresentes = 0;
     var asistenciaTotal = 0;
     var asistenciaTardanzas = 0;
     var asistenciaAusentes = 0;
+    var asistenciaDiaLibre = 0;
+    var usuariosPorRol = <String, int>{};
     var audit = <Map<String, dynamic>>[];
     final semana = List<double>.filled(7, 0);
+    var kardexSemana = <DashboardKardexPoint>[];
     var semanaAnterior = 0.0;
 
     void add(String key, Future<void> Function() loader) {
@@ -298,6 +345,52 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
         kardex = KardexResumen.fromJson(
           Map<String, dynamic>.from(response.data as Map),
         );
+
+        final today = DateTime.now();
+        final start = DateTime(
+          today.year,
+          today.month,
+          today.day,
+        ).subtract(const Duration(days: 6));
+        final daily = List.generate(
+          7,
+          (index) => {'entradas': 0, 'salidas': 0},
+        );
+        final listResponse = await _api.get(
+          ApiConstants.kardex,
+          queryParameters: {
+            'pagina': 1,
+            'limite': 100,
+            'desde': _dateKey(start),
+            'hasta': _dateKey(today),
+            if (_sedeId != null) 'sedeId': _sedeId,
+          },
+        );
+        final payload = Map<String, dynamic>.from(listResponse.data as Map);
+        for (final row
+            in (payload['data'] as List? ?? const []).whereType<Map>()) {
+          final date = DateTime.tryParse(row['fecha']?.toString() ?? '');
+          if (date == null) continue;
+          final index = DateTime(
+            date.year,
+            date.month,
+            date.day,
+          ).difference(DateTime(start.year, start.month, start.day)).inDays;
+          if (index < 0 || index >= daily.length) continue;
+          if (row['tipo'] == 'ENTRADA')
+            daily[index]['entradas'] = daily[index]['entradas']! + 1;
+          if (row['tipo'] == 'SALIDA')
+            daily[index]['salidas'] = daily[index]['salidas']! + 1;
+        }
+        const labels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        kardexSemana = List.generate(7, (index) {
+          final date = start.add(Duration(days: index));
+          return DashboardKardexPoint(
+            label: labels[date.weekday % 7],
+            entradas: daily[index]['entradas']!,
+            salidas: daily[index]['salidas']!,
+          );
+        });
       });
     }
 
@@ -308,19 +401,24 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
           queryParameters: {if (_sedeId != null) 'sedeId': _sedeId},
         );
         final data = Map<String, dynamic>.from(response.data as Map);
-        comprasPendientes = (data['pendientes'] as num?)?.toInt() ?? 0;
-        comprasMontoTotal = (data['montoPendiente'] as num?)?.toDouble() ?? 0;
+        compras = ComprasResumen.fromJson(data);
+        comprasPendientes = compras!.pendientes;
+        comprasMontoTotal = compras!.montoPendiente;
       });
     }
 
     if (_has('asistencia:leer')) {
       add('asistencia', () async {
-        final response = await _api.get(ApiConstants.attendanceResumen);
+        final response = await _api.get(
+          ApiConstants.attendanceResumen,
+          queryParameters: {if (_sedeId != null) 'sedeId': _sedeId},
+        );
         final data = Map<String, dynamic>.from(response.data as Map);
         asistenciaPresentes = (data['presente'] as num?)?.toInt() ?? 0;
         asistenciaTotal = (data['totalEmpleados'] as num?)?.toInt() ?? 0;
         asistenciaTardanzas = (data['tardanza'] as num?)?.toInt() ?? 0;
         asistenciaAusentes = (data['ausente'] as num?)?.toInt() ?? 0;
+        asistenciaDiaLibre = (data['diaLibre'] as num?)?.toInt() ?? 0;
       });
     }
 
@@ -338,6 +436,11 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
           (total, role) =>
               total + ((role['_count'] as Map?)?['usuarios'] as int? ?? 0),
         );
+        usuariosPorRol = {
+          for (final role in roles)
+            role['nombre']?.toString() ?? 'Rol':
+                ((role['_count'] as Map?)?['usuarios'] as num?)?.toInt() ?? 0,
+        };
       });
     }
 
@@ -369,6 +472,29 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
           cajaActual = CajaSesion.fromJson(
             Map<String, dynamic>.from(response.data as Map),
           );
+        }
+      });
+    }
+
+    if (_has('caja:leer')) {
+      add('caja-alerta', () async {
+        final response = await _api.get(
+          ApiConstants.cajaHistorial,
+          queryParameters: {
+            'pagina': 1,
+            'limite': 5,
+            'estado': 'CERRADA',
+            if (_sedeId != null) 'sedeId': _sedeId,
+          },
+        );
+        final payload = Map<String, dynamic>.from(response.data as Map);
+        for (final row
+            in (payload['data'] as List? ?? const []).whereType<Map>()) {
+          final session = CajaSesion.fromJson(Map<String, dynamic>.from(row));
+          if ((session.diferenciaCierre ?? 0) != 0) {
+            cajaConDiferencia = session;
+            break;
+          }
         }
       });
     }
@@ -431,10 +557,12 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
       ventasCountHoy: ventasCountHoy,
       ventasAyer: ventasAyer,
       cajaActual: cajaActual,
+      cajaConDiferencia: cajaConDiferencia,
       stockBajo: stockBajo,
       sedesActivas: sedes.where((sede) => sede.activo).length,
       sedesTotal: sedes.length,
       ventasSemana: semana,
+      kardexSemana: kardexSemana,
       ventasSemanaAnterior: semanaAnterior,
       audit: audit,
       loading: false,
@@ -443,10 +571,13 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
       misTotalesMes: misTotalesMes,
       comprasPendientes: comprasPendientes,
       comprasMontoTotal: comprasMontoTotal,
+      compras: compras,
       asistenciaPresentes: asistenciaPresentes,
       asistenciaTotal: asistenciaTotal,
       asistenciaTardanzas: asistenciaTardanzas,
       asistenciaAusentes: asistenciaAusentes,
+      asistenciaDiaLibre: asistenciaDiaLibre,
+      usuariosPorRol: usuariosPorRol,
     );
     _loaded = true;
   }
@@ -478,6 +609,11 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
     } while (page <= totalPages);
     return rows;
   }
+
+  String _dateKey(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 
   Future<void> loadChartForPeriod(String period) async {
     state = state.copyWith(chartLoading: true);

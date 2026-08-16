@@ -3,13 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/providers/branding_provider.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/barbeer_wordmark.dart';
 import '../providers/auth_provider.dart';
 
-Brightness loginNavigationIconBrightness(Color background) =>
-    ThemeData.estimateBrightnessForColor(background) == Brightness.dark
-    ? Brightness.light
-    : Brightness.dark;
+/// Superficie del panel del login: siempre oscura, igual en web y app,
+/// sin importar el tema del sistema (evita que "se ponga blanco").
+const Color _loginPanel = Color(0xFF0B0A08);
+const Color _loginInputFill = Color(0xFF171512);
+const Color _loginInputBorder = Color(0xFF2B2A26);
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -81,24 +84,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   void _showPasswordHelp() {
     FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Solicita el restablecimiento a un administrador.'),
-      ),
+    AppFeedback.success(
+      context,
+      'Solicita el restablecimiento a un administrador.',
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final navigationBackground = context.colors.background;
-    final navigationIcons = loginNavigationIconBrightness(navigationBackground);
+    final branding = ref.watch(brandingProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: navigationBackground,
-        systemNavigationBarIconBrightness: navigationIcons,
+        systemNavigationBarColor: _loginPanel,
+        systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
         backgroundColor: Colors.black,
@@ -114,7 +115,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   key: const Key('login-desktop-composition'),
                   children: [
                     Expanded(
-                      child: _LoginHero(height: pageHeight, desktop: true),
+                      child: _LoginHero(
+                        height: pageHeight,
+                        desktop: true,
+                        coverUrl: branding.coverUrl,
+                      ),
                     ),
                     Expanded(
                       child: Container(
@@ -144,12 +149,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Image.asset(
-                                        'assets/images/barbeer_Log.png',
+                                      _BrandingLogo(
+                                        url: branding.logoUrl,
                                         width: 88,
                                         height: 72,
-                                        fit: BoxFit.contain,
-                                        semanticLabel: 'Logo de BarBeer',
                                       ),
                                       const SizedBox(height: 18),
                                       _buildForm(desktop: true),
@@ -165,15 +168,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ],
                 );
               }
+              final isNarrow = constraints.maxWidth < 340;
+              final isShort = pageHeight < 560;
               final contentWidth = constraints.maxWidth
                   .clamp(0.0, 600.0)
                   .toDouble();
               final heroHeight = (pageHeight * 0.42)
-                  .clamp(286.0, 360.0)
+                  .clamp(isShort ? 180.0 : 286.0, isShort ? 250.0 : 360.0)
                   .toDouble();
               final panelMinHeight = (pageHeight - heroHeight)
                   .clamp(0.0, double.infinity)
                   .toDouble();
+              final panelHPad = isNarrow ? 20.0 : 24.0;
+              final panelTopPad = isShort ? 34.0 : 44.0;
+              final panelBottomPad = isShort ? 16.0 : 20.0;
 
               return Center(
                 child: SizedBox(
@@ -188,59 +196,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _LoginHero(height: heroHeight),
+                          _LoginHero(
+                            height: heroHeight,
+                            coverUrl: branding.coverUrl,
+                          ),
                           FadeTransition(
                             opacity: _fade,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              alignment: Alignment.topCenter,
-                              children: [
-                                Positioned(
-                                  top: -36,
-                                  child: Container(
-                                    key: const Key('login-panel-bump'),
-                                    width: 88,
-                                    height: 88,
-                                    decoration: BoxDecoration(
-                                      color: context.colors.surface,
-                                      shape: BoxShape.circle,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.06),
+                                end: Offset.zero,
+                              ).animate(_fade),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.topCenter,
+                                children: [
+                                  Container(
+                                    key: const Key('login-panel'),
+                                    margin: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      24,
                                     ),
-                                  ),
-                                ),
-                                Container(
-                                  key: const Key('login-panel'),
-                                  width: double.infinity,
-                                  constraints: BoxConstraints(
-                                    minHeight: panelMinHeight,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: context.colors.surface,
-                                    borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(32),
-                                    ),
-                                  ),
-                                  child: SafeArea(
-                                    top: false,
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        24,
-                                        36,
-                                        24,
-                                        20,
+                                    width: double.infinity,
+                                    constraints: BoxConstraints(
+                                      minHeight: (panelMinHeight - 24).clamp(
+                                        0.0,
+                                        double.infinity,
                                       ),
-                                      child: Center(
-                                        child: ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            maxWidth: 400,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _loginPanel,
+                                      borderRadius: BorderRadius.circular(28),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.10,
+                                        ),
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x80000000),
+                                          blurRadius: 40,
+                                          offset: Offset(0, 20),
+                                        ),
+                                      ],
+                                    ),
+                                    child: SafeArea(
+                                      top: false,
+                                      child: Padding(
+                                        padding: EdgeInsets.fromLTRB(
+                                          panelHPad,
+                                          panelTopPad,
+                                          panelHPad,
+                                          panelBottomPad,
+                                        ),
+                                        child: Center(
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              maxWidth: 400,
+                                            ),
+                                            child: _buildForm(
+                                              desktop: false,
+                                              narrow: isNarrow,
+                                            ),
                                           ),
-                                          child: _buildForm(),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                Positioned(top: -30, child: _LoginLogo()),
-                              ],
+                                  Positioned(
+                                    top: -30,
+                                    child: _LoginLogo(url: branding.logoUrl),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -256,7 +286,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  Widget _buildForm({bool desktop = false}) => Form(
+  Widget _buildForm({bool desktop = false, bool narrow = false}) => Form(
     key: _formKey,
     child: Column(
       mainAxisSize: MainAxisSize.min,
@@ -264,9 +294,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         Text(
           'Iniciar sesión',
           style: TextStyle(
-            fontSize: desktop ? 30 : 23,
+            fontSize: desktop ? 30 : (narrow ? 21 : 23),
             fontWeight: FontWeight.w800,
-            color: desktop ? Colors.white : context.colors.textPrimary,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 3),
@@ -275,10 +305,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ? 'Ingresa tus credenciales para acceder al sistema interno'
               : 'Ingresa tus credenciales para ingresar',
           style: TextStyle(
-            fontSize: desktop ? 15 : 13,
-            color: desktop
-                ? Colors.white.withValues(alpha: 0.48)
-                : context.colors.textSecondary,
+            fontSize: desktop ? 15 : (narrow ? 12 : 13),
+            color: Colors.white.withValues(alpha: 0.48),
           ),
           textAlign: TextAlign.center,
         ),
@@ -288,9 +316,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: context.colors.errorLight,
+              color: const Color(0xFF481B1B),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.colors.errorBorder),
+              border: Border.all(color: const Color(0xFF8F3030)),
             ),
             child: Row(
               children: [
@@ -342,7 +370,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               _showPass
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
-              color: context.colors.textTertiary,
+              color: Colors.white.withValues(alpha: 0.45),
               size: 20,
             ),
           ),
@@ -429,7 +457,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         else
           Text(
             'BarBeer © 2026',
-            style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.32),
+            ),
           ),
       ],
     ),
@@ -439,8 +470,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 class _LoginHero extends StatelessWidget {
   final double height;
   final bool desktop;
+  final String? coverUrl;
 
-  const _LoginHero({required this.height, this.desktop = false});
+  const _LoginHero({required this.height, this.desktop = false, this.coverUrl});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -450,11 +482,22 @@ class _LoginHero extends StatelessWidget {
     child: Stack(
       children: [
         Positioned.fill(
-          child: Image.asset(
-            'assets/images/bebb1.webp',
-            fit: BoxFit.cover,
-            alignment: desktop ? Alignment.center : Alignment.topCenter,
-          ),
+          child: coverUrl == null
+              ? Image.asset(
+                  'assets/images/bebb1.webp',
+                  fit: BoxFit.cover,
+                  alignment: desktop ? Alignment.center : Alignment.topCenter,
+                )
+              : Image.network(
+                  coverUrl!,
+                  fit: BoxFit.cover,
+                  alignment: desktop ? Alignment.center : Alignment.topCenter,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/bebb1.webp',
+                    fit: BoxFit.cover,
+                    alignment: desktop ? Alignment.center : Alignment.topCenter,
+                  ),
+                ),
         ),
         const Positioned.fill(
           child: DecoratedBox(
@@ -488,12 +531,13 @@ class _LoginHero extends StatelessWidget {
   );
 
   Widget _desktopContent({required bool compact}) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
-      const BarBeerWordmark(fontSize: 30, beerColor: Colors.white),
+      const Center(child: BarBeerWordmark(fontSize: 30, beerColor: Colors.white)),
       const Spacer(),
       const Text(
         'SISTEMA INTERNO',
+        textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
@@ -504,6 +548,7 @@ class _LoginHero extends StatelessWidget {
       const SizedBox(height: 10),
       const Text(
         'Sistema interno\nde gestión',
+        textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 42,
           height: 1.05,
@@ -516,6 +561,7 @@ class _LoginHero extends StatelessWidget {
       const Text(
         'Accede de forma segura a la plataforma\n'
         'de administración de BarBeer.',
+        textAlign: TextAlign.center,
         style: TextStyle(fontSize: 14, color: Color(0xE6FFFFFF), height: 1.5),
       ),
       if (!compact) ...[
@@ -542,9 +588,12 @@ class _LoginHero extends StatelessWidget {
         ),
       ],
       const Spacer(),
-      Text(
-        '© ${DateTime.now().year} BarBeer ERP. Todos los derechos reservados.',
-        style: const TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
+      const Center(
+        child: Text(
+          '© 2026 BarBeer ERP. Todos los derechos reservados.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
+        ),
       ),
     ],
   );
@@ -589,26 +638,75 @@ class _LoginHero extends StatelessWidget {
 }
 
 class _LoginLogo extends StatelessWidget {
+  const _LoginLogo({this.url});
+
+  final String? url;
+
   @override
   Widget build(BuildContext context) => Container(
     key: const Key('login-logo-circle'),
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     decoration: BoxDecoration(
-      color: context.colors.surface,
+      color: _loginInputFill,
       shape: BoxShape.circle,
-      border: Border.all(color: context.colors.border, width: 2),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Padding(
-      padding: const EdgeInsets.all(4),
-      child: Image.asset(
-        'assets/images/barbeer_launcher.png',
-        fit: BoxFit.cover,
-        semanticLabel: 'Logo de BarBeer',
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.15),
+        width: 2,
       ),
     ),
+    clipBehavior: Clip.antiAlias,
+    padding: const EdgeInsets.all(10),
+    alignment: Alignment.center,
+    child: url == null
+        ? Image.asset(
+            'assets/images/barbeer_Log.png',
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo de BarBeer',
+          )
+        : Image.network(
+            url!,
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo de BarBeer',
+            errorBuilder: (_, __, ___) => Image.asset(
+              'assets/images/barbeer_Log.png',
+              fit: BoxFit.contain,
+              semanticLabel: 'Logo de BarBeer',
+            ),
+          ),
   );
+}
+
+class _BrandingLogo extends StatelessWidget {
+  const _BrandingLogo({this.url, this.width = 88, this.height = 72});
+
+  final String? url;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => url == null
+      ? Image.asset(
+          'assets/images/barbeer_Log.png',
+          width: width,
+          height: height,
+          fit: BoxFit.contain,
+          semanticLabel: 'Logo de BarBeer',
+        )
+      : Image.network(
+          url!,
+          width: width,
+          height: height,
+          fit: BoxFit.contain,
+          semanticLabel: 'Logo de BarBeer',
+          errorBuilder: (_, __, ___) => Image.asset(
+            'assets/images/barbeer_Log.png',
+            width: width,
+            height: height,
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo de BarBeer',
+          ),
+        );
 }
 
 class _FeatureRow extends StatelessWidget {
@@ -705,28 +803,32 @@ class _LoginField extends StatelessWidget {
     textInputAction: textInputAction,
     onFieldSubmitted: onSubmitted,
     validator: validator,
-    style: TextStyle(fontSize: 15, color: context.colors.textPrimary),
+    style: const TextStyle(fontSize: 15, color: Colors.white),
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(
+      hintStyle: const TextStyle(
         fontSize: 15,
-        color: context.colors.textTertiary,
+        color: Color(0x66FFFFFF),
         fontWeight: FontWeight.w400,
       ),
-      prefixIcon: Icon(icon, color: context.colors.textTertiary, size: 20),
+      prefixIcon: Icon(
+        icon,
+        color: Colors.white.withValues(alpha: 0.45),
+        size: 20,
+      ),
       suffixIcon: trailing,
       suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       filled: true,
-      fillColor: context.colors.backgroundAlt,
+      fillColor: _loginInputFill,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: context.colors.border),
+        borderSide: const BorderSide(color: _loginInputBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: context.colors.border),
+        borderSide: const BorderSide(color: _loginInputBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

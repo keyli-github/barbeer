@@ -36,7 +36,7 @@ class AppTheme {
           primary: colors.primary,
           onPrimary: brightness == Brightness.dark
               ? const Color(0xFF07111F)
-              : Colors.white,
+              : const Color(0xFF2B1100),
           primaryContainer: colors.primarySurface,
           onPrimaryContainer: brightness == Brightness.dark
               ? const Color(0xFFDBEAFE)

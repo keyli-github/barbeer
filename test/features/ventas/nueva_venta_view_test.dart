@@ -144,6 +144,54 @@ class _ReceiptVentasRepository extends VentasRepository {
   }
 }
 
+class _ConfirmReceiptRepository extends VentasRepository {
+  _ConfirmReceiptRepository({required this.analysis}) : super(ApiClient.instance);
+
+  final ComprobanteAnalisis analysis;
+  final creates = <CreateVentaPayload>[];
+
+  @override
+  Future<List<Etiqueta>> listEtiquetasActivas({String? sedeId}) async => const [
+    Etiqueta(
+      id: 'et-1',
+      nombre: 'Yape',
+      activo: true,
+      requiereComprobante: true,
+      orden: 1,
+    ),
+  ];
+
+  @override
+  Future<ComprobanteAnalisis> analizarComprobante({
+    required Uint8List bytes,
+    required String filename,
+    String? sedeId,
+  }) async => analysis;
+
+  @override
+  Future<void> cancelarComprobanteAnalisis(String id) async {}
+
+  @override
+  Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
+    creates.add(payload);
+    return Venta(
+      id: 'v1',
+      codigo: 'V-001',
+      cajaSesionId: 'c1',
+      sedeId: 's1',
+      total: 12,
+      estado: EstadoVenta.activa,
+      conciliacion: const ConciliacionVenta(
+        id: 'co1',
+        estado: EstadoConciliacion.billetera,
+        etiquetaId: 'et-1',
+      ),
+      items: const [],
+      createdAt: '2026-08-13T10:00:00Z',
+    );
+  }
+}
+
 class _RaceReceiptRepository extends VentasRepository {
   _RaceReceiptRepository() : super(ApiClient.instance);
 
@@ -292,7 +340,13 @@ void main() {
       expect(disabledConfirm.onPressed, isNull);
 
       await tester.tap(find.text('+ Agregar').first);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-to-sale-modal')), findsOneWidget);
+      expect(find.text('Añadir a la Venta'), findsOneWidget);
+      expect(find.text('Precio base: S/ 12.00'), findsOneWidget);
+
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
 
       expect(
         find.byKey(const ValueKey('desktop-cart-item-p1')),
@@ -311,7 +365,7 @@ void main() {
       expect(find.byKey(const ValueKey('desktop-product-p4')), findsOneWidget);
     });
 
-    testWidgets('mobile conserva grid responsive y carrito en bottom sheet', (
+    testWidgets('mobile usa tarjetas horizontales y carrito en bottom sheet', (
       tester,
     ) async {
       await _pumpNuevaVenta(
@@ -325,16 +379,17 @@ void main() {
       expect(find.byKey(const Key('desktop-cart-panel')), findsNothing);
       expect(find.byKey(const Key('mobile-cart-bar')), findsNothing);
 
-      final grid = tester.widget<GridView>(
-        find.byKey(const Key('mobile-catalog-grid')),
+      final list = tester.widget<ListView>(
+        find.byKey(const Key('mobile-catalog-list')),
       );
-      expect(
-        grid.gridDelegate,
-        isA<SliverGridDelegateWithMaxCrossAxisExtent>(),
-      );
+      expect(list.scrollDirection, Axis.vertical);
 
-      await tester.tap(find.text('+ Agregar').first);
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('mobile-product-p1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('add-to-sale-modal')), findsOneWidget);
+
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('mobile-cart-bar')), findsOneWidget);
       expect(find.byKey(const Key('desktop-cart-panel')), findsNothing);
 
@@ -380,7 +435,7 @@ void main() {
       expect(find.byKey(const Key('custom-price-field')), findsOneWidget);
 
       await tester.enterText(find.byKey(const Key('custom-price-field')), '0');
-      await tester.tap(find.text('Guardar'));
+      await tester.tap(find.text('Confirmar'));
       await tester.pump();
       expect(find.text('Ingresa un precio mayor a 0'), findsOneWidget);
 
@@ -388,7 +443,7 @@ void main() {
         find.byKey(const Key('custom-price-field')),
         '16.50',
       );
-      await tester.tap(find.text('Guardar'));
+      await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('sale-details')), findsOneWidget);
       expect(find.byKey(const ValueKey('payment-pendiente')), findsOneWidget);
@@ -409,7 +464,10 @@ void main() {
       );
       await tester.pump();
       await tester.tap(find.text('+ Agregar').first);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
       await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
       await tester.pump();
 
@@ -475,7 +533,9 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('+ Agregar').first);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('payment-billetera')));
       await tester.pump();
       await tester.tap(find.byKey(const Key('voucher-picker')));
@@ -484,6 +544,7 @@ void main() {
       expect(find.text('Posible comprobante duplicado'), findsOneWidget);
       expect(find.byKey(const Key('receipt-analysis-panel')), findsOneWidget);
 
+      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
       await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
       await tester.pump();
       expect(find.text('Posible comprobante duplicado'), findsWidgets);
@@ -509,7 +570,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('+ Agregar').first);
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('payment-billetera')));
       await tester.pump();
 
@@ -528,6 +591,221 @@ void main() {
       expect(find.text('Segundo'), findsOneWidget);
       expect(find.text('Primero'), findsNothing);
       expect(repo.cancelled, ['first']);
+    });
+
+    testWidgets('permite editar el precio sin permisos extra (igual que web)', (
+      tester,
+    ) async {
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(390, 844),
+        loader: () async => _products,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('mobile-product-p1')));
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextFormField>(
+        find.byKey(const Key('custom-price-field')),
+      );
+      expect(field.enabled, isTrue);
+
+      await tester.enterText(find.byKey(const Key('custom-price-field')), '8.75');
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('mobile-cart-bar')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('mobile-cart-bar')));
+      await tester.pumpAndSettle();
+      expect(find.text('S/ 8.75 × 1 = S/ 8.75'), findsOneWidget);
+    });
+
+    testWidgets('el dropdown de billetera abre y lista billeteras reales', (
+      tester,
+    ) async {
+      final repo = _ReceiptVentasRepository(
+        analysis: _validAnalysis('analysis-1', 'Yape'),
+      );
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        repository: repo,
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('+ Agregar').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('payment-billetera')));
+      await tester.pump();
+
+      expect(find.byKey(const Key('wallet-field')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('wallet-field')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Yape'), findsWidgets);
+      await tester.tap(find.text('Yape').last);
+      await tester.pumpAndSettle();
+
+      final dropdown = tester.widget<DropdownButton<String>>(
+        find.byKey(const Key('wallet-field')),
+      );
+      expect(dropdown.value, 'et-1');
+      expect(find.text('Yape'), findsWidgets);
+    });
+
+    testWidgets('monto menor al total: permite confirmar y avisa pago parcial', (
+      tester,
+    ) async {
+      final repo = _ConfirmReceiptRepository(
+        analysis: ComprobanteAnalisis(
+          id: 'analysis-partial',
+          estado: 'APTO',
+          posibleDuplicado: false,
+          coincidencias: const [],
+          entidad: 'Yape',
+          etiquetaSugerida: const Etiqueta(
+            id: 'et-1',
+            nombre: 'Yape',
+            activo: true,
+            requiereComprobante: true,
+            orden: 1,
+          ),
+          monto: 10,
+          codigoOperacion: 'OP-P',
+          codigoSeguridad: 'SEC-P',
+          fechaOperacion: '2026-08-13',
+          horaOperacion: '12:30:00',
+          imagenUrl: '/receipt-partial.jpg',
+          thumbnailUrl: '/receipt-partial-thumb.jpg',
+          confianza: const ComprobanteConfianza(
+            documento: .9,
+            entidad: .9,
+            monto: .9,
+            operacion: .9,
+            fecha: .9,
+          ),
+          advertencias: const [],
+          expiraAt: DateTime(2099),
+        ),
+      );
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        repository: repo,
+        voucherPicker: () async => PickedUploadImage(
+          bytes: base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          ),
+          filename: 'voucher-partial.png',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('+ Agregar').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('payment-billetera')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('voucher-picker')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Monto menor al total'),
+        findsOneWidget,
+        reason: 'Pago parcial: se avisa pero no bloquea',
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(repo.creates, hasLength(1));
+      expect(
+        repo.creates.single.json['comprobanteAnalisisId'],
+        'analysis-partial',
+      );
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('monto mayor al total: bloquea la confirmación', (
+      tester,
+    ) async {
+      final repo = _ReceiptVentasRepository(
+        analysis: ComprobanteAnalisis(
+          id: 'analysis-over',
+          estado: 'APTO',
+          posibleDuplicado: false,
+          coincidencias: const [],
+          entidad: 'Yape',
+          etiquetaSugerida: const Etiqueta(
+            id: 'et-1',
+            nombre: 'Yape',
+            activo: true,
+            requiereComprobante: true,
+            orden: 1,
+          ),
+          monto: 30,
+          codigoOperacion: 'OP-O',
+          codigoSeguridad: 'SEC-O',
+          fechaOperacion: '2026-08-13',
+          horaOperacion: '12:30:00',
+          imagenUrl: '/receipt-over.jpg',
+          thumbnailUrl: '/receipt-over-thumb.jpg',
+          confianza: const ComprobanteConfianza(
+            documento: .9,
+            entidad: .9,
+            monto: .9,
+            operacion: .9,
+            fecha: .9,
+          ),
+          advertencias: const [],
+          expiraAt: DateTime(2099),
+        ),
+      );
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        repository: repo,
+        voucherPicker: () async => PickedUploadImage(
+          bytes: base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          ),
+          filename: 'voucher-over.png',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('+ Agregar').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('payment-billetera')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('voucher-picker')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('supera el total'),
+        findsOneWidget,
+        reason: 'El monto del comprobante supera el total → no se puede confirmar',
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.pump();
+
+      expect(repo.createCalls, 0, reason: 'No debe crear la venta');
+      await tester.pump(const Duration(seconds: 3));
     });
   });
 }

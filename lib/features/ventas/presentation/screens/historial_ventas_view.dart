@@ -1,141 +1,126 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/widgets/ds_inputs.dart';
-import '../../../../core/widgets/ds_product_image.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
+import '../widgets/anular_venta_dialog.dart';
 import 'conciliar_venta_screen.dart';
-import 'venta_detail_screen.dart';
 
 class HistorialVentasView extends ConsumerStatefulWidget {
-  const HistorialVentasView({super.key});
+  final VoidCallback? onCreate;
+
+  const HistorialVentasView({super.key, this.onCreate});
+
   @override
   ConsumerState<HistorialVentasView> createState() => _HistorialState();
 }
 
 class _HistorialState extends ConsumerState<HistorialVentasView> {
-  final _searchCtrl = TextEditingController();
-  String _search = '';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final useMis = !canReadAllVentas(ref.read(authProvider));
-      ref.read(ventasListProvider(useMis).notifier).load();
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
   bool get _useMis => !canReadAllVentas(ref.read(authProvider));
+
   Future<void> _refresh() =>
       ref.read(ventasListProvider(_useMis).notifier).refresh();
 
-  // Subpantalla completa de detalle — usa rootNavigator para ocultar Shell
-  void _openDetail(Venta v) =>
-      AppNav.push(context, VentaDetailScreen(venta: v, onChanged: _refresh));
+  void _openConciliar(Venta venta) => AppNav.push(
+    context,
+    ConciliarVentaScreen(venta: venta, onDone: _refresh),
+  );
 
-  // Conciliar también como subpantalla
-  void _openConciliar(Venta v) =>
-      AppNav.push(context, ConciliarVentaScreen(venta: v, onDone: _refresh));
+  Future<void> _anular(Venta venta) async {
+    final motivo = await showAnularVentaDialog(context, codigo: venta.codigo);
+    if (motivo == null || !mounted) return;
+    try {
+      await ref
+          .read(ventasRepositoryProvider)
+          .anularVenta(venta.id, motivo: motivo);
+      if (!mounted) return;
+      AppFeedback.success(context, 'Venta anulada');
+      await _refresh();
+    } catch (error) {
+      if (mounted) AppFeedback.error(context, 'No se pudo anular la venta');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final state = ref.watch(ventasListProvider(_useMis));
-    final canConciliarV = canConciliar(auth);
-    final canAnularV = canAnularVenta(auth);
-
-    // Filtro local de búsqueda
-    final ventas = state.ventas.where((v) {
-      if (_search.isEmpty) return true;
-      final q = _search.toLowerCase();
-      return v.codigo.toLowerCase().contains(q) ||
-          (v.vendedoraUsername?.toLowerCase().contains(q) ?? false);
-    }).toList();
 
     return Column(
       children: [
-        // ── Buscador + filtros ──────────────────────────────────────────
         _FiltersBar(
-          ctrl: _searchCtrl,
           currentFilter: state.filterEstado,
-          onSearch: (v) => setState(() => _search = v),
-          onFilter: (e) =>
-              ref.read(ventasListProvider(_useMis).notifier).load(estado: e),
           total: state.total,
+          loading: state.loading,
+          onCreate: widget.onCreate,
+          onRefresh: _refresh,
+          onFilter: (estado) => ref
+              .read(ventasListProvider(_useMis).notifier)
+              .load(estado: estado),
         ),
-
-        // ── KPIs compactos (solo si hay datos) ──────────────────────────
-        if (ventas.isNotEmpty) _KpiRow(ventas: ventas),
-
-        // ── Lista ───────────────────────────────────────────────────────
         Expanded(
           child: state.loading && state.ventas.isEmpty
-              ? const DSSkeletonList(count: 6)
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: DSSkeletonList(count: 6),
+                )
               : state.error != null && state.ventas.isEmpty
               ? DSErrorState(message: state.error, onRetry: _refresh)
-              : ventas.isEmpty
+              : state.ventas.isEmpty
               ? DSEmptyState(
                   icon: Icons.receipt_long_outlined,
-                  title: _search.isNotEmpty ? 'Sin resultados' : 'Sin ventas',
-                  message: _search.isNotEmpty
-                      ? 'No hay ventas que coincidan con "$_search"'
-                      : 'No hay ventas registradas aún.',
+                  title: 'Sin ventas',
+                  message: 'No hay ventas registradas para este estado.',
                   actionLabel: 'Actualizar',
                   onAction: _refresh,
                 )
               : RefreshIndicator(
-                  color: AppColors.primary,
+                  color: AppColors.brand,
                   onRefresh: _refresh,
-                  child: Container(
-                    color: context.colors.background,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 120),
-                      itemCount:
-                          ventas.length +
-                          (state.totalPaginas > state.pagina ? 1 : 0),
-                      separatorBuilder: (_, _) => Divider(
-                        height: 1,
-                        indent: 71,
-                        color: context.colors.borderLight,
-                      ),
-                      itemBuilder: (_, i) {
-                        if (i == ventas.length) {
-                          return _LoadMoreButton(
-                            loading: state.loading,
-                            onTap: state.loading
-                                ? null
-                                : () => ref
-                                      .read(
-                                        ventasListProvider(_useMis).notifier,
-                                      )
-                                      .loadMore(),
-                          );
-                        }
-                        return _VentaCard(
-                          venta: ventas[i],
-                          canConciliar: canConciliarV,
-                          canAnular: canAnularV,
-                          onTap: () => _openDetail(ventas[i]),
-                          onConciliar: canConciliarV && ventas[i].isPendiente
-                              ? () => _openConciliar(ventas[i])
-                              : null,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(15, 4, 15, 120),
+                    itemCount:
+                        state.ventas.length +
+                        (state.totalPaginas > state.pagina ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == state.ventas.length) {
+                        return _LoadMoreButton(
+                          loading: state.loading,
+                          onTap: state.loading
+                              ? null
+                              : () => ref
+                                    .read(ventasListProvider(_useMis).notifier)
+                                    .loadMore(),
                         );
-                      },
-                    ),
+                      }
+                      final venta = state.ventas[index];
+                      final classified =
+                          venta.conciliacion != null && !venta.isPendiente;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _VentaCard(
+                          venta: venta,
+                          onConciliar: canConciliar(auth) && venta.isPendiente
+                              ? () => _openConciliar(venta)
+                              : canConciliarCorregir(auth) && classified
+                              ? () => _openConciliar(venta)
+                              : null,
+                          correction: classified,
+                          onAnular: canAnularVenta(auth) && !venta.isAnulada
+                              ? () => _anular(venta)
+                              : null,
+                        ),
+                      );
+                    },
                   ),
                 ),
         ),
@@ -144,315 +129,444 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
   }
 }
 
-// ─── Filters bar ─────────────────────────────────────────────────────────────
-
 class _FiltersBar extends StatelessWidget {
-  final TextEditingController ctrl;
   final String? currentFilter;
-  final ValueChanged<String> onSearch;
-  final ValueChanged<String?> onFilter;
   final int total;
+  final bool loading;
+  final VoidCallback? onCreate;
+  final Future<void> Function() onRefresh;
+  final ValueChanged<String?> onFilter;
 
   const _FiltersBar({
-    required this.ctrl,
     required this.currentFilter,
-    required this.onSearch,
-    required this.onFilter,
     required this.total,
+    required this.loading,
+    required this.onRefresh,
+    required this.onFilter,
+    this.onCreate,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: context.colors.background,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.xs,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DSSearchField(
-            controller: ctrl,
-            placeholder: 'Buscar por código o vendedora...',
-            onChanged: onSearch,
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          DSFilterBar(
-            children: [
-              DSFilterChip(
-                label: 'Todas',
-                count: total,
-                selected: currentFilter == null,
-                onTap: () => onFilter(null),
-              ),
-              DSFilterChip(
-                label: 'ACTIVA',
-                selected: currentFilter == 'ACTIVA',
-                onTap: () =>
-                    onFilter(currentFilter == 'ACTIVA' ? null : 'ACTIVA'),
-                selectedColor: AppColors.success,
-              ),
-              DSFilterChip(
-                label: 'PENDIENTE',
-                selected: currentFilter == 'PENDIENTE',
-                onTap: () =>
-                    onFilter(currentFilter == 'PENDIENTE' ? null : 'PENDIENTE'),
-                selectedColor: AppColors.warning,
-              ),
-              DSFilterChip(
-                label: 'ANULADA',
-                selected: currentFilter == 'ANULADA',
-                onTap: () =>
-                    onFilter(currentFilter == 'ANULADA' ? null : 'ANULADA'),
-                selectedColor: AppColors.error,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── KPI row ─────────────────────────────────────────────────────────────────
-
-class _KpiRow extends StatelessWidget {
-  final List<Venta> ventas;
-  const _KpiRow({required this.ventas});
-
-  @override
-  Widget build(BuildContext context) {
-    final total = ventas.fold(0.0, (s, v) => s + v.total);
-    final activas = ventas.where((v) => !v.isAnulada).length;
-    final pendientes = ventas.where((v) => v.isPendiente).length;
-
-    return Container(
-      color: context.colors.background,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          _Kpi('Total', FormatUtils.currency(total), AppColors.primary),
-          _KpiDiv(),
-          _Kpi('Activas', '$activas', AppColors.success),
-          _KpiDiv(),
-          _Kpi('Pendientes', '$pendientes', AppColors.warning),
-        ],
-      ),
-    );
-  }
-}
-
-class _Kpi extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  const _Kpi(this.label, this.value, this.color);
-  @override
-  Widget build(BuildContext context) => Expanded(
+  Widget build(BuildContext context) => Container(
+    color: context.colors.background,
+    padding: const EdgeInsets.fromLTRB(15, 10, 15, 12),
     child: Column(
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: color,
+        DropdownButtonFormField<String>(
+          key: ValueKey(currentFilter ?? 'TODAS'),
+          initialValue: currentFilter ?? 'TODAS',
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+          decoration: const InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
+          items: const [
+            DropdownMenuItem(value: 'TODAS', child: Text('Todos los estados')),
+            DropdownMenuItem(value: 'ACTIVA', child: Text('Activas')),
+            DropdownMenuItem(value: 'ANULADA', child: Text('Anuladas')),
+          ],
+          onChanged: loading
+              ? null
+              : (value) => onFilter(value == 'TODAS' ? null : value),
         ),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
+        const SizedBox(height: 9),
+        Row(
+          children: [
+            SizedBox(
+              width: 44,
+              height: 40,
+              child: OutlinedButton(
+                onPressed: loading ? null : onRefresh,
+                style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                child: AnimatedRotation(
+                  turns: loading ? 1 : 0,
+                  duration: const Duration(milliseconds: 350),
+                  child: const Icon(Icons.refresh_rounded, size: 18),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                '$total venta${total == 1 ? '' : 's'}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: context.colors.textTertiary,
+                ),
+              ),
+            ),
+            const Spacer(),
+            if (onCreate != null)
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: onCreate,
+                  icon: const Icon(Icons.shopping_cart_outlined, size: 17),
+                  label: const Text(
+                    'Nueva venta',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+          ],
         ),
       ],
     ),
   );
 }
 
-class _KpiDiv extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      Container(width: 1, height: 28, color: context.colors.border);
-}
-
-// ─── Venta card — compacta estilo iOS ────────────────────────────────────────
-
-class _VentaCard extends StatelessWidget {
+class _VentaCard extends StatefulWidget {
   final Venta venta;
-  final bool canConciliar, canAnular;
-  final VoidCallback onTap;
   final VoidCallback? onConciliar;
+  final VoidCallback? onAnular;
+  final bool correction;
 
   const _VentaCard({
     required this.venta,
-    required this.canConciliar,
-    required this.canAnular,
-    required this.onTap,
+    required this.correction,
     this.onConciliar,
+    this.onAnular,
   });
 
   @override
+  State<_VentaCard> createState() => _VentaCardState();
+}
+
+class _VentaCardState extends State<_VentaCard> {
+  bool expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final isAnulada = venta.isAnulada;
-    final isPendiente = venta.isPendiente;
-    final statusColor = isAnulada
-        ? AppColors.error
-        : isPendiente
-        ? AppColors.warning
-        : AppColors.success;
+    final venta = widget.venta;
+    final status = _status(venta);
+    final date = DateTime.tryParse(venta.createdAt)?.toLocal();
 
-    DateTime? dt;
-    try {
-      dt = DateTime.parse(venta.createdAt);
-    } catch (_) {}
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: 10,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: venta.isAnulada ? 0.7 : 1,
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(17),
+          border: Border.all(color: context.colors.border),
         ),
-        child: Row(
+        child: Column(
           children: [
-            // Barra de color
-            Container(
-              width: 3,
-              height: 40,
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            // Imagen miniatura
-            DSProductImageSquare(
-              imageUrl: null,
-              productName: venta.items.isNotEmpty
-                  ? venta.items.first.productoNombre
-                  : null,
-              size: 40,
-              radius: 8,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            // Info
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    venta.codigo,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          venta.codigo,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: context.colors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      _StatusBadge(label: status.$1, color: status.$2),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      if (venta.vendedoraUsername != null)
-                        venta.vendedoraUsername!,
-                      if (dt != null) FormatUtils.timeAgo(dt),
-                    ].join(' · '),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.colors.textTertiary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      if (venta.vendedoraUsername != null) ...[
+                        Flexible(
+                          child: Text(
+                            venta.vendedoraUsername!,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colors.textTertiary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                      ],
+                      if (date != null)
+                        Text(
+                          DateFormat('dd/MM/yy, h:mm a').format(date),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: context.colors.textTertiary,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            FormatUtils.currency(venta.total),
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: context.colors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Spacer(),
+                      if (widget.onConciliar != null)
+                        _ActionButton(
+                          label: widget.correction ? 'Corregir' : 'Clasificar',
+                          icon: Icons.account_balance_wallet_outlined,
+                          color: widget.correction
+                              ? context.colors.textSecondary
+                              : AppColors.warning,
+                          onTap: widget.onConciliar!,
+                        ),
+                      if (widget.onAnular != null) ...[
+                        const SizedBox(width: 6),
+                        _SquareAction(
+                          icon: Icons.cancel_outlined,
+                          color: AppColors.error,
+                          onTap: widget.onAnular!,
+                        ),
+                      ],
+                      const SizedBox(width: 6),
+                      _SquareAction(
+                        icon: expanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: context.colors.textTertiary,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => expanded = !expanded);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            // Precio + badge
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  FormatUtils.currency(venta.total),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: context.colors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    isAnulada
-                        ? 'ANULADA'
-                        : isPendiente
-                        ? 'PENDIENTE'
-                        : 'ACTIVA',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      color: statusColor,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-              ],
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              child: expanded ? _ExpandedSale(venta: venta) : const SizedBox(),
             ),
-            const SizedBox(width: 6),
-            // Clasificar o chevron
-            if (onConciliar != null)
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  onConciliar!();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.colors.primarySurface,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Clasificar',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: context.colors.textTertiary,
-              ),
           ],
         ),
       ),
     );
   }
+
+  (String, Color) _status(Venta venta) {
+    if (venta.isAnulada) return ('Anulada', AppColors.error);
+    return switch (venta.conciliacion?.estado) {
+      EstadoConciliacion.pendiente => ('Pendiente', AppColors.warning),
+      EstadoConciliacion.billetera => ('Billetera', AppColors.info),
+      EstadoConciliacion.efectivo => ('Efectivo', AppColors.success),
+      null => ('Activa', AppColors.success),
+    };
+  }
+}
+
+class _ExpandedSale extends StatelessWidget {
+  final Venta venta;
+
+  const _ExpandedSale({required this.venta});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+    decoration: BoxDecoration(
+      border: Border(top: BorderSide(color: context.colors.border)),
+    ),
+    child: Column(
+      children: [
+        for (final item in venta.items)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.productoNombre ?? item.productoId,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textPrimary,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: Text(
+                    '${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.colors.textTertiary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      FormatUtils.currency(item.subtotal),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (venta.conciliacion?.etiquetaNombre != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Billetera: ${venta.conciliacion!.etiquetaNombre}',
+                style: const TextStyle(fontSize: 11, color: AppColors.info),
+              ),
+            ),
+          ),
+        if (venta.motivoAnulacion != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Anulación: ${venta.motivoAnulacion}',
+                style: const TextStyle(fontSize: 11, color: AppColors.error),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(100),
+      border: Border.all(color: color.withValues(alpha: 0.32)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.check_circle_outline_rounded, size: 11, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 11),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _SquareAction extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SquareAction({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Icon(icon, size: 17, color: color),
+    ),
+  );
 }
 
 class _LoadMoreButton extends StatelessWidget {
   final VoidCallback? onTap;
   final bool loading;
+
   const _LoadMoreButton({required this.onTap, required this.loading});
+
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
@@ -465,14 +579,7 @@ class _LoadMoreButton extends StatelessWidget {
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Text(
-                'Cargar más',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
+            : const Text('Cargar más'),
       ),
     ),
   );

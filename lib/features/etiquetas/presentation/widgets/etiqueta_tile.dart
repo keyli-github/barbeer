@@ -99,7 +99,10 @@ class EtiquetaTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Row(
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 5,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _Badge(
                         label: etiqueta.tipo.value,
@@ -109,42 +112,33 @@ class EtiquetaTile extends StatelessWidget {
                           EtiquetaTipo.ambos => AppColors.primary,
                         },
                       ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        etiqueta.requiereComprobante
+                      _Meta(
+                        icon: etiqueta.requiereComprobante
                             ? Icons.check_circle_rounded
                             : Icons.remove_circle_outline_rounded,
-                        size: 12,
+                        label: etiqueta.requiereComprobante
+                            ? 'Comprobante'
+                            : 'Sin comprobante',
                         color: etiqueta.requiereComprobante
                             ? AppColors.success
                             : context.colors.textTertiary,
                       ),
-                      const SizedBox(width: 3),
-                      Text(
-                        etiqueta.requiereComprobante
-                            ? 'Comprobante'
-                            : 'Sin comprobante',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: context.colors.textTertiary,
-                        ),
+                      _Meta(
+                        icon: etiqueta.sedeId == null
+                            ? Icons.public_rounded
+                            : Icons.store_rounded,
+                        label: etiqueta.sedeId == null
+                            ? 'Global'
+                            : 'Sede específica',
+                        color: etiqueta.sedeId == null
+                            ? context.colors.textTertiary
+                            : AppColors.warning,
                       ),
-                      if (etiqueta.sedeId != null) ...[
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.store_rounded,
-                          size: 12,
-                          color: AppColors.warning,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Sede',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.warning,
-                          ),
-                        ),
-                      ],
+                      _Meta(
+                        icon: Icons.sort_rounded,
+                        label: 'Orden ${etiqueta.orden}',
+                        color: context.colors.textTertiary,
+                      ),
                     ],
                   ),
                 ],
@@ -177,6 +171,24 @@ class EtiquetaTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Meta extends StatelessWidget {
+  const _Meta({required this.icon, required this.label, required this.color});
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 12, color: color),
+      const SizedBox(width: 3),
+      Text(label, style: TextStyle(fontSize: 10, color: color)),
+    ],
+  );
 }
 
 class _Badge extends StatelessWidget {

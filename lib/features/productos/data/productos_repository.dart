@@ -126,27 +126,27 @@ class ProductosRepository {
     return ProductosResumen.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
-  Future<Producto> getById(String id) async {
-    final r = await _api.get('/productos/$id');
+  Future<Producto> getById(String id, {String? sedeId}) async {
+    final r = await _api.get(
+      '/productos/$id',
+      queryParameters: {'sedeId': ?sedeId},
+    );
     return Producto.fromJson(Map<String, dynamic>.from(r.data as Map));
   }
 
   Future<Producto> create({
-    required String codigo,
     required String nombre,
     required String categoriaId,
     required double precioVenta,
     required double precioCosto,
     String? descripcion,
     String? imagenUrl,
-    String? unidad,
     bool disponiblePos = false,
     bool activo = true,
   }) async {
     final r = await _api.post(
       '/productos',
       data: {
-        'codigo': codigo,
         'nombre': nombre,
         'categoriaId': categoriaId,
         'precioVenta': precioVenta,
@@ -154,7 +154,6 @@ class ProductosRepository {
         if (descripcion?.trim().isNotEmpty ?? false)
           'descripcion': descripcion!.trim(),
         if (imagenUrl case final imagenUrl?) 'imagenUrl': imagenUrl.trim(),
-        'unidad': ?unidad,
         'disponiblePos': disponiblePos,
         'activo': activo,
       },

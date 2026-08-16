@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/navigation/app_nav.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -136,6 +138,7 @@ class _ProvsState {
   final bool loading;
   final String? error;
   final int page, totalPages, total;
+  final String search, activo;
 
   const _ProvsState({
     this.items = const [],
@@ -144,6 +147,8 @@ class _ProvsState {
     this.page = 1,
     this.totalPages = 1,
     this.total = 0,
+    this.search = '',
+    this.activo = '',
   });
 
   _ProvsState copyWith({
@@ -154,6 +159,8 @@ class _ProvsState {
     int? page,
     int? totalPages,
     int? total,
+    String? search,
+    String? activo,
   }) => _ProvsState(
     items: items ?? this.items,
     loading: loading ?? this.loading,
@@ -161,11 +168,14 @@ class _ProvsState {
     page: page ?? this.page,
     totalPages: totalPages ?? this.totalPages,
     total: total ?? this.total,
+    search: search ?? this.search,
+    activo: activo ?? this.activo,
   );
 }
 
 class _ProvsNotifier extends StateNotifier<_ProvsState> {
   final ComprasRepository _repo;
+  Timer? _debounce;
 
   _ProvsNotifier(this._repo) : super(const _ProvsState()) {
     load();
@@ -175,7 +185,11 @@ class _ProvsNotifier extends StateNotifier<_ProvsState> {
     final p = resetPage ? 1 : state.page;
     state = state.copyWith(loading: true, clearError: true, page: p);
     try {
-      final page = await _repo.listProveedores(pagina: p, activo: 'true');
+      final page = await _repo.listProveedores(
+        pagina: p,
+        q: state.search.isEmpty ? null : state.search,
+        activo: state.activo.isEmpty ? null : state.activo,
+      );
       state = state.copyWith(
         items: page.data,
         total: page.total,
@@ -191,6 +205,26 @@ class _ProvsNotifier extends StateNotifier<_ProvsState> {
   void setPage(int p) {
     state = state.copyWith(page: p);
     load();
+  }
+
+  void setSearch(String value) {
+    state = state.copyWith(search: value);
+    _debounce?.cancel();
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => load(resetPage: true),
+    );
+  }
+
+  void setActivo(String value) {
+    state = state.copyWith(activo: value);
+    load(resetPage: true);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 }
 
@@ -235,7 +269,7 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
         children: [
           // Solo tabs, sin título (el header viene del Shell)
           Container(
-            color: Colors.white,
+            color: context.colors.surface,
             child: TabBar(
               controller: _tabs,
               indicatorColor: AppColors.primary,
@@ -582,42 +616,86 @@ class _ProvsTab extends ConsumerWidget {
     final state = ref.watch(_provsProvider);
     final notifier = ref.read(_provsProvider.notifier);
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      child: state.loading
-          ? const AppLoading(key: ValueKey('l'))
-          : state.error != null
-          ? AppErrorState(
-              key: const ValueKey('e'),
-              message: state.error!,
-              onRetry: () => notifier.load(),
-            )
-          : state.items.isEmpty
-          ? const AppEmptyState(
-              key: ValueKey('empty'),
-              icon: Icons.local_shipping_outlined,
-              title: 'Sin proveedores',
-            )
-          : ListView.builder(
-              key: const ValueKey('list'),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-              itemCount: state.items.length + 1,
-              itemBuilder: (_, i) {
-                if (i == state.items.length) {
-                  return AppPagination(
-                    page: state.page,
-                    totalPages: state.totalPages,
-                    total: state.total,
-                    onPageChange: notifier.setPage,
-                  );
-                }
-                return _ProvTile(
-                  prov: state.items[i],
-                  canEdit: canEdit,
-                  onEdit: () => onEdit(state.items[i]),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: LayoutBuilder(
+            builder: (_, constraints) {
+              final search = TextField(
+                key: const Key('proveedores-search'),
+                onChanged: notifier.setSearch,
+                decoration: const InputDecoration(
+                  hintText: 'Buscar proveedor...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              );
+              final status = DropdownButtonFormField<String>(
+                key: const Key('proveedores-status'),
+                initialValue: state.activo,
+                decoration: const InputDecoration(labelText: 'Estado'),
+                items: const [
+                  DropdownMenuItem(value: '', child: Text('Todos')),
+                  DropdownMenuItem(value: 'true', child: Text('Activos')),
+                  DropdownMenuItem(value: 'false', child: Text('Inactivos')),
+                ],
+                onChanged: (value) => notifier.setActivo(value ?? ''),
+              );
+              if (constraints.maxWidth < 600) {
+                return Column(
+                  children: [search, const SizedBox(height: 8), status],
                 );
-              },
-            ),
+              }
+              return Row(
+                children: [
+                  Expanded(flex: 2, child: search),
+                  const SizedBox(width: 12),
+                  Expanded(child: status),
+                ],
+              );
+            },
+          ),
+        ),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: state.loading
+                ? const AppLoading(key: ValueKey('l'))
+                : state.error != null
+                ? AppErrorState(
+                    key: const ValueKey('e'),
+                    message: state.error!,
+                    onRetry: () => notifier.load(),
+                  )
+                : state.items.isEmpty
+                ? const AppEmptyState(
+                    key: ValueKey('empty'),
+                    icon: Icons.local_shipping_outlined,
+                    title: 'Sin proveedores',
+                  )
+                : ListView.builder(
+                    key: const ValueKey('list'),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    itemCount: state.items.length + 1,
+                    itemBuilder: (_, i) {
+                      if (i == state.items.length) {
+                        return AppPagination(
+                          page: state.page,
+                          totalPages: state.totalPages,
+                          total: state.total,
+                          onPageChange: notifier.setPage,
+                        );
+                      }
+                      return _ProvTile(
+                        prov: state.items[i],
+                        canEdit: canEdit,
+                        onEdit: () => onEdit(state.items[i]),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -657,10 +735,23 @@ class _ProvTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(prov.nombre, style: AppTextStyles.titleMedium),
+                Text(
+                  prov.activo ? 'Activo' : 'Inactivo',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: prov.activo
+                        ? AppColors.success
+                        : context.colors.textTertiary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 if (prov.categoria != null)
                   Text(prov.categoria!, style: AppTextStyles.labelSmall),
+                if (prov.contacto != null)
+                  Text(prov.contacto!, style: AppTextStyles.labelSmall),
                 if (prov.telefono != null)
                   Text(prov.telefono!, style: AppTextStyles.labelSmall),
+                if (prov.email != null)
+                  Text(prov.email!, style: AppTextStyles.labelSmall),
               ],
             ),
           ),
@@ -821,6 +912,8 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _PurchaseTimeline(status: _compra!.estado),
+                  const SizedBox(height: 20),
                   Text(
                     'Artículos (${_compra!.articulos})',
                     style: AppTextStyles.titleMedium,
@@ -842,7 +935,7 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${item.codigo} · ×${item.cantidad}',
+                                  '${item.codigo} · ×${item.cantidad} · S/ ${item.costoUnit.toStringAsFixed(2)} c/u',
                                   style: AppTextStyles.labelSmall,
                                 ),
                               ],
@@ -872,6 +965,19 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
                       ),
                     ],
                   ),
+                  if (_compra!.eta?.isNotEmpty == true) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Entrega estimada: ${_compra!.eta}',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                  ],
+                  if (_compra!.notas.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text('Notas', style: AppTextStyles.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(_compra!.notas, style: AppTextStyles.bodySmall),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -913,17 +1019,96 @@ class _DetalleOrdenScreenState extends State<_DetalleOrdenScreen> {
                         ],
                       ),
                     if (_compra!.estado == 'ENVIADA')
-                      AppButton(
-                        label: 'Marcar recibida',
-                        onPressed: _acting ? null : () => _cambiar('RECIBIDA'),
-                        isFullWidth: true,
-                        isLoading: _acting,
-                        height: 52,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppButton(
+                              label: 'Marcar recibida',
+                              onPressed: _acting
+                                  ? null
+                                  : () => _cambiar('RECIBIDA'),
+                              isFullWidth: true,
+                              isLoading: _acting,
+                              height: 52,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: AppButton(
+                              label: 'Cancelar',
+                              onPressed: _acting
+                                  ? null
+                                  : () => _cambiar('CANCELADA'),
+                              variant: AppButtonVariant.danger,
+                              isFullWidth: true,
+                              height: 52,
+                            ),
+                          ),
+                        ],
                       ),
                   ],
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _PurchaseTimeline extends StatelessWidget {
+  const _PurchaseTimeline({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = ['PENDIENTE', 'ENVIADA', 'RECIBIDA'];
+    final cancelled = status == 'CANCELADA';
+    final current = steps.indexOf(status);
+    return Row(
+      children: [
+        for (var index = 0; index < steps.length; index++) ...[
+          Expanded(
+            child: Column(
+              children: [
+                Icon(
+                  cancelled
+                      ? Icons.cancel_rounded
+                      : index <= current
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: cancelled
+                      ? AppColors.error
+                      : index <= current
+                      ? AppColors.success
+                      : context.colors.textTertiary,
+                  size: 20,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  cancelled && index == 0 ? 'CANCELADA' : steps[index],
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: cancelled
+                        ? AppColors.error
+                        : index <= current
+                        ? context.colors.textPrimary
+                        : context.colors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (index < steps.length - 1)
+            Expanded(
+              child: Divider(
+                color: !cancelled && index < current
+                    ? AppColors.success
+                    : context.colors.border,
+              ),
+            ),
+        ],
+      ],
     );
   }
 }
@@ -949,7 +1134,6 @@ class _NuevaOrdenScreen extends StatefulWidget {
 }
 
 class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
-  final _etaCtrl = TextEditingController();
   final _notasCtrl = TextEditingController();
   String _proveedorId = '';
   String _sedeId = '';
@@ -970,7 +1154,6 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
 
   @override
   void dispose() {
-    _etaCtrl.dispose();
     _notasCtrl.dispose();
     for (final item in _items) {
       item.dispose();
@@ -1070,7 +1253,6 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
         proveedorId: _proveedorId,
         sedeId: _sedeId,
         items: items.cast<CompraCreateItem>(),
-        eta: _etaCtrl.text.trim().isEmpty ? null : _etaCtrl.text.trim(),
         notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
       );
       if (mounted) {
@@ -1244,21 +1426,6 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
             ],
             const SizedBox(height: 14),
             TextField(
-              controller: _etaCtrl,
-              keyboardType: TextInputType.datetime,
-              decoration: InputDecoration(
-                labelText: 'Fecha estimada (YYYY-MM-DD)',
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
               controller: _notasCtrl,
               maxLines: 2,
               decoration: InputDecoration(
@@ -1370,14 +1537,37 @@ class _CompraDraftCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _numberField('Cantidad', line.cantidad)),
-              const SizedBox(width: 8),
-              Expanded(child: _numberField('Costo unit.', line.costoUnit)),
-              const SizedBox(width: 8),
-              Expanded(child: _numberField('P. venta', line.precioVenta)),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 380;
+              final cantidad = _numberField('Cantidad', line.cantidad);
+              final costo = _numberField('Costo unit.', line.costoUnit);
+              final precio = _numberField('P. venta', line.precioVenta);
+              if (narrow) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: cantidad),
+                        const SizedBox(width: 8),
+                        Expanded(child: costo),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    precio,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: cantidad),
+                  const SizedBox(width: 8),
+                  Expanded(child: costo),
+                  const SizedBox(width: 8),
+                  Expanded(child: precio),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 10),
           Align(
@@ -1428,30 +1618,49 @@ class _ProveedorScreen extends StatefulWidget {
 }
 
 class _ProveedorScreenState extends State<_ProveedorScreen> {
-  late TextEditingController _nombreCtrl,
-      _catCtrl,
-      _contactoCtrl,
-      _telCtrl,
-      _emailCtrl;
+  late TextEditingController _nombreCtrl, _contactoCtrl, _telCtrl, _emailCtrl;
   bool _activo = true, _saving = false;
   String? _error;
+  // Categoría: seleccionada del API (igual que en web) o valor libre del proveedor.
+  String? _selectedCat;
+  List<String> _catOptions = [];
+  bool _catsLoading = true;
 
   @override
   void initState() {
     super.initState();
     final p = widget.proveedor;
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
-    _catCtrl = TextEditingController(text: p?.categoria ?? '');
     _contactoCtrl = TextEditingController(text: p?.contacto ?? '');
     _telCtrl = TextEditingController(text: p?.telefono ?? '');
     _emailCtrl = TextEditingController(text: p?.email ?? '');
     _activo = p?.activo ?? true;
+    _selectedCat = p?.categoria?.isNotEmpty == true ? p!.categoria : null;
+    _loadCats();
+  }
+
+  Future<void> _loadCats() async {
+    try {
+      final cats = await ProductosRepository(ApiClient.instance).categorias();
+      if (!mounted) return;
+      final nombres = cats.map((c) => c.nombre).toList();
+      // Si el proveedor tiene una categoría que no está en la lista, la agregamos.
+      if (_selectedCat != null && !nombres.contains(_selectedCat)) {
+        nombres.insert(0, _selectedCat!);
+      }
+      setState(() {
+        _catOptions = nombres;
+        _catsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _catsLoading = false);
+    }
   }
 
   @override
   void dispose() {
     _nombreCtrl.dispose();
-    _catCtrl.dispose();
     _contactoCtrl.dispose();
     _telCtrl.dispose();
     _emailCtrl.dispose();
@@ -1471,7 +1680,7 @@ class _ProveedorScreenState extends State<_ProveedorScreen> {
       if (widget.proveedor == null) {
         await widget.repo.createProveedor(
           nombre: _nombreCtrl.text.trim(),
-          categoria: _catCtrl.text.trim().isEmpty ? null : _catCtrl.text.trim(),
+          categoria: _selectedCat?.isNotEmpty == true ? _selectedCat : null,
           contacto: _contactoCtrl.text.trim().isEmpty
               ? null
               : _contactoCtrl.text.trim(),
@@ -1481,8 +1690,7 @@ class _ProveedorScreenState extends State<_ProveedorScreen> {
       } else {
         await widget.repo.updateProveedor(widget.proveedor!.id, {
           'nombre': _nombreCtrl.text.trim(),
-          if (_catCtrl.text.trim().isNotEmpty)
-            'categoria': _catCtrl.text.trim(),
+          if (_selectedCat?.isNotEmpty == true) 'categoria': _selectedCat!,
           if (_contactoCtrl.text.trim().isNotEmpty)
             'contacto': _contactoCtrl.text.trim(),
           if (_telCtrl.text.trim().isNotEmpty) 'telefono': _telCtrl.text.trim(),
@@ -1527,10 +1735,37 @@ class _ProveedorScreenState extends State<_ProveedorScreen> {
               controller: _nombreCtrl,
             ),
             const SizedBox(height: 12),
-            AppTextField(
-              label: 'Categoría',
-              hint: 'Licores, cervezas...',
-              controller: _catCtrl,
+            // Categoría: dropdown desde el API de categorías de productos
+            // (mismo comportamiento que la web).
+            DropdownButtonFormField<String?>(
+              initialValue:
+                  _catOptions.contains(_selectedCat) ? _selectedCat : null,
+              decoration: InputDecoration(
+                labelText: 'Categoría',
+                suffixIcon: _catsLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Sin categoría'),
+                ),
+                ..._catOptions.map(
+                  (cat) =>
+                      DropdownMenuItem<String?>(value: cat, child: Text(cat)),
+                ),
+              ],
+              onChanged: _catsLoading
+                  ? null
+                  : (v) => setState(() => _selectedCat = v),
             ),
             const SizedBox(height: 12),
             AppTextField(label: 'Contacto', controller: _contactoCtrl),

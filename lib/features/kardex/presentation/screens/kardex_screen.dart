@@ -8,6 +8,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/ds_product_image.dart';
 import '../../data/kardex_repository.dart';
 
 final _kardexRepoProvider = Provider<KardexRepository>(
@@ -90,6 +91,7 @@ class _KardexNotifier extends StateNotifier<_KardexState> {
           sedeId: _sedeId,
         ),
         _repo.resumen(
+          q: state.search.isEmpty ? null : state.search,
           tipo: state.tipoFilter.isEmpty ? null : state.tipoFilter,
           desde: state.desde,
           hasta: state.hasta,
@@ -355,22 +357,30 @@ class _HeaderState extends State<_Header> {
 
   Future<void> _pickDate(BuildContext context, {required bool isDesde}) async {
     final now = DateTime.now();
+    // La causa del fallo era `locale: Locale('es', 'PE')` cuando la app no
+    // tiene flutter_localizations configurado — lo que producía la pantalla
+    // blanca. Se elimina el parámetro y se deja que Flutter use el locale
+    // del sistema, lo que siempre funciona sin delegates adicionales.
     final picked = await showDatePicker(
       context: context,
       initialDate: now,
       firstDate: DateTime(2020),
       lastDate: now,
-      locale: const Locale('es', 'PE'),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: Theme.of(
-            ctx,
-          ).colorScheme.copyWith(primary: AppColors.primary),
-        ),
-        child: child!,
-      ),
+      builder: (ctx, child) {
+        // Aplicar color de marca al picker respetando el tema claro/oscuro.
+        final base = Theme.of(ctx);
+        return Theme(
+          data: base.copyWith(
+            colorScheme: base.colorScheme.copyWith(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     final formatted =
         '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     if (isDesde) {
@@ -465,14 +475,25 @@ class _KpiRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-    child: Row(
-      children: [
-        _Chip('Total', '${resumen.totalMovimientos}', AppColors.primary),
-        const SizedBox(width: 8),
-        _Chip('Entradas', '${resumen.entradas}', AppColors.success),
-        const SizedBox(width: 8),
-        _Chip('Salidas', '${resumen.salidas}', AppColors.error),
-      ],
+    child: LayoutBuilder(
+      builder: (_, constraints) => GridView.count(
+        crossAxisCount: constraints.maxWidth >= 720 ? 4 : 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: constraints.maxWidth >= 720 ? 2.5 : 2.2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _Chip('Total', '${resumen.totalMovimientos}', AppColors.primary),
+          _Chip('Entradas', '${resumen.entradas}', AppColors.success),
+          _Chip('Salidas', '${resumen.salidas}', AppColors.error),
+          _Chip(
+            'Valor total',
+            'S/ ${resumen.valorTotal.toStringAsFixed(2)}',
+            AppColors.warning,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -483,26 +504,24 @@ class _Chip extends StatelessWidget {
   const _Chip(this.label, this.value, this.color);
 
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.09),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.09),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+    ),
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: color,
           ),
-          Text(label, style: AppTextStyles.labelSmall),
-        ],
-      ),
+        ),
+        Text(label, style: AppTextStyles.labelSmall),
+      ],
     ),
   );
 }
@@ -569,14 +588,40 @@ class _MovTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+          // ─ Imagen del producto con indicador de tipo superpuesto
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: Stack(
+              children: [
+                  DSProductImageSquare(
+                    imageUrl: mov.imagenUrl != null
+                        ? '${mov.imagenUrl}?v=${mov.updatedAt?.millisecondsSinceEpoch ?? mov.fecha.hashCode}'
+                        : null,
+                  size: 44,
+                  radius: 10,
+                  productName: mov.producto,
+                ),
+                // Indicador de tipo (entrada/salida/ajuste) en esquina inferior
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: _color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: context.colors.surface,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(_icon, color: Colors.white, size: 9),
+                  ),
+                ),
+              ],
             ),
-            child: Icon(_icon, color: _color, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -627,6 +672,12 @@ class _MovTile extends StatelessWidget {
                 ),
               ),
               Text(_cantidad, style: AppTextStyles.labelSmall),
+              Text(
+                'S/ ${mov.valor.toStringAsFixed(2)}',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: context.colors.textSecondary,
+                ),
+              ),
             ],
           ),
         ],

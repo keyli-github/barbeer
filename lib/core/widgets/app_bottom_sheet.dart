@@ -126,13 +126,15 @@ class ConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Dialog(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 60,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
             height: 60,
             decoration: BoxDecoration(
               color: isDanger
@@ -161,29 +163,30 @@ class ConfirmDialog extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(cancelLabel ?? 'Cancelar'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(cancelLabel ?? 'Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onConfirm,
+                      style: isDanger
+                          ? ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.error,
+                            )
+                          : null,
+                      child: Text(confirmLabel),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: onConfirm,
-                  style: isDanger
-                      ? ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
-                        )
-                      : null,
-                  child: Text(confirmLabel),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );

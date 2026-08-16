@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/providers/branding_provider.dart';
 import 'core/providers/theme_mode_provider.dart';
 import 'core/routes/app_router.dart';
 import 'core/theme/app_scroll_behavior.dart';
@@ -37,11 +38,13 @@ class BarBeerApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    // Notifica al GoRouter cada vez que cambia el estado de autenticación
-    // para que re-evalúe su redirect sin necesidad de recrear el router.
+    // Carga branding remoto (endpoint público) al arrancar la app
     ref.listen<AuthState>(authProvider, (_, __) {
       router.refresh();
     });
+    // Precarga el branding fuera del ciclo de build para evitar
+    // modificar el árbol durante su construcción.
+    Future.microtask(() => ref.read(brandingProvider.notifier).load());
 
     return MaterialApp.router(
       title: 'BarBeer',

@@ -83,10 +83,14 @@ class StatCard extends StatelessWidget {
               ),
               const Spacer(),
               if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.success,
+                Flexible(
+                  child: Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.success,
+                    ),
                   ),
                 ),
             ],

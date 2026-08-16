@@ -9,6 +9,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caja_repository.dart';
@@ -101,6 +102,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                               .loadMovimientos(state.actual!.id, pagina: page);
                         }
                       },
+                      onRefresh: ref.read(cajaProvider.notifier).load,
                     ),
             ),
           ),
@@ -110,12 +112,15 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showDetail(BuildContext context, String id) async {
-    final isSuperAdmin = ref.read(authProvider).user?.isSuperAdmin ?? false;
+    final auth = ref.read(authProvider);
+    final canReopen =
+        auth.hasPermission('caja:cerrar') &&
+        (auth.user?.isSuperAdmin == true || auth.user?.rol == 'CAJERO');
     AppNav.push(
       context,
       _DetailSheet(
         future: ref.read(cajaProvider.notifier).detalle(id),
-        canReopen: isSuperAdmin,
+        canReopen: canReopen,
         onReopen: () => ref.read(cajaProvider.notifier).reaperturar(id),
       ),
     );
@@ -130,8 +135,13 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showPrecuadre(BuildContext context) async {
+    final state = ref.read(cajaProvider);
+    final precuadre = cajaCantidadesFromResponse(
+      state.actual?.denominacionesPrecuadre,
+    );
     showPrecuadreSheet(
       context,
+      initialCounts: precuadre.isEmpty ? state.aperturaSugerida : precuadre,
       onSuccess: () => _success('Precuadre registrado'),
     );
   }
@@ -158,9 +168,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   void _success(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    AppFeedback.success(context, message);
   }
 }
 
@@ -261,6 +269,7 @@ class _Actual extends StatelessWidget {
   final ValueChanged<String> onMove;
   final ValueChanged<String?> onMovementFilter;
   final ValueChanged<int> onMovementPage;
+  final Future<void> Function() onRefresh;
 
   const _Actual({
     super.key,
@@ -279,6 +288,7 @@ class _Actual extends StatelessWidget {
     required this.onMove,
     required this.onMovementFilter,
     required this.onMovementPage,
+    required this.onRefresh,
   });
 
   @override
@@ -318,7 +328,7 @@ class _Actual extends StatelessWidget {
         );
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () async {},
+      onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
         children: [
@@ -675,7 +685,7 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
     appBar: SubPageAppBar(
       title: 'Apertura de caja',
       subtitle: widget.initialCounts.isEmpty
-          ? 'Conteo obligatorio de las 9 denominaciones PEN'
+          ? 'Conteo obligatorio de las 11 denominaciones PEN'
           : 'Prefill del último cierre; verifica el efectivo físico',
     ),
     body: SingleChildScrollView(
@@ -686,7 +696,8 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
             crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 2.5,
+            childAspectRatio:
+                MediaQuery.sizeOf(context).width < 380 ? 1.9 : 2.5,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
             children: [
@@ -845,7 +856,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
   }
 }
 
-class _DetailSheet extends StatefulWidget {
+class _DetailSheet extends ConsumerStatefulWidget {
   final Future<CajaSesion> future;
   final bool canReopen;
   final Future<void> Function() onReopen;
@@ -857,129 +868,394 @@ class _DetailSheet extends StatefulWidget {
   });
 
   @override
-  State<_DetailSheet> createState() => _DetailSheetState();
+  ConsumerState<_DetailSheet> createState() => _DetailSheetState();
 }
 
-class _DetailSheetState extends State<_DetailSheet> {
+class _DetailSheetState extends ConsumerState<_DetailSheet> {
   bool _reopening = false;
+  // Movimientos de la sesión
+  List<CajaMovimiento> _movimientos = [];
+  bool _movLoading = false;
+  int _movPage = 1;
+  int _movPages = 1;
+  int _movTotal = 0;
+  String? _movTipo;
+  String? _loadedId;
+
+  Future<void> _loadMovimientos(
+    String id, {
+    int? pagina,
+    String? tipo,
+  }) async {
+    setState(() => _movLoading = true);
+    try {
+      final repo = ref.read(cajaRepositoryProvider);
+      final page = await repo.movimientos(
+        id,
+        pagina: pagina ?? _movPage,
+        tipo: tipo,
+      );
+      if (!mounted) return;
+      setState(() {
+        _movimientos = page.data;
+        _movPages = page.totalPaginas;
+        _movTotal = page.total;
+        _movPage = page.pagina;
+        _movLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _movLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: context.colors.surface,
     appBar: SubPageAppBar(
-      title: 'Detalle de caja',
-      subtitle: 'Resumen y arqueos registrados por el servidor',
+      title: 'Detalle de sesión de caja',
+      subtitle: 'Resumen y arqueos del turno',
     ),
-    body: SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: FutureBuilder<CajaSesion>(
-        future: widget.future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const _InlineSkeleton();
-          }
-          if (snapshot.hasError) {
-            return AppErrorState(message: snapshot.error.toString());
-          }
-          final session = snapshot.data!;
-          final values = <String, String>{
-            'Sede': session.sede,
-            'Estado': session.estado,
-            'Apertura': _money(session.montoApertura),
-            'Abierta por': session.usuarioAperturaLabel,
-            'Fecha de apertura': _dateTime(session.abiertaAt),
-            if (session.resumen != null)
-              'Saldo esperado': _money(session.resumen!.efectivoEsperado),
-            if (session.montoDeclaradoPrecuadre != null)
-              'Precuadre declarado': _money(session.montoDeclaradoPrecuadre!),
-            if (session.diferenciaPrecuadre != null)
-              'Diferencia precuadre': _money(session.diferenciaPrecuadre!),
-            if (session.montoDeclaradoCierre != null)
-              'Cierre declarado': _money(session.montoDeclaradoCierre!),
-            if (session.diferenciaCierre != null)
-              'Diferencia cierre': _money(session.diferenciaCierre!),
-            if (session.cerradaAt != null)
-              'Fecha de cierre': _dateTime(session.cerradaAt!),
-            if (session.observacionesCierre?.isNotEmpty ?? false)
-              'Observaciones': session.observacionesCierre!,
-          };
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final entry in values.entries) ...[
-                _DetailRow(label: entry.key, value: entry.value),
-                const Divider(height: 18),
+    body: FutureBuilder<CajaSesion>(
+      future: widget.future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const _InlineSkeleton();
+        }
+        if (snapshot.hasError) {
+          return AppErrorState(message: snapshot.error.toString());
+        }
+        final session = snapshot.data!;
+
+        if (_loadedId == null) {
+          _loadedId = session.id;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _loadMovimientos(session.id);
+          });
+        }
+
+        final resumen = session.resumen;
+        final v2 = resumen?.v2;
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          children: [
+            // ── Cabecera ──────────────────────────────────────────────────
+            Row(
+              children: [
+                _StatusPill(
+                  label: session.estado,
+                  color: session.isAbierta
+                      ? AppColors.success
+                      : context.colors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${session.sede} · ${_dateTime(session.abiertaAt)}',
+                    style: AppTextStyles.bodySmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
-              const SizedBox(height: 8),
-              const Text(
-                'Conteo de apertura',
-                style: AppTextStyles.titleMedium,
+            ),
+            const SizedBox(height: 14),
+
+            // ── Tarjetas de métricas ───────────────────────────────────────
+            if (resumen != null)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final w = (constraints.maxWidth - 10) / 2;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _Metric(
+                        width: w,
+                        label: 'Apertura',
+                        value: session.montoApertura,
+                        icon: Icons.play_circle_outline_rounded,
+                        color: context.colors.textSecondary,
+                      ),
+                      if (resumen.isV2 && v2 != null) ...[
+                        _Metric(
+                          width: w,
+                          label: 'Ventas neto',
+                          value: v2.totalVentasNeto,
+                          icon: Icons.trending_up_rounded,
+                          color: AppColors.success,
+                        ),
+                        _Metric(
+                          width: w,
+                          label: 'Digital neto',
+                          value: v2.totalDigitalNeto,
+                          icon: Icons.trending_down_rounded,
+                          color: AppColors.primary,
+                        ),
+                        _Metric(
+                          width: w,
+                          label: 'Efectivo esperado',
+                          value: v2.efectivoEsperado,
+                          icon: Icons.account_balance_rounded,
+                          color: AppColors.warning,
+                        ),
+                      ] else ...[
+                        _Metric(
+                          width: w,
+                          label: 'Entradas',
+                          value: resumen.v1?.totalEntradas ?? 0,
+                          icon: Icons.south_west_rounded,
+                          color: AppColors.success,
+                        ),
+                        _Metric(
+                          width: w,
+                          label: 'Salidas',
+                          value: resumen.v1?.totalSalidas ?? 0,
+                          icon: Icons.north_east_rounded,
+                          color: AppColors.error,
+                        ),
+                        _Metric(
+                          width: w,
+                          label: 'Efectivo esperado',
+                          value: resumen.efectivoEsperado,
+                          icon: Icons.account_balance_rounded,
+                          color: AppColors.warning,
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: session.denominaciones
-                    .map(
-                      (item) => _ReadOnlyChip(
-                        label:
-                            'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
+            const SizedBox(height: 14),
+
+            // ── Sección Apertura ───────────────────────────────────────────
+            _SectionCard(title: 'Apertura', rows: [
+              _DetailRow(label: 'Sede', value: session.sede),
+              _DetailRow(label: 'Estado', value: session.estado),
+              _DetailRow(label: 'Fecha', value: _dateTime(session.abiertaAt)),
+              _DetailRow(label: 'Usuario', value: session.usuarioAperturaLabel),
+              _DetailRow(label: 'Monto', value: _money(session.montoApertura)),
+              if (session.createdAt != null)
+                _DetailRow(label: 'Creada', value: _dateTime(session.createdAt!)),
+              if (session.updatedAt != null)
+                _DetailRow(label: 'Actualizada', value: _dateTime(session.updatedAt!)),
+            ]),
+            const SizedBox(height: 10),
+
+            // ── Sección Precuadre ──────────────────────────────────────────
+            _SectionCard(title: 'Precuadre', rows: [
+              _DetailRow(
+                label: 'Fecha',
+                value: session.precuadreAt != null
+                    ? _dateTime(session.precuadreAt!)
+                    : 'No realizado',
+              ),
+              _DetailRow(
+                label: 'Usuario',
+                value: session.usuarioPrecuadre ?? 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Declarado',
+                value: session.montoDeclaradoPrecuadre != null
+                    ? _money(session.montoDeclaradoPrecuadre!)
+                    : 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Esperado',
+                value: session.saldoEsperadoPrecuadre != null
+                    ? _money(session.saldoEsperadoPrecuadre!)
+                    : 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Diferencia',
+                value: session.diferenciaPrecuadre != null
+                    ? _money(session.diferenciaPrecuadre!)
+                    : 'No registrado',
+              ),
+            ]),
+            const SizedBox(height: 10),
+
+            // ── Sección Cierre ─────────────────────────────────────────────
+            _SectionCard(title: 'Cierre', rows: [
+              _DetailRow(
+                label: 'Fecha',
+                value: session.cerradaAt != null
+                    ? _dateTime(session.cerradaAt!)
+                    : 'Caja aún abierta',
+              ),
+              _DetailRow(
+                label: 'Usuario',
+                value: session.usuarioCierre ?? 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Declarado',
+                value: session.montoDeclaradoCierre != null
+                    ? _money(session.montoDeclaradoCierre!)
+                    : 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Esperado',
+                value: session.saldoEsperadoCierre != null
+                    ? _money(session.saldoEsperadoCierre!)
+                    : 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Diferencia',
+                value: session.diferenciaCierre != null
+                    ? _money(session.diferenciaCierre!)
+                    : 'No registrado',
+              ),
+              _DetailRow(
+                label: 'Observaciones',
+                value: session.observacionesCierre?.isNotEmpty == true
+                    ? session.observacionesCierre!
+                    : 'Sin observaciones',
+              ),
+            ]),
+            const SizedBox(height: 14),
+
+            // ── Denominaciones de apertura (tabla) ─────────────────────────
+            if (session.denominaciones.isNotEmpty) ...[
+              _DenominacionesTable(
+                title: 'Denominaciones de apertura',
+                items: session.denominaciones,
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            // ── Denominaciones de precuadre (tabla) ────────────────────────
+            if (session.denominacionesPrecuadre.isNotEmpty) ...[
+              _DenominacionesTable(
+                title: 'Denominaciones de precuadre',
+                items: session.denominacionesPrecuadre,
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            // ── Billetera ──────────────────────────────────────────────────
+            if (v2?.porBilletera.isNotEmpty ?? false) ...[
+              CajaBilleteraCard(porBilletera: v2!.porBilletera),
+              const SizedBox(height: 14),
+            ],
+
+            // ── Vendedoras ─────────────────────────────────────────────────
+            if (v2?.porVendedora.isNotEmpty ?? false) ...[
+              CajaVendedoraTable(porVendedora: v2!.porVendedora),
+              const SizedBox(height: 14),
+            ],
+
+            // ── Productos ──────────────────────────────────────────────────
+            if (v2?.resumenProductos.isNotEmpty ?? false) ...[
+              CajaProductosTable(resumenProductos: v2!.resumenProductos),
+              const SizedBox(height: 14),
+            ],
+
+            // ── Movimientos ────────────────────────────────────────────────
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Movimientos',
+                            style: AppTextStyles.titleMedium,
+                          ),
+                        ),
+                        Text(
+                          '$_movTotal registros',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                    child: _FilterRow(
+                      selected: _movTipo,
+                      values: const [null, 'ENTRADA', 'SALIDA'],
+                      labels: const ['Todos', 'Entradas', 'Salidas'],
+                      onChanged: (tipo) {
+                        setState(() {
+                          _movTipo = tipo;
+                          _movPage = 1;
+                        });
+                        _loadMovimientos(
+                          _loadedId!,
+                          tipo: tipo,
+                          pagina: 1,
+                        );
+                      },
+                    ),
+                  ),
+                  if (_movLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                        ),
                       ),
                     )
-                    .toList(),
+                  else if (_movimientos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: AppEmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Sin movimientos',
+                        description:
+                            'No hay movimientos para este filtro.',
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                      child: Column(
+                        children: [
+                          for (final m in _movimientos)
+                            _MovementTile(movement: m),
+                        ],
+                      ),
+                    ),
+                  if (_movPages > 1)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+                      child: _Pager(
+                        page: _movPage,
+                        pages: _movPages,
+                        total: _movTotal,
+                        onPage: (page) {
+                          setState(() => _movPage = page);
+                          _loadMovimientos(
+                            _loadedId!,
+                            pagina: page,
+                            tipo: _movTipo,
+                          );
+                        },
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 10),
+                ],
               ),
-              if (session.denominacionesPrecuadre.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Conteo de precuadre',
-                  style: AppTextStyles.titleMedium,
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: session.denominacionesPrecuadre
-                      .map(
-                        (item) => _ReadOnlyChip(
-                          label:
-                              'S/ ${_denomination((item['denominacion'] as num).toDouble())} × ${item['cantidad']}',
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-              if (session.resumen?.v2?.porBilletera.isNotEmpty ?? false) ...[
-                const SizedBox(height: 16),
-                CajaBilleteraCard(
-                  porBilletera: session.resumen!.v2!.porBilletera,
-                ),
-              ],
-              if (session.resumen?.v2?.porVendedora.isNotEmpty ?? false) ...[
-                const SizedBox(height: 16),
-                CajaVendedoraTable(
-                  porVendedora: session.resumen!.v2!.porVendedora,
-                ),
-              ],
-              if (session.resumen?.v2?.resumenProductos.isNotEmpty ??
-                  false) ...[
-                const SizedBox(height: 16),
-                CajaProductosTable(
-                  resumenProductos: session.resumen!.v2!.resumenProductos,
-                ),
-              ],
-              if (widget.canReopen && session.isCerrada && session.isV2) ...[
-                const SizedBox(height: 24),
-                PrimaryButton(
-                  label: 'Reaperturar caja',
-                  icon: Icons.lock_open_rounded,
-                  isLoading: _reopening,
-                  onPressed: _reopen,
-                ),
-              ],
+            ),
+
+            // ── Reaperturar ────────────────────────────────────────────────
+            if (widget.canReopen && session.isCerrada && session.isV2) ...[
+              const SizedBox(height: 14),
+              PrimaryButton(
+                label: 'Reaperturar caja',
+                icon: Icons.lock_open_rounded,
+                isLoading: _reopening,
+                onPressed: _reopen,
+              ),
             ],
-          );
-        },
-      ),
+          ],
+        );
+      },
     ),
   );
 
@@ -1068,54 +1344,82 @@ class _MovementTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: AppCard(
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                incoming ? Icons.south_west_rounded : Icons.north_east_rounded,
-                color: color,
-                size: 18,
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    incoming
+                        ? Icons.south_west_rounded
+                        : Icons.north_east_rounded,
+                    color: color,
+                    size: 17,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        movement.concepto,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        [
+                          if (movement.medioPago?.isNotEmpty ?? false)
+                            movement.medioPago!,
+                          if (movement.etiqueta?.isNotEmpty ?? false)
+                            movement.etiqueta!,
+                          if (movement.origen.isNotEmpty) movement.origen,
+                        ].join(' · '),
+                        style: AppTextStyles.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${incoming ? '+' : '-'} ${_money(movement.monto)}',
+                  style: AppTextStyles.labelLarge.copyWith(color: color),
+                ),
+              ],
             ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Fila secundaria: fecha, referencia y comprobante
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 46),
+              child: Row(
                 children: [
-                  Text(
-                    movement.concepto,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      [
+                        _dateTime(movement.createdAt),
+                        if (movement.referencia?.isNotEmpty ?? false)
+                          movement.referencia!,
+                      ].join(' · '),
+                      style: AppTextStyles.labelSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    [
-                      if (movement.medioPago?.isNotEmpty ?? false)
-                        movement.medioPago!,
-                      if (movement.etiqueta?.isNotEmpty ?? false)
-                        movement.etiqueta!,
-                      if (movement.origen.isNotEmpty) movement.origen,
-                      _dateTime(movement.createdAt),
-                    ].join(' · '),
-                    style: AppTextStyles.labelSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  if (movement.comprobante?.isNotEmpty ?? false)
+                    _ComprobanteBtn(url: movement.comprobante),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${incoming ? '+' : '-'} ${_money(movement.monto)}',
-              style: AppTextStyles.labelLarge.copyWith(color: color),
             ),
           ],
         ),
@@ -1256,11 +1560,23 @@ class _TotalBand extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Text(label, style: AppTextStyles.bodyMedium),
-        const Spacer(),
-        Text(
-          _money(value),
-          style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodyMedium,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            _money(value),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: AppTextStyles.titleLarge.copyWith(color: AppColors.primary),
+          ),
         ),
       ],
     ),
@@ -1409,13 +1725,7 @@ class _SkeletonBox extends StatelessWidget {
 }
 
 void _sheetError(BuildContext context, Object error) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(error.toString()),
-      backgroundColor: AppColors.error,
-      behavior: SnackBarBehavior.floating,
-    ),
-  );
+  AppFeedback.error(context, error.toString());
 }
 
 String _money(double value) => 'S/ ${value.toStringAsFixed(2)}';
@@ -1426,4 +1736,236 @@ String _denomination(double value) =>
 String _dateTime(DateTime value) {
   final local = value.toLocal();
   return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+}
+
+// ── Tarjeta de sección (Apertura / Precuadre / Cierre) ───────────────────────
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final List<_DetailRow> rows;
+
+  const _SectionCard({required this.title, required this.rows});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: EdgeInsets.zero,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: context.colors.border),
+            ),
+          ),
+          child: Text(
+            title.toUpperCase(),
+            style: AppTextStyles.labelSmall.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Column(
+            children: [
+              for (int i = 0; i < rows.length; i++) ...[
+                rows[i],
+                if (i < rows.length - 1)
+                  Divider(height: 16, color: context.colors.border),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Tabla de denominaciones (apertura / precuadre) ───────────────────────────
+
+class _DenominacionesTable extends StatelessWidget {
+  final String title;
+  final List<Map<String, dynamic>> items;
+
+  const _DenominacionesTable({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+    padding: EdgeInsets.zero,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: context.colors.border),
+            ),
+          ),
+          child: Text(
+            title,
+            style: AppTextStyles.titleMedium,
+          ),
+        ),
+        // Cabecera de tabla
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  'DENOMINACIÓN',
+                  style: AppTextStyles.labelSmall.copyWith(fontSize: 9, letterSpacing: 0.6),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'CANT.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.labelSmall.copyWith(fontSize: 9, letterSpacing: 0.6),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'SUBTOTAL',
+                  textAlign: TextAlign.right,
+                  style: AppTextStyles.labelSmall.copyWith(fontSize: 9, letterSpacing: 0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: context.colors.border),
+        // Filas
+        for (final item in items)
+          _buildRow(context, item),
+        const SizedBox(height: 4),
+      ],
+    ),
+  );
+
+  Widget _buildRow(BuildContext context, Map<String, dynamic> item) {
+    final denom = (item['denominacion'] as num).toDouble();
+    final qty = (item['cantidad'] as num).toInt();
+    final subtotal = denom * qty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              'S/ ${_denomination(denom)}',
+              style: AppTextStyles.bodySmall.copyWith(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              '$qty',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall,
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              _money(subtotal),
+              textAlign: TextAlign.right,
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Botón visor de comprobante ────────────────────────────────────────────────
+
+class _ComprobanteBtn extends StatelessWidget {
+  final String? url;
+  const _ComprobanteBtn({this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) return const SizedBox.shrink();
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: AppColors.primary,
+      ),
+      icon: const Icon(Icons.visibility_outlined, size: 13),
+      label: const Text(
+        'Ver comprobante',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+      ),
+      onPressed: () => _show(context),
+    );
+  }
+
+  void _show(BuildContext context) {
+    final normalised =
+        (url!.startsWith('http') || url!.startsWith('/')) ? url! : 'https://$url';
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Comprobante',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    normalised,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Text('No se pudo cargar el comprobante'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

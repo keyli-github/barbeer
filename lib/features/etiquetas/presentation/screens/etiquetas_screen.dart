@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/etiqueta.dart';
 import '../providers/etiquetas_provider.dart';
@@ -93,25 +94,16 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
       final repo = ref.read(etiquetasRepositoryProvider);
       await repo.updateActivo(etiqueta.id, activo: nuevoEstado);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nuevoEstado
-                ? '"${etiqueta.nombre}" activada'
-                : '"${etiqueta.nombre}" desactivada',
-          ),
-          backgroundColor: AppColors.success,
-        ),
+      AppFeedback.success(
+        context,
+        nuevoEstado
+            ? '"${etiqueta.nombre}" activada'
+            : '"${etiqueta.nombre}" desactivada',
       );
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_friendlyError(e)),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppFeedback.error(context, _friendlyError(e));
     }
   }
 
@@ -209,23 +201,41 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                       ],
                     ),
                   )
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                      itemCount: _etiquetas.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) {
-                        final et = _etiquetas[i];
+                : LayoutBuilder(
+                    builder: (_, constraints) {
+                      Widget tile(int index) {
+                        final etiqueta = _etiquetas[index];
                         return EtiquetaTile(
-                          etiqueta: et,
+                          etiqueta: etiqueta,
                           canEdit: canEdit,
                           canDeactivate: canDeactivate,
-                          onEdit: () => _openEdit(et),
-                          onToggle: () => _toggleEstado(et),
+                          onEdit: () => _openEdit(etiqueta),
+                          onToggle: () => _toggleEstado(etiqueta),
                         );
-                      },
-                    ),
+                      }
+
+                      final content = constraints.maxWidth >= 640
+                          ? GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisExtent: 142,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                  ),
+                              itemCount: _etiquetas.length,
+                              itemBuilder: (_, index) => tile(index),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                              itemCount: _etiquetas.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (_, index) => tile(index),
+                            );
+                      return RefreshIndicator(onRefresh: _load, child: content);
+                    },
                   ),
           ),
         ],

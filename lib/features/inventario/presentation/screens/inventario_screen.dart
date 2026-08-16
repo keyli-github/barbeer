@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -6,10 +8,13 @@ import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/theme/app_spacing.dart' as spacing;
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/ds_product_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../categorias/data/categorias_repository.dart' show Categoria;
 import '../../../productos/data/productos_repository.dart' as products;
 import '../../data/inventario_repository.dart';
 
@@ -19,13 +24,18 @@ final _invRepoProvider = Provider<InventarioRepository>(
   (ref) => InventarioRepository(ApiClient.instance),
 );
 
+/// Categorías activas del catálogo — usadas en el filtro de inventario.
+final _invCatsProvider = FutureProvider<List<Categoria>>((ref) async {
+  return products.ProductosRepository(ApiClient.instance).categorias();
+});
+
 class _InvState {
   final List<InventarioItem> items;
   final InventarioResumen? resumen;
   final bool loading;
   final String? error;
   final int page, totalPages, total;
-  final String search, estadoFilter;
+  final String search, estadoFilter, categoriaFilter;
 
   const _InvState({
     this.items = const [],
@@ -37,6 +47,7 @@ class _InvState {
     this.total = 0,
     this.search = '',
     this.estadoFilter = '',
+    this.categoriaFilter = '',
   });
 
   _InvState copyWith({
@@ -50,6 +61,7 @@ class _InvState {
     int? total,
     String? search,
     String? estadoFilter,
+    String? categoriaFilter,
   }) => _InvState(
     items: items ?? this.items,
     resumen: resumen ?? this.resumen,
@@ -60,18 +72,22 @@ class _InvState {
     total: total ?? this.total,
     search: search ?? this.search,
     estadoFilter: estadoFilter ?? this.estadoFilter,
+    categoriaFilter: categoriaFilter ?? this.categoriaFilter,
   );
 }
 
 class _InvNotifier extends StateNotifier<_InvState> {
   final InventarioRepository _repo;
   final String? _sedeId;
+  Timer? _searchDebounce;
+  int _loadGeneration = 0;
 
   _InvNotifier(this._repo, this._sedeId) : super(const _InvState()) {
     load();
   }
 
   Future<void> load({bool resetPage = false}) async {
+    final generation = ++_loadGeneration;
     final p = resetPage ? 1 : state.page;
     state = state.copyWith(loading: true, clearError: true, page: p);
     try {
@@ -81,12 +97,16 @@ class _InvNotifier extends StateNotifier<_InvState> {
           limite: 20,
           q: state.search.isEmpty ? null : state.search,
           estado: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+          categoriaId: state.categoriaFilter.isEmpty
+              ? null
+              : state.categoriaFilter,
           sedeId: _sedeId,
         ),
         _repo.resumen(sedeId: _sedeId),
       ]);
       final page = results[0] as InventarioPage;
       final resumen = results[1] as InventarioResumen;
+      if (generation != _loadGeneration) return;
       state = state.copyWith(
         items: page.data,
         resumen: resumen,
@@ -96,17 +116,27 @@ class _InvNotifier extends StateNotifier<_InvState> {
         loading: false,
       );
     } catch (e) {
+      if (generation != _loadGeneration) return;
       state = state.copyWith(loading: false, error: e.toString());
     }
   }
 
   void setSearch(String s) {
     state = state.copyWith(search: s);
-    load(resetPage: true);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => load(resetPage: true),
+    );
   }
 
   void setEstado(String v) {
     state = state.copyWith(estadoFilter: v);
+    load(resetPage: true);
+  }
+
+  void setCategoria(String id) {
+    state = state.copyWith(categoriaFilter: id);
     load(resetPage: true);
   }
 
@@ -129,6 +159,12 @@ class _InvNotifier extends StateNotifier<_InvState> {
     );
     await load();
   }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
 }
 
 final _invProvider = StateNotifierProvider<_InvNotifier, _InvState>(
@@ -148,6 +184,7 @@ class InventarioScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final state = ref.watch(_invProvider);
     final notifier = ref.read(_invProvider.notifier);
+    final catsAsync = ref.watch(_invCatsProvider);
     final canEdit = auth.hasPermission('inventario:editar');
     final canCreate =
         auth.hasPermission('inventario:crear') &&
@@ -163,6 +200,7 @@ class InventarioScreen extends ConsumerWidget {
               heroTag: 'inventario_config_fab',
               backgroundColor: AppColors.brand,
               foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
               onPressed: () => _showConfig(context, ref),
               icon: const Icon(Icons.settings_outlined),
               label: const Text('Configurar'),
@@ -174,6 +212,9 @@ class InventarioScreen extends ConsumerWidget {
             onSearch: notifier.setSearch,
             estadoFilter: state.estadoFilter,
             onEstado: notifier.setEstado,
+            categoriaFilter: state.categoriaFilter,
+            onCategoria: notifier.setCategoria,
+            cats: catsAsync.valueOrNull ?? const [],
           ),
           if (state.resumen != null && !state.loading)
             _KpiRow(resumen: state.resumen!),
@@ -260,15 +301,20 @@ class InventarioScreen extends ConsumerWidget {
   }
 }
 
-// ─── Barra de búsqueda + filtros (sin título, ya está en AppHeader) ────────────
+// ─── Barra de búsqueda + filtros ──────────────────────────────────────────────
 
 class _SearchBar extends StatefulWidget {
-  final ValueChanged<String> onSearch, onEstado;
-  final String estadoFilter;
+  final ValueChanged<String> onSearch, onEstado, onCategoria;
+  final String estadoFilter, categoriaFilter;
+  final List<Categoria> cats;
+
   const _SearchBar({
     required this.onSearch,
     required this.estadoFilter,
     required this.onEstado,
+    required this.categoriaFilter,
+    required this.onCategoria,
+    required this.cats,
   });
 
   @override
@@ -288,75 +334,60 @@ class _SearchBarState extends State<_SearchBar> {
   Widget build(BuildContext context) {
     return Container(
       color: context.colors.background,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-            child: TextField(
-              controller: _ctrl,
-              onChanged: widget.onSearch,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nombre o código...',
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: context.colors.textTertiary,
-                  size: 18,
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
+          // ─ Buscador
+          TextField(
+            controller: _ctrl,
+            onChanged: widget.onSearch,
+            decoration: InputDecoration(
+              hintText: 'Buscar por nombre o código...',
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: context.colors.textTertiary,
+                size: 18,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(
-              children: [
-                for (final e in [
-                  ('', 'Todos'),
-                  ('OK', 'OK'),
-                  ('ALERTA', 'Alerta'),
-                  ('CRITICO', 'Crítico'),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => widget.onEstado(e.$1),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.estadoFilter == e.$1
-                              ? context.colors.primarySurface
-                              : context.colors.backgroundAlt,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: widget.estadoFilter == e.$1
-                                ? context.colors.primaryBorder
-                                : context.colors.border,
-                          ),
-                        ),
-                        child: Text(
-                          e.$2,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: widget.estadoFilter == e.$1
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: widget.estadoFilter == e.$1
-                                ? AppColors.primary
-                                : context.colors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          // ─ Filtros en fila: Estado + Categoría
+          Row(
+            children: [
+              // Estado
+              Expanded(
+                child: _FilterDropdown<String>(
+                  key: const ValueKey('inv-estado-drop'),
+                  value: widget.estadoFilter,
+                  label: 'Estado',
+                  items: const [
+                    ('', 'Todos'),
+                    ('OK', 'OK'),
+                    ('ALERTA', 'Alerta'),
+                    ('CRITICO', 'Crítico'),
+                  ],
+                  onChanged: widget.onEstado,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Categoría
+              Expanded(
+                child: _FilterDropdown<String>(
+                  key: const ValueKey('inv-cat-drop'),
+                  value: widget.categoriaFilter,
+                  label: 'Categoría',
+                  items: [
+                    ('', 'Todas'),
+                    for (final c in widget.cats) (c.id, c.nombre),
+                  ],
+                  onChanged: widget.onCategoria,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -364,112 +395,76 @@ class _SearchBarState extends State<_SearchBar> {
   }
 }
 
-// ─── Header viejo (mantenido por compatibilidad, ya no se usa) ────────────────
-class _Header extends StatefulWidget {
-  final int total;
-  final ValueChanged<String> onSearch, onEstado;
-  final String estadoFilter;
-  const _Header({
-    required this.total,
-    required this.onSearch,
-    required this.estadoFilter,
-    required this.onEstado,
+/// Dropdown compacto reutilizable para filtros de inventario.
+class _FilterDropdown<T extends Object> extends StatelessWidget {
+  final T value;
+  final String label;
+  final List<(T, String)> items;
+  final ValueChanged<T> onChanged;
+
+  const _FilterDropdown({
+    super.key,
+    required this.value,
+    required this.label,
+    required this.items,
+    required this.onChanged,
   });
 
   @override
-  State<_Header> createState() => _HeaderState();
-}
-
-class _HeaderState extends State<_Header> {
-  final _ctrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: context.colors.background,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              controller: _ctrl,
-              onChanged: widget.onSearch,
-              style: AppTextStyles.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'Buscar por nombre o código...',
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: context.colors.textTertiary,
-                  size: 18,
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+  Widget build(BuildContext context) => InputDecorator(
+    decoration: InputDecoration(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      labelText: label,
+      labelStyle: TextStyle(fontSize: 11, color: context.colors.textTertiary),
+      filled: true,
+      fillColor: context.colors.surface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+        borderSide: BorderSide(color: context.colors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+        borderSide: BorderSide(color: context.colors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<T>(
+        value: value,
+        isDense: true,
+        isExpanded: true,
+        borderRadius: BorderRadius.circular(10),
+        icon: Icon(
+          Icons.keyboard_arrow_down_rounded,
+          size: 18,
+          color: context.colors.textTertiary,
+        ),
+        style: TextStyle(fontSize: 13, color: context.colors.textPrimary),
+        items: items
+            .map(
+              (e) => DropdownMenuItem<T>(
+                value: e.$1,
+                child: Text(
+                  e.$2,
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Row(
-              children: [
-                for (final e in [
-                  ('', 'Todos'),
-                  ('OK', 'OK'),
-                  ('ALERTA', 'Alerta'),
-                  ('CRITICO', 'Crítico'),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => widget.onEstado(e.$1),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.estadoFilter == e.$1
-                              ? context.colors.primarySurface
-                              : context.colors.backgroundAlt,
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                          border: Border.all(
-                            color: widget.estadoFilter == e.$1
-                                ? context.colors.primaryBorder
-                                : context.colors.border,
-                          ),
-                        ),
-                        child: Text(
-                          e.$2,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: widget.estadoFilter == e.$1
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: widget.estadoFilter == e.$1
-                                ? AppColors.primary
-                                : context.colors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+            )
+            .toList(),
+        onChanged: (v) {
+          if (v != null) onChanged(v);
+        },
       ),
-    );
-  }
+    ),
+  );
 }
 
+// ─── KPIs ─────────────────────────────────────────────────────────────────────
 class _KpiRow extends StatelessWidget {
   final InventarioResumen resumen;
   const _KpiRow({required this.resumen});
@@ -477,14 +472,25 @@ class _KpiRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-    child: Row(
-      children: [
-        _Chip('Críticos', '${resumen.critico}', AppColors.error),
-        const SizedBox(width: 8),
-        _Chip('En Alerta', '${resumen.alerta}', AppColors.warning),
-        const SizedBox(width: 8),
-        _Chip('OK', '${resumen.ok}', AppColors.success),
-      ],
+    child: LayoutBuilder(
+      builder: (_, constraints) => GridView.count(
+        crossAxisCount: constraints.maxWidth >= 720 ? 4 : 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: constraints.maxWidth >= 720 ? 2.5 : 2.2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _Chip('Total productos', '${resumen.totalItems}', AppColors.primary),
+          _Chip('Estado crítico', '${resumen.critico}', AppColors.error),
+          _Chip('En alerta', '${resumen.alerta}', AppColors.warning),
+          _Chip(
+            'Valor inventario',
+            'S/ ${resumen.valorTotal.toStringAsFixed(2)}',
+            AppColors.success,
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -495,26 +501,24 @@ class _Chip extends StatelessWidget {
   const _Chip(this.label, this.value, this.color);
 
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.09),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.09),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+    ),
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: color,
           ),
-          Text(label, style: AppTextStyles.labelSmall),
-        ],
-      ),
+        ),
+        Text(label, style: AppTextStyles.labelSmall),
+      ],
     ),
   );
 }
@@ -556,6 +560,16 @@ class _InventarioTile extends StatelessWidget {
           children: [
             Row(
               children: [
+                // ─ Imagen del producto (única por productoId, cache-busted por updatedAt)
+                DSProductImageSquare(
+                  imageUrl: item.imagenUrl != null
+                      ? '${item.imagenUrl}?v=${item.updatedAt.hashCode}'
+                      : null,
+                  size: 48,
+                  radius: 10,
+                  productName: item.producto,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -620,7 +634,11 @@ class _InventarioTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        'Min ${item.min.toStringAsFixed(0)} · Max ${item.max.toStringAsFixed(0)} · ${item.ubicacion}',
+                        'Min ${item.min.toStringAsFixed(0)} · ${item.max > 0 ? 'Max ${item.max.toStringAsFixed(0)}' : 'Sin objetivo'} · ${item.ubicacion}',
+                        style: AppTextStyles.labelSmall,
+                      ),
+                      Text(
+                        'Costo: S/ ${item.costo.toStringAsFixed(2)}',
                         style: AppTextStyles.labelSmall,
                       ),
                     ],
@@ -833,13 +851,13 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
               if (item != null)
                 DropdownMenuItem(
                   value: item.productoId,
-                  child: Text('${item.producto} (${item.codigo})'),
+                  child: Text(item.producto),
                 ),
               if (!productLocked)
                 for (final product in _products)
                   DropdownMenuItem(
                     value: product.id,
-                    child: Text('${product.nombre} (${product.codigo})'),
+                    child: Text(product.nombre),
                   ),
             ],
             onChanged: productLocked || _loading

@@ -21,7 +21,7 @@ class ConfirmationDialog {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLG),
         ),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: EdgeInsets.all(AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -324,7 +324,14 @@ class AppBottomSheet {
             if (title != null)
               Divider(height: 1, color: context.colors.divider),
             // Contenido
-            Flexible(child: child),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
+                child: child,
+              ),
+            ),
           ],
         ),
       ),

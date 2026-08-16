@@ -101,12 +101,16 @@ class DSStatCard extends StatelessWidget {
                   color: positive ? AppColors.success : AppColors.error,
                 ),
                 const SizedBox(width: 2),
-                Text(
-                  change!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: positive ? AppColors.success : AppColors.error,
+                Flexible(
+                  child: Text(
+                    change!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: positive ? AppColors.success : AppColors.error,
+                    ),
                   ),
                 ),
               ],

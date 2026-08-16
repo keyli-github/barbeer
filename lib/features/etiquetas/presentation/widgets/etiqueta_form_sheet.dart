@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
+import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../data/models/etiqueta.dart';
 import '../providers/etiquetas_provider.dart';
 
@@ -69,11 +71,9 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isEdit ? 'Etiqueta actualizada' : 'Etiqueta creada'),
-          backgroundColor: AppColors.success,
-        ),
+      AppFeedback.success(
+        context,
+        _isEdit ? 'Etiqueta actualizada' : 'Etiqueta creada',
       );
       widget.onDone();
       Navigator.pop(context);
@@ -112,6 +112,11 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Indicador de estado activo/inactivo (solo en modo edición)
+            if (_isEdit) ...[
+              _EstadoIndicator(activo: widget.etiqueta!.activo),
+              const SizedBox(height: 16),
+            ],
             // Nombre
             TextField(
               controller: _nombreCtrl,
@@ -144,21 +149,69 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
               onChanged: (tipo) => setState(() => _tipo = tipo ?? _tipo),
             ),
             const SizedBox(height: 12),
-            // RequiereComprobante
-            SwitchListTile(
-              value: _requiereComprobante,
-              onChanged: (v) => setState(() => _requiereComprobante = v),
-              title: const Text(
-                'Requiere comprobante',
-                style: TextStyle(fontSize: 14),
+            // RequiereComprobante — switch con diseño consistente con la app
+            GestureDetector(
+              onTap: () =>
+                  setState(() => _requiereComprobante = !_requiereComprobante),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: _requiereComprobante
+                      ? AppColors.primary.withValues(alpha: 0.08)
+                      : context.colors.backgroundAlt,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _requiereComprobante
+                        ? AppColors.primary.withValues(alpha: 0.35)
+                        : context.colors.border,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Requiere comprobante',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _requiereComprobante
+                                  ? AppColors.primary
+                                  : context.colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _requiereComprobante
+                                ? 'El cajero debe adjuntar voucher al clasificar'
+                                : 'Sin voucher obligatorio',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.colors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _requiereComprobante,
+                      onChanged: (v) =>
+                          setState(() => _requiereComprobante = v),
+                      activeColor: AppColors.primary,
+                      activeTrackColor: AppColors.primary.withValues(
+                        alpha: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              subtitle: const Text(
-                'El cajero deberá adjuntar voucher al clasificar',
-                style: TextStyle(fontSize: 11),
-              ),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              activeThumbColor: AppColors.primary,
             ),
             const SizedBox(height: 16),
             // Error
@@ -209,4 +262,52 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
       ),
     );
   }
+}
+
+/// Indicador de estado activo/inactivo para el encabezado del form de edición.
+/// Solo lectura — para cambiar el estado se usa el botón de toggle en la lista.
+class _EstadoIndicator extends StatelessWidget {
+  final bool activo;
+  const _EstadoIndicator({required this.activo});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: activo ? AppColors.success : context.colors.textTertiary,
+          shape: BoxShape.circle,
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        activo ? 'Etiqueta activa' : 'Etiqueta inactiva',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: activo ? AppColors.success : context.colors.textTertiary,
+        ),
+      ),
+      const Spacer(),
+      if (!activo)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: context.colors.backgroundAlt,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(color: context.colors.border),
+          ),
+          child: Text(
+            'INACTIVA',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: context.colors.textTertiary,
+            ),
+          ),
+        ),
+    ],
+  );
 }

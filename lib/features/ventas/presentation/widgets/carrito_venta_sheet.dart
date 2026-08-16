@@ -30,6 +30,7 @@ class CarritoVentaSheet extends StatelessWidget {
   final bool submitting;
   final String? error;
   final VoidCallback onConfirm;
+  final VoidCallback? onSavePending;
   final VoidCallback onRetry;
   final VoidCallback onClear;
   final void Function(String productoId, int delta) onChangeQuantity;
@@ -44,6 +45,7 @@ class CarritoVentaSheet extends StatelessWidget {
     required this.submitting,
     this.error,
     required this.onConfirm,
+    this.onSavePending,
     required this.onRetry,
     required this.onClear,
     required this.onChangeQuantity,
@@ -118,9 +120,15 @@ class CarritoVentaSheet extends StatelessWidget {
             )
           else
             Flexible(
+              flex: 2,
               child: ListView.separated(
                 shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom,
+                ),
                 itemCount: items.length,
                 separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (_, i) {
@@ -147,6 +155,8 @@ class CarritoVentaSheet extends StatelessWidget {
                                   Flexible(
                                     child: Text(
                                       '${_fmtCurrency(item.precio)} × ${item.cantidad} = ${_fmtCurrency(item.subtotal)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: context.colors.textSecondary,
@@ -218,10 +228,19 @@ class CarritoVentaSheet extends StatelessWidget {
           // Footer
           if (items.isNotEmpty) ...[
             const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
+            Flexible(
+              // Con detalles de pago (método, billetera, comprobante) el
+              // footer necesita más espacio para no verse aplastado.
+              flex: saleDetails != null ? 3 : 1,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  16 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -282,6 +301,34 @@ class CarritoVentaSheet extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 12),
+                  // DEJAR PDTE. — guarda sin clasificar
+                  if (onSavePending != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: submitting ? null : onSavePending,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.warning,
+                          side: BorderSide(
+                            color: AppColors.warning.withValues(alpha: 0.6),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'DEJAR PDTE.',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -316,6 +363,7 @@ class CarritoVentaSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+                ),
               ),
             ),
           ],

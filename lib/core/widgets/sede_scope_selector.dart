@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../providers/sede_scope_provider.dart';
 import '../theme/app_colors.dart';
+import 'app_feedback.dart';
 
 class SedeScopeSelector extends ConsumerWidget {
   final bool compact;
@@ -83,11 +84,7 @@ class SedeScopeSelector extends ConsumerWidget {
   ) async {
     if (options.isLoading) return;
     if (options.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No se pudieron cargar las sedes: ${options.error}'),
-        ),
-      );
+      AppFeedback.error(context, 'No se pudieron cargar las sedes: ${options.error}');
       ref.invalidate(sedeScopeOptionsProvider);
       return;
     }

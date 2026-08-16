@@ -11,6 +11,7 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
@@ -131,14 +132,60 @@ final rolesProvider = StateNotifierProvider<RolesNotifier, RolesState>(
   (ref) => RolesNotifier(ApiClient.instance),
 );
 
-class RolesScreen extends ConsumerWidget {
+class RolesScreen extends ConsumerStatefulWidget {
   const RolesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RolesScreen> createState() => _RolesScreenState();
+}
+
+class _RolesScreenState extends ConsumerState<RolesScreen> {
+  String _search = '';
+  String _filter = 'TODOS';
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(rolesProvider);
     final auth = ref.watch(authProvider);
     final isSuperAdmin = auth.user?.isSuperAdmin ?? false;
+    final query = _search.trim().toLowerCase();
+    final filtered = state.roles.where((role) {
+      final name = (role['nombre'] as String? ?? '').toUpperCase();
+      final description = (role['descripcion'] as String? ?? '').toLowerCase();
+      final active = role['activo'] == true;
+      final base = _RoleTile._protected.contains(name);
+      final matchesSearch =
+          query.isEmpty ||
+          name.toLowerCase().contains(query) ||
+          description.contains(query);
+      final matchesFilter = switch (_filter) {
+        'ACTIVOS' => active,
+        'INACTIVOS' => !active,
+        'BASE' => base,
+        'PERSONALIZADOS' => !base,
+        _ => true,
+      };
+      return matchesSearch && matchesFilter;
+    }).toList();
+    final activeCount = state.roles
+        .where((role) => role['activo'] == true)
+        .length;
+    final baseCount = state.roles
+        .where(
+          (role) => _RoleTile._protected.contains(
+            (role['nombre'] as String? ?? '').toUpperCase(),
+          ),
+        )
+        .length;
+    // Usuarios asignados y asignaciones totales
+    final totalUsuarios = state.roles.fold<int>(
+      0,
+      (sum, role) => sum + ((role['_count']?['usuarios'] as int?) ?? 0),
+    );
+    final totalAsignaciones = state.roles.fold<int>(
+      0,
+      (sum, role) => sum + ((role['permisos'] as List?)?.length ?? 0),
+    );
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -156,6 +203,76 @@ class RolesScreen extends ConsumerWidget {
         onRefresh: () => ref.read(rolesProvider.notifier).load(),
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+              child: GridView.count(
+                crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+                childAspectRatio: 2.2,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _RoleMetric(
+                    'Roles activos',
+                    '$activeCount/${state.total}',
+                    AppColors.success,
+                    icon: Icons.shield_rounded,
+                  ),
+                  _RoleMetric(
+                    'Roles base',
+                    '$baseCount',
+                    AppColors.warning,
+                    icon: Icons.lock_rounded,
+                  ),
+                  _RoleMetric(
+                    'Usuarios asignados',
+                    '$totalUsuarios',
+                    AppColors.primary,
+                    icon: Icons.people_rounded,
+                  ),
+                  _RoleMetric(
+                    'Asignaciones',
+                    '$totalAsignaciones',
+                    AppColors.info,
+                    icon: Icons.key_rounded,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: TextField(
+                onChanged: (value) => setState(() => _search = value),
+                decoration: const InputDecoration(
+                  hintText: 'Buscar por nombre o descripción...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  for (final option in const [
+                    ('TODOS', 'Todos'),
+                    ('ACTIVOS', 'Activos'),
+                    ('INACTIVOS', 'Inactivos'),
+                    ('BASE', 'Base'),
+                    ('PERSONALIZADOS', 'Personalizados'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(option.$2),
+                        selected: _filter == option.$1,
+                        onSelected: (_) => setState(() => _filter = option.$1),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             Expanded(
               child: state.isLoading
                   ? const AppLoading()
@@ -164,7 +281,7 @@ class RolesScreen extends ConsumerWidget {
                       message: state.error!,
                       onRetry: () => ref.read(rolesProvider.notifier).load(),
                     )
-                  : state.roles.isEmpty
+                  : filtered.isEmpty
                   ? const AppEmptyState(
                       icon: Icons.admin_panel_settings_outlined,
                       title: 'Sin roles',
@@ -172,7 +289,7 @@ class RolesScreen extends ConsumerWidget {
                   : ListView(
                       children: [
                         const SizedBox(height: 8),
-                        for (final role in state.roles)
+                        for (final role in filtered)
                           _RoleTile(
                             role: role,
                             isSuperAdmin: isSuperAdmin,
@@ -243,15 +360,9 @@ class RolesScreen extends ConsumerWidget {
     if (ok && context.mounted) {
       try {
         await ref.read(rolesProvider.notifier).deleteRole(role['id'] as String);
-        if (context.mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Rol eliminado')));
+        if (context.mounted) AppFeedback.success(context, 'Rol eliminado');
       } catch (e) {
-        if (context.mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (context.mounted) AppFeedback.error(context, 'Error: $e');
       }
     }
   }
@@ -273,6 +384,71 @@ class RolesScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _RoleMetric extends StatelessWidget {
+  const _RoleMetric(this.label, this.value, this.color, {this.icon});
+
+  final String label;
+  final String value;
+  final Color color;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.09),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 11, color: color.withValues(alpha: 0.7)),
+              const SizedBox(width: 4),
+            ],
+            Expanded(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.textTertiary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+        Text(
+          'Página actual',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 10,
+            color: context.colors.textTertiary,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _RoleTile extends StatelessWidget {
@@ -298,6 +474,7 @@ class _RoleTile extends StatelessWidget {
     final userCount = role['_count']?['usuarios'] as int? ?? 0;
     final permCount = (role['permisos'] as List?)?.length ?? 0;
     final isProtected = _protected.contains(nombre.toUpperCase());
+    final isSuperAdminRole = nombre.toUpperCase() == 'SUPERADMIN';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -327,7 +504,14 @@ class _RoleTile extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(nombre, style: AppTextStyles.titleMedium),
+                          Flexible(
+                            child: Text(
+                              nombre,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.titleMedium,
+                            ),
+                          ),
                           if (isProtected) ...[
                             const SizedBox(width: 6),
                             Container(
@@ -362,7 +546,7 @@ class _RoleTile extends StatelessWidget {
                   ),
                 ),
                 StatusBadge(activo: activo),
-                if (isSuperAdmin)
+                if (isSuperAdmin && !isSuperAdminRole)
                   PopupMenuButton<String>(
                     icon: Icon(
                       Icons.more_vert_rounded,
@@ -421,18 +605,18 @@ class _RoleTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _InfoChip(
                   icon: Icons.people_rounded,
                   label: '$userCount usuarios',
                 ),
-                const SizedBox(width: 8),
                 _InfoChip(
                   icon: Icons.security_rounded,
                   label: '$permCount permisos',
                 ),
-                const SizedBox(width: 8),
                 _InfoChip(
                   icon: Icons.signal_cellular_alt_rounded,
                   label: 'Nivel $nivel',
@@ -577,15 +761,10 @@ class _RoleFormState extends State<_RoleForm> {
       });
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Rol creado')));
+        AppFeedback.success(context, 'Rol creado');
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) AppFeedback.error(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -605,6 +784,11 @@ class _RoleEditFormState extends State<_RoleEditForm> {
   late int _nivel;
   late bool _activo;
   bool _loading = false;
+
+  // El backend bloquea: cambiar nivel o desactivar el rol SUPERADMIN.
+  bool get _isSuperAdminRole =>
+      (widget.role['nombre'] as String? ?? '').toUpperCase() == 'SUPERADMIN';
+
   @override
   void initState() {
     super.initState();
@@ -630,6 +814,70 @@ class _RoleEditFormState extends State<_RoleEditForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Nombre del rol (inmutable por diseño del backend — se muestra como info)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: context.colors.backgroundAlt,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: context.colors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nombre del rol',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: context.colors.textTertiary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.role['nombre'] as String? ?? '',
+                  style: AppTextStyles.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'El nombre de un rol no puede modificarse.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: context.colors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_isSuperAdminRole) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.shield_rounded,
+                    size: 16,
+                    color: AppColors.warning,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'El rol SUPERADMIN está protegido. Su nivel y estado no pueden modificarse para mantener la integridad del sistema.',
+                      style: TextStyle(fontSize: 12, color: AppColors.warning),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
           AppTextField(
             label: 'Descripcion',
             hint: 'Descripcion del rol',
@@ -651,7 +899,10 @@ class _RoleEditFormState extends State<_RoleEditForm> {
                   value: _nivel.toDouble(),
                   min: 1,
                   max: 99,
-                  onChanged: (v) => setState(() => _nivel = v.toInt()),
+                  // El backend rechaza cambiar el nivel del SUPERADMIN
+                  onChanged: _isSuperAdminRole
+                      ? null
+                      : (v) => setState(() => _nivel = v.toInt()),
                 ),
               ),
               SizedBox(
@@ -660,7 +911,9 @@ class _RoleEditFormState extends State<_RoleEditForm> {
                   child: Text(
                     '$_nivel',
                     style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.primary,
+                      color: _isSuperAdminRole
+                          ? context.colors.textTertiary
+                          : AppColors.primary,
                     ),
                   ),
                 ),
@@ -675,7 +928,11 @@ class _RoleEditFormState extends State<_RoleEditForm> {
               ),
               Switch(
                 value: _activo,
-                onChanged: (v) => setState(() => _activo = v),
+                // El backend rechaza desactivar el SUPERADMIN
+                onChanged: _isSuperAdminRole
+                    ? null
+                    : (v) => setState(() => _activo = v),
+                activeColor: AppColors.primary,
               ),
             ],
           ),
@@ -695,20 +952,17 @@ class _RoleEditFormState extends State<_RoleEditForm> {
     try {
       await widget.onSave({
         'descripcion': _descCtrl.text,
-        'nivel': _nivel,
-        'activo': _activo,
+        // Solo enviamos nivel/activo si el rol no es SUPERADMIN
+        // (el backend los rechazaría de todas formas)
+        if (!_isSuperAdminRole) 'nivel': _nivel,
+        if (!_isSuperAdminRole) 'activo': _activo,
       });
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Rol actualizado')));
+        AppFeedback.success(context, 'Rol actualizado');
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) AppFeedback.error(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -817,16 +1071,12 @@ class _PermissionsAssignState extends State<_PermissionsAssign> {
               await widget.onSave(_selected.toList());
               if (mounted) {
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Permisos actualizados')),
-                );
+                AppFeedback.success(context, 'Permisos actualizados');
               }
             } catch (e) {
               if (mounted) {
                 setState(() => _loading = false);
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                AppFeedback.error(context, 'Error: $e');
               }
             }
           },
