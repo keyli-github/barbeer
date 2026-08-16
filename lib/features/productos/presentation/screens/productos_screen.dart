@@ -203,120 +203,126 @@ class ProductosScreen extends ConsumerWidget {
               child: const Icon(Icons.add_rounded),
             )
           : null,
-      body: Column(
-        children: [
-          // ─── Filtros ────────────────────────────────────────
-          _FiltersSection(
-            search: state.search,
-            onSearch: notifier.setSearch,
-            estadoFilter: state.estadoFilter,
-            onEstado: notifier.setEstado,
-          ),
-          // ─── Categorías ─────────────────────────────────────
-          catsAsync.when(
-            data: (cats) => _CatStrip(
-              cats: cats,
-              selected: state.categoriaFilter,
-              onSelect: notifier.setCategoria,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => notifier.load(),
+        child: CustomScrollView(
+          slivers: [
+            // ─── Filtros ────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: _FiltersSection(
+                search: state.search,
+                onSearch: notifier.setSearch,
+                estadoFilter: state.estadoFilter,
+                onEstado: notifier.setEstado,
+              ),
             ),
-            loading: () => const SizedBox(height: 40),
-            error: (_, _) => const SizedBox.shrink(),
-          ),
-          // ─── KPIs ───────────────────────────────────────────
-          if (state.resumen != null && !state.loading)
-            _KpiRow(resumen: state.resumen!),
-          const SizedBox(height: AppSpacing.xs),
-          // ─── Grid de productos ──────────────────────────────
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: state.loading
-                  ? AppLoadingIndicator(key: ValueKey('loading'))
-                  : state.error != null
-                  ? AppErrorState(
-                      key: ValueKey('error'),
-                      message: state.error!,
-                      onActionPressed: () => notifier.load(),
-                    )
-                  : state.items.isEmpty
-                  ? AppEmptyState(
-                      key: ValueKey('empty'),
-                      icon: Icons.inventory_2_outlined,
-                      title: 'Sin productos',
-                      message: 'No hay productos con los filtros actuales.',
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final columns = desktop
-                            ? (constraints.maxWidth / 230).floor().clamp(3, 6)
-                            : 2;
-                        return Column(
-                          children: [
-                            Expanded(
-                              child: GridView.builder(
-                                key: ValueKey('grid'),
-                                padding: EdgeInsets.all(AppSpacing.md),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: columns,
-                                      childAspectRatio: desktop ? 0.68 : 0.56,
-                                      crossAxisSpacing: AppSpacing.sm,
-                                      mainAxisSpacing: AppSpacing.sm,
-                                    ),
-                                itemCount: state.items.length,
-                                itemBuilder: (_, i) => _ProductCard(
-                                  product: state.items[i],
-                                  canEdit: canEdit,
-                                  canDelete: canDelete,
-                                  onOpen: () => _showProductDetail(
-                                    context,
-                                    ref,
-                                    state.items[i],
-                                  ),
-                                  onEdit: () =>
-                                      _showForm(context, ref, state.items[i]),
-                                  onToggleActivo: () =>
-                                      notifier.toggleActivo(state.items[i]),
-                                  onTogglePos: () =>
-                                      notifier.togglePos(state.items[i]),
-                                  onDelete: () async {
-                                    final ok = await ConfirmationDialog.show(
-                                      context: context,
-                                      title: 'Dar de baja producto',
-                                      message:
-                                          '¿Dar de baja "${state.items[i].nombre}"? Podrás reactivarlo después.',
-                                      confirmText: 'Dar de baja',
-                                      isDestructive: true,
-                                      icon: Icons.delete_outline,
-                                    );
-                                    if (ok) {
-                                      await notifier.delete(state.items[i].id);
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                AppSpacing.md,
-                                0,
-                                AppSpacing.md,
-                                AppSpacing.md,
-                              ),
-                              child: AppPagination(
-                                page: state.page,
-                                totalPages: state.totalPages,
-                                total: state.total,
-                                onPageChange: notifier.setPage,
-                              ),
-                            ),
-                          ],
+            // ─── Categorías ─────────────────────────────────────
+            SliverToBoxAdapter(
+              child: catsAsync.when(
+                data: (cats) => _CatStrip(
+                  cats: cats,
+                  selected: state.categoriaFilter,
+                  onSelect: notifier.setCategoria,
+                ),
+                loading: () => const SizedBox(height: 40),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
+            ),
+            // ─── KPIs ───────────────────────────────────────────
+            if (state.resumen != null && !state.loading)
+              SliverToBoxAdapter(child: _KpiRow(resumen: state.resumen!)),
+            // ─── Contenido ──────────────────────────────────────
+            if (state.loading)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 80),
+                  child: AppLoadingIndicator(),
+                ),
+              )
+            else if (state.error != null)
+              SliverToBoxAdapter(
+                child: AppErrorState(
+                  message: state.error!,
+                  onActionPressed: () => notifier.load(),
+                ),
+              )
+            else if (state.items.isEmpty)
+              const SliverToBoxAdapter(
+                child: AppEmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Sin productos',
+                  message: 'No hay productos con los filtros actuales.',
+                ),
+              )
+            else ...[
+              SliverPadding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: desktop
+                        ? (MediaQuery.sizeOf(context).width / 230)
+                              .floor()
+                              .clamp(3, 6)
+                        : 2,
+                    childAspectRatio: desktop ? 0.68 : 0.56,
+                    crossAxisSpacing: AppSpacing.sm,
+                    mainAxisSpacing: AppSpacing.sm,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _ProductCard(
+                      product: state.items[i],
+                      canEdit: canEdit,
+                      canDelete: canDelete,
+                      onOpen: () => _showProductDetail(
+                        context,
+                        ref,
+                        state.items[i],
+                      ),
+                      onEdit: () =>
+                          _showForm(context, ref, state.items[i]),
+                      onToggleActivo: () =>
+                          notifier.toggleActivo(state.items[i]),
+                      onTogglePos: () =>
+                          notifier.togglePos(state.items[i]),
+                      onDelete: () async {
+                        final ok = await ConfirmationDialog.show(
+                          context: context,
+                          title: 'Dar de baja producto',
+                          message:
+                              '¿Dar de baja "${state.items[i].nombre}"? Podrás reactivarlo después.',
+                          confirmText: 'Dar de baja',
+                          isDestructive: true,
+                          icon: Icons.delete_outline,
                         );
+                        if (ok) {
+                          await notifier.delete(state.items[i].id);
+                        }
                       },
                     ),
-            ),
-          ),
-        ],
+                    childCount: state.items.length,
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    0,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                  ),
+                  child: AppPagination(
+                    page: state.page,
+                    totalPages: state.totalPages,
+                    total: state.total,
+                    onPageChange: notifier.setPage,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -412,8 +418,7 @@ class _FiltersSectionState extends State<_FiltersSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: context.colors.background,
+    return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
@@ -554,12 +559,10 @@ class _CatStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: context.colors.background,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: Row(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Row(
           children: [
             _Chip(
               label: 'Todos',
@@ -575,7 +578,6 @@ class _CatStrip extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -1373,7 +1375,7 @@ class _InfoRow extends StatelessWidget {
 
 // ─── Subpantalla: Formulario de Producto ─────────────────────────────────────
 
-class _ProductFormScreen extends StatefulWidget {
+class _ProductFormScreen extends ConsumerStatefulWidget {
   final Producto? product;
   final List<Categoria> cats;
   final VoidCallback onSaved;
@@ -1388,10 +1390,10 @@ class _ProductFormScreen extends StatefulWidget {
   });
 
   @override
-  State<_ProductFormScreen> createState() => _ProductFormState();
+  ConsumerState<_ProductFormScreen> createState() => _ProductFormState();
 }
 
-class _ProductFormState extends State<_ProductFormScreen> {
+class _ProductFormState extends ConsumerState<_ProductFormScreen> {
   final _nombreCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _ventaCtrl = TextEditingController();
@@ -1542,6 +1544,11 @@ class _ProductFormState extends State<_ProductFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Categorías: usa las del provider si el FutureProvider aún no cargó,
+    // evitando que el dropdown se rompa al editar con la lista vacía.
+    final cats = ref.watch(_categoriasProvider).value ?? widget.cats;
+    final hasCategoria =
+        _categoriaId.isNotEmpty && cats.any((c) => c.id == _categoriaId);
     return Scaffold(
       backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
@@ -1672,7 +1679,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
             ),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
-              initialValue: _categoriaId.isEmpty ? null : _categoriaId,
+              initialValue: hasCategoria ? _categoriaId : null,
               decoration: InputDecoration(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -1683,7 +1690,7 @@ class _ProductFormState extends State<_ProductFormScreen> {
                 ),
               ),
               hint: const Text('Seleccionar categoría'),
-              items: widget.cats
+              items: cats
                   .map(
                     (c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)),
                   )

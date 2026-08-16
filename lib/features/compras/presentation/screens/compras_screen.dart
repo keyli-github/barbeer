@@ -370,130 +370,124 @@ class _OrdenesTab extends ConsumerWidget {
   final ValueChanged<String> onDetail;
   const _OrdenesTab({required this.canEdit, required this.onDetail});
 
-  @override
+@override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(_ordenesProvider);
     final notifier = ref.read(_ordenesProvider.notifier);
 
-    return Column(
-      children: [
-        if (state.resumen != null && !state.loading)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => notifier.load(),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        children: [
+          if (state.resumen != null && !state.loading)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  _Chip(
+                    'Pendientes',
+                    '${state.resumen!.pendientes}',
+                    AppColors.warning,
+                  ),
+                  const SizedBox(width: 8),
+                  _Chip(
+                    'Recibidas',
+                    '${state.resumen!.recibidas}',
+                    AppColors.success,
+                  ),
+                  const SizedBox(width: 8),
+                  _Chip(
+                    'Total',
+                    '${state.resumen!.totalOrdenes}',
+                    AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 12),
             child: Row(
               children: [
-                _Chip(
-                  'Pendientes',
-                  '${state.resumen!.pendientes}',
-                  AppColors.warning,
-                ),
-                const SizedBox(width: 8),
-                _Chip(
-                  'Recibidas',
-                  '${state.resumen!.recibidas}',
-                  AppColors.success,
-                ),
-                const SizedBox(width: 8),
-                _Chip(
-                  'Total',
-                  '${state.resumen!.totalOrdenes}',
-                  AppColors.primary,
-                ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Row(
-            children: [
-              for (final e in [
-                ('', 'Todas'),
-                ('PENDIENTE', 'Pendiente'),
-                ('ENVIADA', 'Enviada'),
-                ('RECIBIDA', 'Recibida'),
-                ('CANCELADA', 'Cancelada'),
-              ])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => notifier.setEstado(e.$1),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: state.estadoFilter == e.$1
-                            ? context.colors.primarySurface
-                            : context.colors.backgroundAlt,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                        border: Border.all(
-                          color: state.estadoFilter == e.$1
-                              ? context.colors.primaryBorder
-                              : context.colors.border,
+                for (final e in [
+                  ('', 'Todas'),
+                  ('PENDIENTE', 'Pendiente'),
+                  ('ENVIADA', 'Enviada'),
+                  ('RECIBIDA', 'Recibida'),
+                  ('CANCELADA', 'Cancelada'),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => notifier.setEstado(e.$1),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-                      ),
-                      child: Text(
-                        e.$2,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: state.estadoFilter == e.$1
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+                        decoration: BoxDecoration(
                           color: state.estadoFilter == e.$1
-                              ? AppColors.primary
-                              : context.colors.textSecondary,
+                              ? context.colors.primarySurface
+                              : context.colors.backgroundAlt,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                          border: Border.all(
+                            color: state.estadoFilter == e.$1
+                                ? context.colors.primaryBorder
+                                : context.colors.border,
+                          ),
+                        ),
+                        child: Text(
+                          e.$2,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: state.estadoFilter == e.$1
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: state.estadoFilter == e.$1
+                                ? AppColors.primary
+                                : context.colors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: state.loading
-                ? const AppLoading(key: ValueKey('l'))
-                : state.error != null
-                ? AppErrorState(
-                    key: const ValueKey('e'),
-                    message: state.error!,
-                    onRetry: () => notifier.load(),
-                  )
-                : state.items.isEmpty
-                ? const AppEmptyState(
-                    key: ValueKey('empty'),
-                    icon: Icons.shopping_cart_outlined,
-                    title: 'Sin órdenes',
-                  )
-                : ListView.builder(
-                    key: const ValueKey('list'),
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    itemCount: state.items.length + 1,
-                    itemBuilder: (_, i) {
-                      if (i == state.items.length) {
-                        return AppPagination(
-                          page: state.page,
-                          totalPages: state.totalPages,
-                          total: state.total,
-                          onPageChange: notifier.setPage,
-                        );
-                      }
-                      return _OrdenTile(
-                        compra: state.items[i],
-                        onTap: () => onDetail(state.items[i].id),
-                      );
-                    },
-                  ),
-          ),
-        ),
-      ],
-    );
+          if (state.loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 60),
+              child: AppLoading(),
+            )
+          else if (state.error != null)
+            AppErrorState(
+              message: state.error!,
+              onRetry: () => notifier.load(),
+            )
+          else if (state.items.isEmpty)
+            const AppEmptyState(
+              icon: Icons.shopping_cart_outlined,
+              title: 'Sin órdenes',
+            )
+          else ...[
+            for (final compra in state.items)
+              _OrdenTile(
+                compra: compra,
+                onTap: () => onDetail(compra.id),
+              ),
+            AppPagination(
+              page: state.page,
+              totalPages: state.totalPages,
+              total: state.total,
+              onPageChange: notifier.setPage,
+            ),
+          ],
+        ],
+      ),
+);
   }
 }
 
@@ -616,11 +610,13 @@ class _ProvsTab extends ConsumerWidget {
     final state = ref.watch(_provsProvider);
     final notifier = ref.read(_provsProvider.notifier);
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: LayoutBuilder(
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () => notifier.load(),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        children: [
+          LayoutBuilder(
             builder: (_, constraints) {
               final search = TextField(
                 key: const Key('proveedores-search'),
@@ -655,47 +651,38 @@ class _ProvsTab extends ConsumerWidget {
               );
             },
           ),
-        ),
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: state.loading
-                ? const AppLoading(key: ValueKey('l'))
-                : state.error != null
-                ? AppErrorState(
-                    key: const ValueKey('e'),
-                    message: state.error!,
-                    onRetry: () => notifier.load(),
-                  )
-                : state.items.isEmpty
-                ? const AppEmptyState(
-                    key: ValueKey('empty'),
-                    icon: Icons.local_shipping_outlined,
-                    title: 'Sin proveedores',
-                  )
-                : ListView.builder(
-                    key: const ValueKey('list'),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                    itemCount: state.items.length + 1,
-                    itemBuilder: (_, i) {
-                      if (i == state.items.length) {
-                        return AppPagination(
-                          page: state.page,
-                          totalPages: state.totalPages,
-                          total: state.total,
-                          onPageChange: notifier.setPage,
-                        );
-                      }
-                      return _ProvTile(
-                        prov: state.items[i],
-                        canEdit: canEdit,
-                        onEdit: () => onEdit(state.items[i]),
-                      );
-                    },
-                  ),
-          ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          if (state.loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 60),
+              child: AppLoading(),
+            )
+          else if (state.error != null)
+            AppErrorState(
+              message: state.error!,
+              onRetry: () => notifier.load(),
+            )
+          else if (state.items.isEmpty)
+            const AppEmptyState(
+              icon: Icons.local_shipping_outlined,
+              title: 'Sin proveedores',
+            )
+          else ...[
+            for (final prov in state.items)
+              _ProvTile(
+                prov: prov,
+                canEdit: canEdit,
+                onEdit: () => onEdit(prov),
+              ),
+            AppPagination(
+              page: state.page,
+              totalPages: state.totalPages,
+              total: state.total,
+              onPageChange: notifier.setPage,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

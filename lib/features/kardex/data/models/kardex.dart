@@ -12,6 +12,8 @@ class KardexMovimiento {
   final double valor;
   final String referencia;
   final String usuario;
+  final String? imagenUrl;
+  final DateTime? updatedAt;
 
   const KardexMovimiento({
     required this.id,
@@ -27,6 +29,8 @@ class KardexMovimiento {
     required this.valor,
     required this.referencia,
     required this.usuario,
+    this.imagenUrl,
+    this.updatedAt,
   });
 
   factory KardexMovimiento.fromJson(Map<String, dynamic> json) =>
@@ -44,6 +48,10 @@ class KardexMovimiento {
         valor: (json['valor'] as num?)?.toDouble() ?? 0,
         referencia: json['referencia'] as String? ?? '',
         usuario: json['usuario'] as String? ?? 'sistema',
+        imagenUrl: json['imagenUrl'] as String?,
+        updatedAt: json['updatedAt'] is String
+            ? DateTime.tryParse(json['updatedAt'] as String)
+            : null,
       );
 }
 

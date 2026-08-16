@@ -158,59 +158,52 @@ class KardexScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      body: Column(
-        children: [
-          _Header(
-            total: state.total,
-            onSearch: notifier.setSearch,
-            tipoFilter: state.tipoFilter,
-            onTipo: notifier.setTipo,
-            desde: state.desde,
-            hasta: state.hasta,
-            onDesde: notifier.setDesde,
-            onHasta: notifier.setHasta,
-          ),
-          if (state.resumen != null && !state.loading)
-            _KpiRow(resumen: state.resumen!),
-          const SizedBox(height: 4),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: state.loading
-                  ? const AppLoading(key: ValueKey('l'))
-                  : state.error != null
-                  ? AppErrorState(
-                      key: const ValueKey('e'),
-                      message: state.error!,
-                      onRetry: () => notifier.load(),
-                    )
-                  : state.items.isEmpty
-                  ? const AppEmptyState(
-                      key: ValueKey('empty'),
-                      icon: Icons.swap_vert_outlined,
-                      title: 'Sin movimientos',
-                      description:
-                          'No hay movimientos con los filtros actuales.',
-                    )
-                  : ListView.builder(
-                      key: const ValueKey('list'),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                      itemCount: state.items.length + 1,
-                      itemBuilder: (_, i) {
-                        if (i == state.items.length) {
-                          return AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: notifier.setPage,
-                          );
-                        }
-                        return _MovTile(mov: state.items[i]);
-                      },
-                    ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => notifier.load(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          children: [
+            _Header(
+              total: state.total,
+              onSearch: notifier.setSearch,
+              tipoFilter: state.tipoFilter,
+              onTipo: notifier.setTipo,
+              desde: state.desde,
+              hasta: state.hasta,
+              onDesde: notifier.setDesde,
+              onHasta: notifier.setHasta,
             ),
-          ),
-        ],
+            if (state.resumen != null && !state.loading)
+              _KpiRow(resumen: state.resumen!),
+            const SizedBox(height: 4),
+            if (state.loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: AppLoading(),
+              )
+            else if (state.error != null)
+              AppErrorState(
+                message: state.error!,
+                onRetry: () => notifier.load(),
+              )
+            else if (state.items.isEmpty)
+              const AppEmptyState(
+                icon: Icons.swap_vert_outlined,
+                title: 'Sin movimientos',
+                description: 'No hay movimientos con los filtros actuales.',
+              )
+            else ...[
+              for (final mov in state.items) _MovTile(mov: mov),
+              AppPagination(
+                page: state.page,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPageChange: notifier.setPage,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -248,33 +241,31 @@ class _HeaderState extends State<_Header> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: context.colors.background,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              controller: _ctrl,
-              onChanged: widget.onSearch,
-              style: AppTextStyles.bodyMedium,
-              decoration: InputDecoration(
-                hintText: 'Buscar producto...',
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: context.colors.textTertiary,
-                  size: 18,
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+          child: TextField(
+            controller: _ctrl,
+            onChanged: widget.onSearch,
+            style: AppTextStyles.bodyMedium,
+            decoration: InputDecoration(
+              hintText: 'Buscar producto...',
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: context.colors.textTertiary,
+                size: 18,
+              ),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
               ),
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
                 for (final t in [
@@ -327,7 +318,7 @@ class _HeaderState extends State<_Header> {
           ),
           // ── Date range filters ──────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
                 Expanded(
@@ -351,7 +342,6 @@ class _HeaderState extends State<_Header> {
             ),
           ),
         ],
-      ),
     );
   }
 
@@ -474,13 +464,13 @@ class _KpiRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    padding: const EdgeInsets.only(top: 12, bottom: 4),
     child: LayoutBuilder(
       builder: (_, constraints) => GridView.count(
         crossAxisCount: constraints.maxWidth >= 720 ? 4 : 2,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        childAspectRatio: constraints.maxWidth >= 720 ? 2.5 : 2.2,
+        childAspectRatio: constraints.maxWidth >= 720 ? 1.9 : 1.6,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: [
@@ -505,22 +495,34 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.09),
-      borderRadius: BorderRadius.circular(AppRadius.sm),
+      color: color.withValues(alpha: 0.09),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: color.withValues(alpha: 0.20)),
     ),
     child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: color,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
         ),
-        Text(label, style: AppTextStyles.labelSmall),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.labelSmall,
+        ),
       ],
     ),
   );
@@ -595,9 +597,7 @@ class _MovTile extends StatelessWidget {
             child: Stack(
               children: [
                   DSProductImageSquare(
-                    imageUrl: mov.imagenUrl != null
-                        ? '${mov.imagenUrl}?v=${mov.updatedAt?.millisecondsSinceEpoch ?? mov.fecha.hashCode}'
-                        : null,
+                    imageUrl: mov.imagenUrl,
                   size: 44,
                   radius: 10,
                   productName: mov.producto,
@@ -651,7 +651,7 @@ class _MovTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _color.withOpacity(0.12),
+                  color: _color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(

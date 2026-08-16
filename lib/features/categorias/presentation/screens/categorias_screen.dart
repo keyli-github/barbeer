@@ -38,125 +38,107 @@ class CategoriasScreen extends ConsumerWidget {
               child: const Icon(Icons.add_rounded),
             )
           : null,
-      body: Column(
-        children: [
-          Container(
-            color: context.colors.surface,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: AppSearchBar(
-                    hint: 'Buscar categoria...',
-                    onChanged: ref.read(categoriasProvider.notifier).search,
-                  ),
-                ),
-                _CategoryFilters(state: state),
-              ],
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: ref.read(categoriasProvider.notifier).load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+          children: [
+            AppSearchBar(
+              hint: 'Buscar categoria...',
+              onChanged: ref.read(categoriasProvider.notifier).search,
             ),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: _body(context, ref, state, auth),
-            ),
-          ),
-        ],
+            _CategoryFilters(state: state),
+            ..._bodyContent(context, ref, state, auth),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _body(
+  List<Widget> _bodyContent(
     BuildContext context,
     WidgetRef ref,
     CategoriasState state,
     AuthState auth,
   ) {
     if (state.isLoading && state.categorias.isEmpty) {
-      return const _CategorySkeleton(key: ValueKey('loading'));
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 80),
+          child: _CategorySkeleton(key: ValueKey('loading')),
+        ),
+      ];
     }
     if (state.error != null && state.categorias.isEmpty) {
-      return AppErrorState(
-        key: const ValueKey('error'),
-        message: state.error!,
-        onRetry: ref.read(categoriasProvider.notifier).load,
-      );
+      return [
+        AppErrorState(
+          key: const ValueKey('error'),
+          message: state.error!,
+          onRetry: ref.read(categoriasProvider.notifier).load,
+        ),
+      ];
     }
     if (state.categorias.isEmpty) {
-      return const AppEmptyState(
-        key: ValueKey('empty'),
-        icon: Icons.category_outlined,
-        title: 'Sin categorias',
-        description: 'No hay resultados para los filtros seleccionados.',
-      );
+      return const [
+        AppEmptyState(
+          key: ValueKey('empty'),
+          icon: Icons.category_outlined,
+          title: 'Sin categorias',
+          description: 'No hay resultados para los filtros seleccionados.',
+        ),
+      ];
     }
-    return RefreshIndicator(
-      key: const ValueKey('list'),
-      color: AppColors.primary,
-      onRefresh: ref.read(categoriasProvider.notifier).load,
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-          itemCount: state.categorias.length + 1,
-          itemBuilder: (context, index) {
-            if (index == state.categorias.length) {
-              return AppPagination(
-                page: state.pagina,
-                totalPages: state.totalPaginas,
-                total: state.total,
-                onPageChange: (page) =>
-                    ref.read(categoriasProvider.notifier).load(pagina: page),
-              );
-            }
-            final categoria = state.categorias[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: AppCard(
-                padding: const EdgeInsets.all(12),
-                onTap: () => _showDetail(context, ref, categoria.id),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: categoria.activo
-                            ? context.colors.primarySurface
-                            : context.colors.backgroundAlt,
-                        borderRadius: BorderRadius.circular(10),
+    return [
+      const SizedBox(height: 12),
+      for (final categoria in state.categorias)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: AppCard(
+            padding: const EdgeInsets.all(12),
+            onTap: () => _showDetail(context, ref, categoria.id),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: categoria.activo
+                        ? context.colors.primarySurface
+                        : context.colors.backgroundAlt,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.category_rounded,
+                    size: 19,
+                    color: categoria.activo
+                        ? AppColors.primary
+                        : context.colors.textTertiary,
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        categoria.nombre,
+                        style: AppTextStyles.titleMedium,
                       ),
-                      child: Icon(
-                        Icons.category_rounded,
-                        size: 19,
-                        color: categoria.activo
-                            ? AppColors.primary
-                            : context.colors.textTertiary,
+                      Text(
+                        '${categoria.productosCount} producto${categoria.productosCount == 1 ? '' : 's'}',
+                        style: AppTextStyles.labelSmall,
                       ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            categoria.nombre,
-                            style: AppTextStyles.titleMedium,
-                          ),
-                          Text(
-                            '${categoria.productosCount} producto${categoria.productosCount == 1 ? '' : 's'}',
-                            style: AppTextStyles.labelSmall,
-                          ),
-                          if (categoria.descripcion?.isNotEmpty == true)
-                            Text(
-                              categoria.descripcion!,
-                              style: AppTextStyles.bodySmall,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
-                    ),
+                      if (categoria.descripcion?.isNotEmpty == true)
+                        Text(
+                          categoria.descripcion!,
+                          style: AppTextStyles.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
                     _ActivePill(active: categoria.activo),
                     if (auth.hasPermission('categorias:editar') ||
                         auth.hasPermission('categorias:eliminar'))
@@ -195,11 +177,15 @@ class CategoriasScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            );
-          },
-        ),
-      ),
-    );
+            ),
+          AppPagination(
+            page: state.pagina,
+            totalPages: state.totalPaginas,
+            total: state.total,
+            onPageChange: (page) =>
+                ref.read(categoriasProvider.notifier).load(pagina: page),
+          ),
+        ];
   }
 
   Future<void> _showDetail(
@@ -344,7 +330,7 @@ class _CategoryFilters extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentValue = state.activo;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 10),
       child: InputDecorator(
         key: const ValueKey('categorias-estado-filter'),
         decoration: InputDecoration(

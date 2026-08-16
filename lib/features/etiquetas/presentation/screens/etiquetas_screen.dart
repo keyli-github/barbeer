@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -19,11 +21,23 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
   List<Etiqueta> _etiquetas = [];
   bool _loading = true;
   String? _error;
+  bool _showInfo = true;
+  Timer? _infoTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // El aviso de solo lectura se muestra brevemente y se oculta solo.
+    _infoTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showInfo = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _infoTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -139,23 +153,30 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
           : null,
       body: Column(
         children: [
-          // Info banner
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.colors.primarySurface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: context.colors.primaryBorder),
-              ),
-              child: Text(
-                'Clasifica métodos de pago, ingresos y salidas. '
-                'Las etiquetas del sistema son de solo lectura.',
-                style: TextStyle(fontSize: 11, color: AppColors.primary),
-              ),
-            ),
+          // Info banner transitorio: se muestra al entrar y se oculta solo
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _showInfo
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: context.colors.primarySurface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: context.colors.primaryBorder),
+                      ),
+                      child: Text(
+                        'Clasifica métodos de pago, ingresos y salidas. '
+                        'Las etiquetas del sistema son de solo lectura.',
+                        style: TextStyle(fontSize: 11, color: AppColors.primary),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
           const SizedBox(height: 12),
           // Content

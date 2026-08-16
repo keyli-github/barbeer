@@ -201,58 +201,55 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(rolesProvider.notifier).load(),
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-              child: GridView.count(
-                crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
-                childAspectRatio: 2.2,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _RoleMetric(
-                    'Roles activos',
-                    '$activeCount/${state.total}',
-                    AppColors.success,
-                    icon: Icons.shield_rounded,
-                  ),
-                  _RoleMetric(
-                    'Roles base',
-                    '$baseCount',
-                    AppColors.warning,
-                    icon: Icons.lock_rounded,
-                  ),
-                  _RoleMetric(
-                    'Usuarios asignados',
-                    '$totalUsuarios',
-                    AppColors.primary,
-                    icon: Icons.people_rounded,
-                  ),
-                  _RoleMetric(
-                    'Asignaciones',
-                    '$totalAsignaciones',
-                    AppColors.info,
-                    icon: Icons.key_rounded,
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: TextField(
-                onChanged: (value) => setState(() => _search = value),
-                decoration: const InputDecoration(
-                  hintText: 'Buscar por nombre o descripción...',
-                  prefixIcon: Icon(Icons.search_rounded),
+            GridView.count(
+              crossAxisCount:
+                  MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+              childAspectRatio: 2.2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _RoleMetric(
+                  'Roles activos',
+                  '$activeCount/${state.total}',
+                  AppColors.success,
+                  icon: Icons.shield_rounded,
                 ),
+                _RoleMetric(
+                  'Roles base',
+                  '$baseCount',
+                  AppColors.warning,
+                  icon: Icons.lock_rounded,
+                ),
+                _RoleMetric(
+                  'Usuarios asignados',
+                  '$totalUsuarios',
+                  AppColors.primary,
+                  icon: Icons.people_rounded,
+                ),
+                _RoleMetric(
+                  'Asignaciones',
+                  '$totalAsignaciones',
+                  AppColors.info,
+                  icon: Icons.key_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              onChanged: (value) => setState(() => _search = value),
+              decoration: const InputDecoration(
+                hintText: 'Buscar por nombre o descripción...',
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
+            const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Row(
                 children: [
                   for (final option in const [
@@ -267,52 +264,51 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
                       child: FilterChip(
                         label: Text(option.$2),
                         selected: _filter == option.$1,
-                        onSelected: (_) => setState(() => _filter = option.$1),
+                        onSelected: (_) =>
+                            setState(() => _filter = option.$1),
                       ),
                     ),
                 ],
               ),
             ),
-            Expanded(
-              child: state.isLoading
-                  ? const AppLoading()
-                  : state.error != null
-                  ? AppErrorState(
-                      message: state.error!,
-                      onRetry: () => ref.read(rolesProvider.notifier).load(),
-                    )
-                  : filtered.isEmpty
-                  ? const AppEmptyState(
-                      icon: Icons.admin_panel_settings_outlined,
-                      title: 'Sin roles',
-                    )
-                  : ListView(
-                      children: [
-                        const SizedBox(height: 8),
-                        for (final role in filtered)
-                          _RoleTile(
-                            role: role,
-                            isSuperAdmin: isSuperAdmin,
-                            onEdit: () => _showEditModal(context, ref, role),
-                            onDelete: () => _deleteRole(context, ref, role),
-                            onAssignPerms: () => _showPermissionsModal(
-                              context,
-                              ref,
-                              role,
-                              state,
-                            ),
-                          ),
-                        AppPagination(
-                          page: state.page,
-                          totalPages: state.totalPages,
-                          total: state.total,
-                          onPageChange: (p) =>
-                              ref.read(rolesProvider.notifier).load(page: p),
-                        ),
-                        const SizedBox(height: 80),
-                      ],
-                    ),
-            ),
+            const SizedBox(height: 12),
+            if (state.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: AppLoading(),
+              )
+            else if (state.error != null)
+              AppErrorState(
+                message: state.error!,
+                onRetry: () => ref.read(rolesProvider.notifier).load(),
+              )
+            else if (filtered.isEmpty)
+              const AppEmptyState(
+                icon: Icons.admin_panel_settings_outlined,
+                title: 'Sin roles',
+              )
+            else ...[
+              for (final role in filtered)
+                _RoleTile(
+                  role: role,
+                  isSuperAdmin: isSuperAdmin,
+                  onEdit: () => _showEditModal(context, ref, role),
+                  onDelete: () => _deleteRole(context, ref, role),
+                  onAssignPerms: () => _showPermissionsModal(
+                    context,
+                    ref,
+                    role,
+                    state,
+                  ),
+                ),
+              AppPagination(
+                page: state.page,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPageChange: (p) =>
+                    ref.read(rolesProvider.notifier).load(page: p),
+              ),
+            ],
           ],
         ),
       ),
@@ -477,7 +473,7 @@ class _RoleTile extends StatelessWidget {
     final isSuperAdminRole = nombre.toUpperCase() == 'SUPERADMIN';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

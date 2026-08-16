@@ -206,67 +206,61 @@ class InventarioScreen extends ConsumerWidget {
               label: const Text('Configurar'),
             )
           : null,
-      body: Column(
-        children: [
-          _SearchBar(
-            onSearch: notifier.setSearch,
-            estadoFilter: state.estadoFilter,
-            onEstado: notifier.setEstado,
-            categoriaFilter: state.categoriaFilter,
-            onCategoria: notifier.setCategoria,
-            cats: catsAsync.valueOrNull ?? const [],
-          ),
-          if (state.resumen != null && !state.loading)
-            _KpiRow(resumen: state.resumen!),
-          const SizedBox(height: 4),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: state.loading
-                  ? const AppLoading(key: ValueKey('l'))
-                  : state.error != null
-                  ? AppErrorState(
-                      key: const ValueKey('e'),
-                      message: state.error!,
-                      onRetry: () => notifier.load(),
-                    )
-                  : state.items.isEmpty
-                  ? const AppEmptyState(
-                      key: ValueKey('empty'),
-                      icon: Icons.inventory_2_outlined,
-                      title: 'Sin productos en inventario',
-                    )
-                  : ListView.builder(
-                      key: const ValueKey('list'),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                      itemCount: state.items.length + 1,
-                      itemBuilder: (_, i) {
-                        if (i == state.items.length) {
-                          return AppPagination(
-                            page: state.page,
-                            totalPages: state.totalPages,
-                            total: state.total,
-                            onPageChange: notifier.setPage,
-                          );
-                        }
-                        return _InventarioTile(
-                          item: state.items[i],
-                          canEdit: canEdit,
-                          canConfigure: canEdit,
-                          canAdjust:
-                              canEdit &&
-                              (auth.user?.isSuperAdmin != true ||
-                                  selectedSedeId != null),
-                          onConfigure: () =>
-                              _showConfig(context, ref, item: state.items[i]),
-                          onAdjust: () =>
-                              _showAdjust(context, ref, state.items[i]),
-                        );
-                      },
-                    ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => notifier.load(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          children: [
+            _SearchBar(
+              onSearch: notifier.setSearch,
+              estadoFilter: state.estadoFilter,
+              onEstado: notifier.setEstado,
+              categoriaFilter: state.categoriaFilter,
+              onCategoria: notifier.setCategoria,
+              cats: catsAsync.valueOrNull ?? const [],
             ),
-          ),
-        ],
+            if (state.resumen != null && !state.loading)
+              _KpiRow(resumen: state.resumen!),
+            const SizedBox(height: 4),
+            if (state.loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: AppLoading(),
+              )
+            else if (state.error != null)
+              AppErrorState(
+                message: state.error!,
+                onRetry: () => notifier.load(),
+              )
+            else if (state.items.isEmpty)
+              const AppEmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'Sin productos en inventario',
+              )
+            else ...[
+              for (final item in state.items)
+                _InventarioTile(
+                  item: item,
+                  canEdit: canEdit,
+                  canConfigure: canEdit,
+                  canAdjust:
+                      canEdit &&
+                      (auth.user?.isSuperAdmin != true ||
+                          selectedSedeId != null),
+                  onConfigure: () =>
+                      _showConfig(context, ref, item: item),
+                  onAdjust: () => _showAdjust(context, ref, item),
+                ),
+              AppPagination(
+                page: state.page,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPageChange: notifier.setPage,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -332,10 +326,10 @@ class _SearchBarState extends State<_SearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: context.colors.background,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ─ Buscador
           TextField(
@@ -471,7 +465,7 @@ class _KpiRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    padding: const EdgeInsets.only(top: 8, bottom: 4),
     child: LayoutBuilder(
       builder: (_, constraints) => GridView.count(
         crossAxisCount: constraints.maxWidth >= 720 ? 4 : 2,
@@ -560,11 +554,9 @@ class _InventarioTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                // ─ Imagen del producto (única por productoId, cache-busted por updatedAt)
+                // ─ Imagen del producto
                 DSProductImageSquare(
-                  imageUrl: item.imagenUrl != null
-                      ? '${item.imagenUrl}?v=${item.updatedAt.hashCode}'
-                      : null,
+                  imageUrl: item.imagenUrl,
                   size: 48,
                   radius: 10,
                   productName: item.producto,
@@ -1032,9 +1024,59 @@ class _AdjustSheetState extends State<_AdjustSheet> {
         subtitle: '${widget.item.producto} · Stock: ${widget.item.stock}',
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ── Resumen del producto ────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: context.colors.backgroundAlt,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: context.colors.borderLight),
+              ),
+              child: Row(
+                children: [
+                  DSProductImageSquare(
+                    imageUrl: widget.item.imagenUrl,
+                    size: 52,
+                    radius: 12,
+                    productName: widget.item.producto,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.producto,
+                          style: AppTextStyles.titleMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.item.codigo} · ${widget.item.categoria}',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Stock actual: ${widget.item.stock.toStringAsFixed(widget.item.stock % 1 == 0 ? 0 : 1)} ${widget.item.unidad} · '
+                          'Min ${widget.item.min.toStringAsFixed(0)} · '
+                          '${widget.item.max > 0 ? 'Max ${widget.item.max.toStringAsFixed(0)}' : 'Sin objetivo'}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            // ── Selector de tipo de ajuste ──────────────────────────────────
             Row(
               children: [
                 for (final t in [
@@ -1052,7 +1094,7 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                         }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
                           decoration: BoxDecoration(
                             color: _tipo == t.$1
                                 ? context.colors.primarySurface
@@ -1083,25 +1125,27 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+            // ── Cantidad ────────────────────────────────────────────────────
             TextField(
               controller: _cantCtrl,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 hintText: '0',
                 hintStyle: TextStyle(
-                  fontSize: 28,
+                  fontSize: 22,
                   color: context.colors.textDisabled,
                 ),
                 labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            // ── Referencia ──────────────────────────────────────────────────
             TextField(
               controller: _refCtrl,
               decoration: const InputDecoration(
@@ -1119,10 +1163,10 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                 style: const TextStyle(color: AppColors.error, fontSize: 13),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton(
                 onPressed: _saving ? null : _confirm,
                 child: _saving

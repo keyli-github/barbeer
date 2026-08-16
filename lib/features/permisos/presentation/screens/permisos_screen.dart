@@ -145,160 +145,143 @@ class PermisosScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      body: Column(
-        children: [
-          // Header compacto sin título duplicado
-          Container(
-            color: context.colors.background,
-            child: Column(
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(permisosProvider.notifier).load(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+          children: [
+            Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${state.total} total',
-                          style: AppTextStyles.bodySmall,
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => context.go('/roles'),
-                        icon: const Icon(Icons.admin_panel_settings_outlined),
-                        label: const Text('Configurar roles'),
-                      ),
-                    ],
+                Expanded(
+                  child: Text(
+                    '${state.total} total',
+                    style: AppTextStyles.bodySmall,
                   ),
                 ),
-                if (state.catalogo.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: _PermissionKpis(catalogo: state.catalogo),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: AppSearchBar(
-                    hint: 'Buscar permisos...',
-                    onChanged: (q) =>
-                        ref.read(permisosProvider.notifier).setSearchQuery(q),
-                  ),
-                ),
-                // Module tabs
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Row(
-                    children: [
-                      _ModuleTab(
-                        label: 'Todos',
-                        selected: state.moduleFilter == null,
-                        onTap: () => ref
-                            .read(permisosProvider.notifier)
-                            .setModuleFilter(null),
-                      ),
-                      ...modules.map(
-                        (m) => _ModuleTab(
-                          label: m,
-                          selected: state.moduleFilter == m,
-                          onTap: () => ref
-                              .read(permisosProvider.notifier)
-                              .setModuleFilter(
-                                state.moduleFilter == m ? null : m,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
+                TextButton.icon(
+                  onPressed: () => context.go('/roles'),
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  label: const Text('Configurar roles'),
                 ),
               ],
             ),
-          ),
-          // Content
-          Expanded(
-            child: state.isLoading
-                ? const AppLoading()
-                : state.error != null
-                ? AppErrorState(
-                    message: state.error!,
-                    onRetry: () => ref.read(permisosProvider.notifier).load(),
-                  )
-                : filtered.isEmpty
-                ? const AppEmptyState(
-                    icon: Icons.security_outlined,
-                    title: 'Sin permisos encontrados',
-                  )
-                : ListView(
-                    children: [
-                      const SizedBox(height: 8),
-                      for (final perm in filtered)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 3,
+            if (state.catalogo.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 4, 0, 12),
+                child: _PermissionKpis(catalogo: state.catalogo),
+              ),
+            AppSearchBar(
+              hint: 'Buscar permisos...',
+              onChanged: (q) =>
+                  ref.read(permisosProvider.notifier).setSearchQuery(q),
+            ),
+            const SizedBox(height: 8),
+            // Module tabs
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _ModuleTab(
+                    label: 'Todos',
+                    selected: state.moduleFilter == null,
+                    onTap: () => ref
+                        .read(permisosProvider.notifier)
+                        .setModuleFilter(null),
+                  ),
+                  ...modules.map(
+                    (m) => _ModuleTab(
+                      label: m,
+                      selected: state.moduleFilter == m,
+                      onTap: () => ref
+                          .read(permisosProvider.notifier)
+                          .setModuleFilter(
+                            state.moduleFilter == m ? null : m,
                           ),
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: context.colors.surface,
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              border: Border.all(
-                                color: context.colors.borderLight,
-                                width: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (state.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: AppLoading(),
+              )
+            else if (state.error != null)
+              AppErrorState(
+                message: state.error!,
+                onRetry: () => ref.read(permisosProvider.notifier).load(),
+              )
+            else if (filtered.isEmpty)
+              const AppEmptyState(
+                icon: Icons.security_outlined,
+                title: 'Sin permisos encontrados',
+              )
+            else ...[
+              for (final perm in filtered)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      border: Border.all(
+                        color: context.colors.borderLight,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                perm['nombre'] as String? ?? '',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: context.colors.textPrimary,
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        perm['nombre'] as String? ?? '',
-                                        style: AppTextStyles.bodyMedium
-                                            .copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              color: context.colors.textPrimary,
-                                            ),
-                                      ),
-                                      if ((perm['descripcion'] as String? ?? '')
-                                          .isNotEmpty) ...[
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          perm['descripcion'] as String? ?? '',
-                                          style: AppTextStyles.labelSmall,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                PermissionModuleBadge(
-                                  module: perm['modulo'] as String? ?? '',
-                                ),
-                                const SizedBox(width: 6),
-                                _ActionBadge(
-                                  action: _permissionAction(
-                                    perm['nombre'] as String? ?? '',
-                                  ),
+                              if ((perm['descripcion'] as String? ?? '')
+                                  .isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  perm['descripcion'] as String? ?? '',
+                                  style: AppTextStyles.labelSmall,
                                 ),
                               ],
-                            ),
+                            ],
                           ),
                         ),
-                      AppPagination(
-                        page: state.page,
-                        totalPages: state.totalPages,
-                        total: state.total,
-                        onPageChange: (p) => ref
-                            .read(permisosProvider.notifier)
-                            .load(page: p, modulo: state.moduleFilter),
-                      ),
-                      const SizedBox(height: 80),
-                    ],
+                        const SizedBox(width: 8),
+                        PermissionModuleBadge(
+                          module: perm['modulo'] as String? ?? '',
+                        ),
+                        const SizedBox(width: 6),
+                        _ActionBadge(
+                          action: _permissionAction(
+                            perm['nombre'] as String? ?? '',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-          ),
-        ],
+                ),
+              AppPagination(
+                page: state.page,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPageChange: (p) => ref
+                    .read(permisosProvider.notifier)
+                    .load(page: p, modulo: state.moduleFilter),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

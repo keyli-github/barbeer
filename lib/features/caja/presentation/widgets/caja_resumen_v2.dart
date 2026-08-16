@@ -67,148 +67,40 @@ class CajaResumenPrincipalV2 extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.colors.borderLight),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Detalle del turno',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: context.colors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _InfoRow('Ventas activas', '${resumen.cantidadVentas}'),
-              _InfoRow('Ventas anuladas', '${resumen.cantidadAnuladas}'),
-              _InfoRow('Total ventas bruto', _money(resumen.totalVentasBruto)),
-              _InfoRow('Anulaciones', _money(resumen.totalAnulaciones)),
-              _InfoRow(
-                'Total digital bruto',
-                _money(resumen.totalDigitalBruto),
-              ),
-              if (resumen.ventasPendientes > 0)
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: context.colors.warningLight,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.hourglass_top_rounded,
-                        size: 16,
-                        color: AppColors.warning,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${resumen.ventasPendientes} venta(s) sin clasificar '
-                          'como efectivo o billetera.',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.warning,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── CajaBilleteraCard ────────────────────────────────────────────────────────
-
-/// Desglose de ventas clasificadas por billetera (porBilletera).
-/// Solo se muestra cuando la lista no está vacía.
-class CajaBilleteraCard extends StatelessWidget {
-  final List<Map<String, dynamic>> porBilletera;
-
-  const CajaBilleteraCard({super.key, required this.porBilletera});
-
-  @override
-  Widget build(BuildContext context) {
-    if (porBilletera.isEmpty) return const SizedBox.shrink();
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.colors.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(12, 10, 12, 8),
-            child: Text(
-              'Desglose por billetera',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: context.colors.textSecondary,
+        if (resumen.ventasPendientes > 0) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.colors.warningLight,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.3),
               ),
             ),
-          ),
-          const Divider(height: 1),
-          ...porBilletera.map((b) {
-            // 'conciliacion' puede venir como Map o como String — guard defensivo
-            final conc = b['conciliacion'];
-            final nombre = conc is Map
-                ? (conc['etiqueta'] is Map
-                      ? conc['etiqueta']['nombre'] as String? ?? 'Sin etiqueta'
-                      : conc['etiqueta'] as String? ?? 'Sin etiqueta')
-                : b['nombre'] as String? ??
-                      b['conciliacionId'] as String? ??
-                      'Sin etiqueta';
-            final total = (b['total'] as num?)?.toDouble() ?? 0;
-            final cantidad = (b['cantidad'] as num?)?.toInt() ?? 0;
-            return ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              title: Text(nombre, style: const TextStyle(fontSize: 12)),
-              trailing: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _money(total),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.hourglass_top_rounded,
+                  size: 16,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${resumen.ventasPendientes} venta(s) sin clasificar '
+                    'como efectivo o billetera.',
                     style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
+                      fontSize: 11,
+                      color: AppColors.warning,
                     ),
                   ),
-                  Text(
-                    '$cantidad venta(s)',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: context.colors.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -228,7 +120,6 @@ class CajaVendedoraTable extends StatelessWidget {
       title: 'Ventas por vendedora',
       headers: const ['Vendedora', 'Ventas', 'Total'],
       rows: porVendedora
-          .where((v) => v is Map)
           .map(
             (v) => [
               v['username'] as String? ??
@@ -274,6 +165,9 @@ class CajaProductosTable extends StatelessWidget {
 
 // ── _CajaDataTable (privado) ─────────────────────────────────────────────────
 
+/// Tabla responsiva: distribuye el ancho disponible entre las columnas
+/// usando pesos, en lugar de un DataTable con scroll horizontal que se ve
+/// pequeño y desalineado en pantallas móviles.
 class _CajaDataTable extends StatelessWidget {
   final String title;
   final List<String> headers;
@@ -308,35 +202,82 @@ class _CajaDataTable extends StatelessWidget {
             ),
           ),
           const Divider(height: 1),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowHeight: 32,
-              dataRowMinHeight: 36,
-              dataRowMaxHeight: 36,
-              horizontalMargin: 12,
-              columnSpacing: 16,
-              headingTextStyle: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: context.colors.textTertiary,
-              ),
-              dataTextStyle: const TextStyle(fontSize: 11),
-              columns: headers
-                  .map((h) => DataColumn(label: Text(h.toUpperCase())))
-                  .toList(),
-              rows: rows
-                  .map(
-                    (row) => DataRow(
-                      cells: row.map((c) => DataCell(Text(c))).toList(),
+          // Cabecera
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+            child: Row(
+              children: List.generate(headers.length, (index) {
+                return Expanded(
+                  flex: _flexFor(index),
+                  child: Text(
+                    headers[index].toUpperCase(),
+                    textAlign: _alignFor(index, isHeader: true),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: context.colors.textTertiary,
                     ),
-                  )
-                  .toList(),
+                  ),
+                );
+              }),
             ),
           ),
+          const Divider(height: 1),
+          // Filas
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: List.generate(row.length, (index) {
+                  return Expanded(
+                    flex: _flexFor(index),
+                    child: Text(
+                      row[index],
+                      textAlign: _alignFor(index),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          const SizedBox(height: 4),
         ],
       ),
     );
+  }
+
+  // Pesos por posición para que cada tabla ocupe el ancho completo.
+  int _flexFor(int index) {
+    // 4 columnas: Código / Producto / Cant. / Total
+    if (headers.length == 4) {
+      return switch (index) {
+        0 => 1,
+        1 => 2,
+        2 => 1,
+        _ => 1,
+      };
+    }
+    // 3 columnas: Vendedora / Ventas / Total
+    return switch (index) {
+      0 => 2,
+      1 => 1,
+      _ => 1,
+    };
+  }
+
+  TextAlign _alignFor(int index, {bool isHeader = false}) {
+    // Columna numérica (última) alineada a la derecha
+    if (index == headers.length - 1) return TextAlign.right;
+    if (headers.length == 4 && index == 2) return TextAlign.center;
+    return TextAlign.left;
   }
 }
 
@@ -396,33 +337,6 @@ class _MetricCard extends StatelessWidget {
           ),
         ],
       ),
-    ),
-  );
-}
-
-// ── _InfoRow (privado) ───────────────────────────────────────────────────────
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 4),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
-        ),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-        ),
-      ],
     ),
   );
 }

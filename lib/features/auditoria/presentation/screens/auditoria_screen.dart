@@ -163,139 +163,129 @@ class AuditoriaScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      body: Column(
-        children: [
-          Container(
-            color: context.colors.background,
-            child: Column(
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () => ref.read(auditoriaProvider.notifier).load(),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+          children: [
+            Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: Row(
-                    children: [
-                      Text(
-                        '${state.total} registros',
-                        style: AppTextStyles.bodySmall,
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.filter_list_rounded,
-                          color: AppColors.primary,
-                        ),
-                        onPressed: () => _showFilters(context, ref, state),
-                      ),
-                    ],
-                  ),
+                Text(
+                  '${state.total} registros',
+                  style: AppTextStyles.bodySmall,
                 ),
-                if (state.accionFilter != null ||
-                    state.entidadFilter != null ||
-                    state.desdeFilter != null ||
-                    state.hastaFilter != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        const Text(
-                          'Filtros activos: ',
-                          style: AppTextStyles.labelSmall,
-                        ),
-                        if (state.accionFilter != null)
-                          _FilterChip(
-                            label: state.accionFilter!,
-                            onRemove: () => ref
-                                .read(auditoriaProvider.notifier)
-                                .setFilters(
-                                  entidad: state.entidadFilter,
-                                  desde: state.desdeFilter,
-                                  hasta: state.hastaFilter,
-                                ),
-                          ),
-                        if (state.entidadFilter != null)
-                          _FilterChip(
-                            label: state.entidadFilter!,
-                            onRemove: () => ref
-                                .read(auditoriaProvider.notifier)
-                                .setFilters(
-                                  accion: state.accionFilter,
-                                  desde: state.desdeFilter,
-                                  hasta: state.hastaFilter,
-                                ),
-                          ),
-                        if (state.desdeFilter != null)
-                          _FilterChip(
-                            label: 'Desde ${state.desdeFilter}',
-                            onRemove: () => ref
-                                .read(auditoriaProvider.notifier)
-                                .setFilters(
-                                  accion: state.accionFilter,
-                                  entidad: state.entidadFilter,
-                                  hasta: state.hastaFilter,
-                                ),
-                          ),
-                        if (state.hastaFilter != null)
-                          _FilterChip(
-                            label: 'Hasta ${state.hastaFilter}',
-                            onRemove: () => ref
-                                .read(auditoriaProvider.notifier)
-                                .setFilters(
-                                  accion: state.accionFilter,
-                                  entidad: state.entidadFilter,
-                                  desde: state.desdeFilter,
-                                ),
-                          ),
-                      ],
-                    ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(
+                    Icons.filter_list_rounded,
+                    color: AppColors.primary,
                   ),
+                  onPressed: () => _showFilters(context, ref, state),
+                ),
               ],
             ),
-          ),
-          if (state.logs.isNotEmpty)
-            _AuditKpis(total: state.total, logs: state.logs),
-          Expanded(
-            child: RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () => ref.read(auditoriaProvider.notifier).load(),
-              child: state.isLoading
-                  ? const AppLoading()
-                  : state.error != null
-                  ? AppErrorState(
-                      message: state.error!,
-                      onRetry: () =>
-                          ref.read(auditoriaProvider.notifier).load(),
-                    )
-                  : state.logs.isEmpty
-                  ? const AppEmptyState(
-                      icon: Icons.history_outlined,
-                      title: 'Sin registros de auditoria',
-                    )
-                  : ListView(
-                      children: [
-                        const SizedBox(height: 8),
-                        for (final log in state.logs)
-                          _LogTile(
-                            log: log,
-                            sedeName: state.sedeNames[log['sedeId']],
-                            onTap: () => _showDetail(context, {
-                              ...log,
-                              'sedeNombre': state.sedeNames[log['sedeId']],
-                            }),
-                          ),
-                        AppPagination(
-                          page: state.page,
-                          totalPages: state.totalPages,
-                          total: state.total,
-                          onPageChange: (p) => ref
-                              .read(auditoriaProvider.notifier)
-                              .load(page: p),
-                        ),
-                        const SizedBox(height: 80),
-                      ],
+            if (state.accionFilter != null ||
+                state.entidadFilter != null ||
+                state.desdeFilter != null ||
+                state.hastaFilter != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      'Filtros activos: ',
+                      style: AppTextStyles.labelSmall,
                     ),
-            ),
-          ),
-        ],
+                    if (state.accionFilter != null)
+                      _FilterChip(
+                        label: state.accionFilter!,
+                        onRemove: () => ref
+                            .read(auditoriaProvider.notifier)
+                            .setFilters(
+                              entidad: state.entidadFilter,
+                              desde: state.desdeFilter,
+                              hasta: state.hastaFilter,
+                            ),
+                      ),
+                    if (state.entidadFilter != null)
+                      _FilterChip(
+                        label: state.entidadFilter!,
+                        onRemove: () => ref
+                            .read(auditoriaProvider.notifier)
+                            .setFilters(
+                              accion: state.accionFilter,
+                              desde: state.desdeFilter,
+                              hasta: state.hastaFilter,
+                            ),
+                      ),
+                    if (state.desdeFilter != null)
+                      _FilterChip(
+                        label: 'Desde ${state.desdeFilter}',
+                        onRemove: () => ref
+                            .read(auditoriaProvider.notifier)
+                            .setFilters(
+                              accion: state.accionFilter,
+                              entidad: state.entidadFilter,
+                              hasta: state.hastaFilter,
+                            ),
+                      ),
+                    if (state.hastaFilter != null)
+                      _FilterChip(
+                        label: 'Hasta ${state.hastaFilter}',
+                        onRemove: () => ref
+                            .read(auditoriaProvider.notifier)
+                            .setFilters(
+                              accion: state.accionFilter,
+                              entidad: state.entidadFilter,
+                              desde: state.desdeFilter,
+                            ),
+                      ),
+                  ],
+                ),
+              ),
+            if (state.logs.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _AuditKpis(total: state.total, logs: state.logs),
+              ),
+            if (state.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: AppLoading(),
+              )
+            else if (state.error != null)
+              AppErrorState(
+                message: state.error!,
+                onRetry: () => ref.read(auditoriaProvider.notifier).load(),
+              )
+            else if (state.logs.isEmpty)
+              const AppEmptyState(
+                icon: Icons.history_outlined,
+                title: 'Sin registros de auditoria',
+              )
+            else ...[
+              for (final log in state.logs)
+                _LogTile(
+                  log: log,
+                  sedeName: state.sedeNames[log['sedeId']],
+                  onTap: () => _showDetail(context, {
+                    ...log,
+                    'sedeNombre': state.sedeNames[log['sedeId']],
+                  }),
+                ),
+              AppPagination(
+                page: state.page,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPageChange: (p) => ref
+                    .read(auditoriaProvider.notifier)
+                    .load(page: p),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -476,7 +466,7 @@ class _LogTile extends StatelessWidget {
     } catch (_) {}
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -746,16 +736,14 @@ class _AuditKpis extends StatelessWidget {
       ('Entidades', entities.length, AppColors.info),
       ('Usuarios', users.length, AppColors.success),
     ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: GridView.count(
-        crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
-        childAspectRatio: 2.8,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
+    return GridView.count(
+      crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+      childAspectRatio: 2.8,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
           for (final value in values)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -786,7 +774,6 @@ class _AuditKpis extends StatelessWidget {
               ),
             ),
         ],
-      ),
     );
   }
 }

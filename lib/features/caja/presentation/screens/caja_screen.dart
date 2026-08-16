@@ -184,34 +184,28 @@ class _CajaTabs extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-    color: context.colors.surface,
+  Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-    child: Column(
-      children: [
-        // Tabs: Turno actual / Historial
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: context.colors.backgroundAlt,
-            borderRadius: BorderRadius.circular(10),
+    child: Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: context.colors.backgroundAlt,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          _Tab(
+            label: 'Turno actual',
+            selected: !historial,
+            onTap: () => onTab(false),
           ),
-          child: Row(
-            children: [
-              _Tab(
-                label: 'Turno actual',
-                selected: !historial,
-                onTap: () => onTab(false),
-              ),
-              _Tab(
-                label: 'Historial',
-                selected: historial,
-                onTap: () => onTab(true),
-              ),
-            ],
+          _Tab(
+            label: 'Historial',
+            selected: historial,
+            onTap: () => onTab(true),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -352,12 +346,6 @@ class _Actual extends StatelessWidget {
               resumen: summary.v2!,
               montoApertura: session.montoApertura,
             ),
-            const SizedBox(height: 12),
-            CajaBilleteraCard(porBilletera: summary.v2!.porBilletera),
-            if (summary.v2!.porBilletera.isNotEmpty) const SizedBox(height: 12),
-            CajaVendedoraTable(porVendedora: summary.v2!.porVendedora),
-            if (summary.v2!.porVendedora.isNotEmpty) const SizedBox(height: 12),
-            CajaProductosTable(resumenProductos: summary.v2!.resumenProductos),
           ] else ...[
             LayoutBuilder(
               builder: (context, constraints) {
@@ -1128,12 +1116,6 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
                 title: 'Denominaciones de precuadre',
                 items: session.denominacionesPrecuadre,
               ),
-              const SizedBox(height: 14),
-            ],
-
-            // ── Billetera ──────────────────────────────────────────────────
-            if (v2?.porBilletera.isNotEmpty ?? false) ...[
-              CajaBilleteraCard(porBilletera: v2!.porBilletera),
               const SizedBox(height: 14),
             ],
 

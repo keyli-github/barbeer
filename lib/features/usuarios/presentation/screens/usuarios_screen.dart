@@ -280,167 +280,161 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(usuariosProvider.notifier).load(),
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-              child: TextField(
-                onChanged: (value) => setState(() => _search = value),
-                decoration: const InputDecoration(
-                  hintText: 'Buscar usuario...',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
+            TextField(
+              onChanged: (value) => setState(() => _search = value),
+              decoration: const InputDecoration(
+                hintText: 'Buscar usuario...',
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: AppCard(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: _FilterDropdown<String>(
-                        label: 'Rol',
-                        initialValue: _roleFilter,
-                        items: [
-                          const DropdownMenuItem(
-                            value: '',
-                            child: Text('Todos'),
-                          ),
-                          for (final role in state.roles)
-                            DropdownMenuItem(
-                              value: role['id'] as String? ?? '',
-                              child: Text(role['nombre'] as String? ?? ''),
-                            ),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _roleFilter = value ?? ''),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: _FilterDropdown<String>(
-                        label: 'Estado',
-                        initialValue: _statusFilter,
-                        items: const [
-                          DropdownMenuItem(value: '', child: Text('Todos')),
-                          DropdownMenuItem(value: 'true', child: Text('Activos')),
+            const SizedBox(height: 8),
+            AppCard(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _FilterDropdown<String>(
+                      label: 'Rol',
+                      initialValue: _roleFilter,
+                      items: [
+                        const DropdownMenuItem(
+                          value: '',
+                          child: Text('Todos'),
+                        ),
+                        for (final role in state.roles)
                           DropdownMenuItem(
-                            value: 'false',
-                            child: Text('Inactivos'),
+                            value: role['id'] as String? ?? '',
+                            child: Text(role['nombre'] as String? ?? ''),
                           ),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _statusFilter = value ?? ''),
-                      ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _roleFilter = value ?? ''),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: _FilterDropdown<String>(
+                      label: 'Estado',
+                      initialValue: _statusFilter,
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('Todos')),
+                        DropdownMenuItem(
+                          value: 'true',
+                          child: Text('Activos'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'false',
+                          child: Text('Inactivos'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _statusFilter = value ?? ''),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Stats
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: AppCard(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cols = constraints.maxWidth >= 700 ? 4 : 2;
+                    return GridView.count(
+                      crossAxisCount: cols,
+                      childAspectRatio: cols == 4 ? 2.6 : 1.9,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _StatChip(
+                          label: 'Administradores',
+                          value: '$adminCount',
+                          color: AppColors.primary,
+                        ),
+                        _StatChip(
+                          label: 'Empleados',
+                          value: '${state.users.length - adminCount}',
+                          color: AppColors.info,
+                        ),
+                        _StatChip(
+                          label: 'Activos',
+                          value:
+                              '${state.users.where((u) => u['activo'] == true).length}',
+                          color: AppColors.success,
+                        ),
+                        _StatChip(
+                          label: 'Inactivos',
+                          value:
+                              '${state.users.where((u) => u['activo'] != true).length}',
+                          color: context.colors.textTertiary,
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
             // Content
-            Expanded(
-              child: state.isLoading
-                  ? const AppLoading()
-                  : state.error != null
-                  ? AppErrorState(
-                      message: state.error!,
-                      onRetry: () => ref.read(usuariosProvider.notifier).load(),
-                    )
-                  : filteredUsers.isEmpty
-                  ? const AppEmptyState(
-                      icon: Icons.people_outline_rounded,
-                      title: 'Sin usuarios',
-                      description: 'No hay usuarios registrados',
-                    )
-                  : ListView(
-                      children: [
-                        // Stats
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                          child: AppCard(
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final cols = constraints.maxWidth >= 700 ? 4 : 2;
-                                return GridView.count(
-                                  crossAxisCount: cols,
-                                  childAspectRatio: cols == 4 ? 2.6 : 1.9,
-                                  crossAxisSpacing: 8,
-                                  mainAxisSpacing: 8,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  children: [
-                                    _StatChip(
-                                      label: 'Administradores',
-                                      value: '$adminCount',
-                                      color: AppColors.primary,
-                                    ),
-                                    _StatChip(
-                                      label: 'Empleados',
-                                      value:
-                                          '${state.users.length - adminCount}',
-                                      color: AppColors.info,
-                                    ),
-                                    _StatChip(
-                                      label: 'Activos',
-                                      value:
-                                          '${state.users.where((u) => u['activo'] == true).length}',
-                                      color: AppColors.success,
-                                    ),
-                                    _StatChip(
-                                      label: 'Inactivos',
-                                      value:
-                                          '${state.users.where((u) => u['activo'] != true).length}',
-                                      color: context.colors.textTertiary,
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        // User list
-                        for (final user in filteredUsers)
-                          _UserTile(
-                            user: user,
-                            auth: auth,
-                            onTap: () =>
-                                _showDetail(context, ref, user['id'] as String),
-                            onEdit: () => _showEditModal(
-                              context,
-                              ref,
-                              user,
-                              state,
-                              availableRoles,
-                              activeSedes,
-                            ),
-                            onDeactivate: () => _deactivate(context, ref, user),
-                            onReactivate: () => ref
-                                .read(usuariosProvider.notifier)
-                                .reactivateUser(user['id'] as String),
-                            onResetPassword: () => _resetPassword(
-                              context,
-                              ref,
-                              user['id'] as String,
-                            ),
-                          ),
-                        // Pagination
-                        AppPagination(
-                          page: state.page,
-                          totalPages: state.totalPages,
-                          total: state.total,
-                          onPageChange: (p) =>
-                              ref.read(usuariosProvider.notifier).load(page: p),
-                        ),
-                        const SizedBox(height: 80),
-                      ],
-                    ),
-            ),
+            if (state.isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: AppLoading(),
+              )
+            else if (state.error != null)
+              AppErrorState(
+                message: state.error!,
+                onRetry: () => ref.read(usuariosProvider.notifier).load(),
+              )
+            else if (filteredUsers.isEmpty)
+              const AppEmptyState(
+                icon: Icons.people_outline_rounded,
+                title: 'Sin usuarios',
+                description: 'No hay usuarios registrados',
+              )
+            else ...[
+              for (final user in filteredUsers)
+                _UserTile(
+                  user: user,
+                  auth: auth,
+                  onTap: () =>
+                      _showDetail(context, ref, user['id'] as String),
+                  onEdit: () => _showEditModal(
+                    context,
+                    ref,
+                    user,
+                    state,
+                    availableRoles,
+                    activeSedes,
+                  ),
+                  onDeactivate: () => _deactivate(context, ref, user),
+                  onReactivate: () => ref
+                      .read(usuariosProvider.notifier)
+                      .reactivateUser(user['id'] as String),
+                  onResetPassword: () => _resetPassword(
+                    context,
+                    ref,
+                    user['id'] as String,
+                  ),
+                ),
+              AppPagination(
+                page: state.page,
+                totalPages: state.totalPages,
+                total: state.total,
+                onPageChange: (p) =>
+                    ref.read(usuariosProvider.notifier).load(page: p),
+              ),
+            ],
           ],
         ),
       ),
@@ -632,8 +626,9 @@ class _UserTile extends StatelessWidget {
     final mustChange = user['mustChangePassword'] as bool? ?? false;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         onTap: onTap,
         child: Row(
           children: [
@@ -1529,21 +1524,28 @@ class _StatChip extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(AppRadius.sm),
+      color: color.withValues(alpha: 0.09),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: color.withValues(alpha: 0.20)),
     ),
     child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: color,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
         ),
+        const SizedBox(height: 4),
         Text(
           label,
           maxLines: 1,
