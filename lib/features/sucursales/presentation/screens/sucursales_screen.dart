@@ -11,6 +11,7 @@ import '../../../../core/widgets/app_badge.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
@@ -57,7 +58,7 @@ class SucursalesNotifier extends StateNotifier<SucursalesState> {
     try {
       final r = await _api.get(
         ApiConstants.establishments,
-        queryParameters: {'pagina': page, 'limite': 20},
+        queryParameters: {'pagina': page, 'limite': 25},
       );
       final d = r.data as Map;
       state = state.copyWith(
@@ -146,32 +147,37 @@ class SucursalesScreen extends ConsumerWidget {
                       children: [
                         Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Row(
+                          child: GridView.count(
+                            crossAxisCount:
+                                MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+                            childAspectRatio: 2.5,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
                             children: [
-                              Expanded(
-                                child: _StatChip(
-                                  label: 'Total',
-                                  value: '${state.total}',
-                                  color: AppColors.primary,
-                                ),
+                              _StatChip(
+                                label: 'Total',
+                                value: '${state.total}',
+                                color: AppColors.primary,
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _StatChip(
-                                  label: 'Activas',
-                                  value:
-                                      '${state.sedes.where((s) => s['activo'] == true).length}',
-                                  color: AppColors.success,
-                                ),
+                              _StatChip(
+                                label: 'Activas',
+                                value:
+                                    '${state.sedes.where((s) => s['activo'] == true).length}',
+                                color: AppColors.success,
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _StatChip(
-                                  label: 'Inactivas',
-                                  value:
-                                      '${state.sedes.where((s) => s['activo'] != true).length}',
-                                  color: context.colors.textTertiary,
-                                ),
+                              _StatChip(
+                                label: 'Inactivas',
+                                value:
+                                    '${state.sedes.where((s) => s['activo'] != true).length}',
+                                color: context.colors.textTertiary,
+                              ),
+                              _StatChip(
+                                label: 'Usuarios',
+                                value:
+                                    '${state.sedes.fold<int>(0, (total, sede) => total + ((sede['_count'] as Map?)?['usuarios'] as int? ?? 0))}',
+                                color: AppColors.info,
                               ),
                             ],
                           ),
@@ -219,7 +225,7 @@ class SucursalesScreen extends ConsumerWidget {
             .hasPermission('establecimientos:editar'),
         canDelete: ref
             .read(authProvider)
-            .hasPermission('establecimientos:editar'),
+            .hasPermission('establecimientos:eliminar'),
         onEdit: () => _showForm(context, ref, sede),
         onDelete: () => _deleteSede(context, ref, sede),
       ),
@@ -255,10 +261,9 @@ class SucursalesScreen extends ConsumerWidget {
   ) async {
     final userCount = sede['_count']?['usuarios'] as int? ?? 0;
     if (userCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se puede eliminar: tiene usuarios asignados'),
-        ),
+      AppFeedback.error(
+        context,
+        'No se puede eliminar: tiene usuarios asignados',
       );
       return;
     }
@@ -275,15 +280,9 @@ class SucursalesScreen extends ConsumerWidget {
         await ref
             .read(sucursalesProvider.notifier)
             .deleteSede(sede['id'] as String);
-        if (context.mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Sucursal eliminada')));
+        if (context.mounted) AppFeedback.success(context, 'Sucursal eliminada');
       } catch (e) {
-        if (context.mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (context.mounted) AppFeedback.error(context, 'Error: $e');
       }
     }
   }
@@ -306,7 +305,6 @@ class _SedeTile extends StatelessWidget {
     final nombre = sede['nombre'] as String? ?? '';
     final direccion = sede['direccion'] as String?;
     final telefono = sede['telefono'] as String?;
-    final ruc = sede['ruc'] as String?;
     final codigoSede = sede['codigoSede'] as String? ?? '';
     final activo = sede['activo'] as bool? ?? false;
     final userCount = sede['_count']?['usuarios'] as int? ?? 0;
@@ -407,10 +405,6 @@ class _SedeTile extends StatelessWidget {
                   _InfoChip(icon: Icons.phone_rounded, label: telefono),
                   const SizedBox(width: 8),
                 ],
-                if (ruc != null) ...[
-                  _InfoChip(icon: Icons.receipt_rounded, label: 'RUC: $ruc'),
-                  const SizedBox(width: 8),
-                ],
                 _InfoChip(
                   icon: Icons.people_rounded,
                   label: '$userCount usuarios',
@@ -467,7 +461,6 @@ class _SedeDetailScreen extends StatelessWidget {
     final activo = sede['activo'] as bool? ?? false;
     final dir = sede['direccion'] as String? ?? '';
     final tel = sede['telefono'] as String? ?? '';
-    final ruc = sede['ruc'] as String? ?? '';
     final codigo =
         sede['codigoSede'] as String? ?? sede['codigo'] as String? ?? '';
     final users = (sede['_count'] as Map?)?['usuarios'] as int? ?? 0;
@@ -580,10 +573,6 @@ class _SedeDetailScreen extends StatelessWidget {
                     _SRow('Teléfono', tel),
                     Divider(height: 1, color: context.colors.surfaceAlt),
                   ],
-                  if (ruc.isNotEmpty) ...[
-                    _SRow('RUC', ruc),
-                    Divider(height: 1, color: context.colors.surfaceAlt),
-                  ],
                   _SRow('Usuarios', '$users'),
                 ],
               ),
@@ -648,53 +637,6 @@ class _SRow extends StatelessWidget {
   );
 }
 
-class _SedeDetail extends StatelessWidget {
-  final Map<String, dynamic> sede;
-  const _SedeDetail({required this.sede});
-  @override
-  Widget build(BuildContext context) {
-    final items = {
-      'Nombre': sede['nombre'] as String? ?? '',
-      'Codigo': sede['codigoSede'] as String? ?? '',
-      'Direccion': sede['direccion'] as String? ?? '',
-      'Telefono': sede['telefono'] as String? ?? '',
-      'RUC': sede['ruc'] as String? ?? '',
-      'Estado': (sede['activo'] as bool? ?? false) ? 'Activa' : 'Inactiva',
-      'Creada': sede['createdAt'] as String? ?? '',
-    };
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final e in items.entries)
-          if (e.value.isNotEmpty) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    e.key,
-                    style: AppTextStyles.labelLarge.copyWith(
-                      color: context.colors.textTertiary,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    e.value,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: context.colors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 16),
-          ],
-      ],
-    );
-  }
-}
-
 class _SedeForm extends StatefulWidget {
   final Map<String, dynamic>? sede;
   final Future<void> Function(Map<String, dynamic>) onSave;
@@ -705,11 +647,7 @@ class _SedeForm extends StatefulWidget {
 
 class _SedeFormState extends State<_SedeForm> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameCtrl,
-      _codigoCtrl,
-      _dirCtrl,
-      _telCtrl,
-      _rucCtrl;
+  late final TextEditingController _nameCtrl, _codigoCtrl, _dirCtrl, _telCtrl;
   bool _activo = true, _loading = false;
 
   int get _assignedUsers =>
@@ -730,9 +668,6 @@ class _SedeFormState extends State<_SedeForm> {
     _telCtrl = TextEditingController(
       text: widget.sede?['telefono'] as String? ?? '',
     );
-    _rucCtrl = TextEditingController(
-      text: widget.sede?['ruc'] as String? ?? '',
-    );
     _activo = widget.sede?['activo'] as bool? ?? true;
   }
 
@@ -742,7 +677,6 @@ class _SedeFormState extends State<_SedeForm> {
     _codigoCtrl.dispose();
     _dirCtrl.dispose();
     _telCtrl.dispose();
-    _rucCtrl.dispose();
     super.dispose();
   }
 
@@ -803,21 +737,6 @@ class _SedeFormState extends State<_SedeForm> {
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
             ),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'RUC',
-              hint: '11 digitos (opcional)',
-              controller: _rucCtrl,
-              prefixIcon: Icons.receipt_rounded,
-              keyboardType: TextInputType.number,
-              maxLength: 11,
-              validator: (v) {
-                if (v == null || v.isEmpty) return null;
-                if (!RegExp(r'^\d{11}$').hasMatch(v))
-                  return 'El RUC debe tener 11 digitos';
-                return null;
-              },
-            ),
             if (widget.sede != null) ...[
               const SizedBox(height: 14),
               Row(
@@ -857,10 +776,9 @@ class _SedeFormState extends State<_SedeForm> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_activo && _assignedUsers > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se puede desactivar una sede con usuarios'),
-        ),
+      AppFeedback.error(
+        context,
+        'No se puede desactivar una sede con usuarios',
       );
       return;
     }
@@ -872,24 +790,17 @@ class _SedeFormState extends State<_SedeForm> {
       }
       if (_dirCtrl.text.isNotEmpty) data['direccion'] = _dirCtrl.text;
       if (_telCtrl.text.isNotEmpty) data['telefono'] = _telCtrl.text;
-      if (_rucCtrl.text.isNotEmpty) data['ruc'] = _rucCtrl.text;
       if (widget.sede != null) data['activo'] = _activo;
       await widget.onSave(data);
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.sede == null ? 'Sucursal creada' : 'Sucursal actualizada',
-            ),
-          ),
+        AppFeedback.success(
+          context,
+          widget.sede == null ? 'Sucursal creada' : 'Sucursal actualizada',
         );
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) AppFeedback.error(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -921,7 +832,12 @@ class _StatChip extends StatelessWidget {
             color: color,
           ),
         ),
-        Text(label, style: AppTextStyles.labelSmall),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.labelSmall,
+        ),
       ],
     ),
   );

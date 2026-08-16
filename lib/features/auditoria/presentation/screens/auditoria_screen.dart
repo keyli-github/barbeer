@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../../../../core/navigation/app_nav.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -135,7 +137,9 @@ class AuditoriaNotifier extends StateNotifier<AuditoriaState> {
       total: state.total,
       page: state.page,
       totalPages: state.totalPages,
-      accionFilter: accion?.trim().isEmpty == true ? null : accion,
+      accionFilter: accion?.trim().isEmpty == true
+          ? null
+          : accion?.trim().toUpperCase(),
       entidadFilter: entidad?.trim().isEmpty == true ? null : entidad,
       desdeFilter: desde,
       hastaFilter: hasta,
@@ -247,6 +251,8 @@ class AuditoriaScreen extends ConsumerWidget {
               ],
             ),
           ),
+          if (state.logs.isNotEmpty)
+            _AuditKpis(total: state.total, logs: state.logs),
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primary,
@@ -315,7 +321,7 @@ class AuditoriaScreen extends ConsumerWidget {
               top: Radius.circular(AppRadius.xl),
             ),
           ),
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -496,7 +502,14 @@ class _LogTile extends StatelessWidget {
                           color: context.colors.textTertiary,
                         ),
                         const SizedBox(width: 4),
-                        Text(username, style: AppTextStyles.labelSmall),
+                        Flexible(
+                          child: Text(
+                            username,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        ),
                         if (entidad != null) ...[
                           const SizedBox(width: 8),
                           Icon(
@@ -505,7 +518,14 @@ class _LogTile extends StatelessWidget {
                             color: context.colors.textTertiary,
                           ),
                           const SizedBox(width: 4),
-                          Text(entidad, style: AppTextStyles.labelSmall),
+                          Flexible(
+                            child: Text(
+                              entidad!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.labelSmall,
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -598,7 +618,10 @@ class _LogDetailScreen extends StatelessWidget {
     final username = auditUsername(log);
     final entidad = log['entidad'] as String? ?? '';
     final entidadId = log['entidadId'] as String? ?? '';
-    final ip = log['ip'] as String? ?? '';
+    final rawIp = log['ip'] as String? ?? '';
+    final ip = const ['::1', '127.0.0.1', '::ffff:127.0.0.1'].contains(rawIp)
+        ? 'Local'
+        : rawIp;
     final ua = log['userAgent'] as String? ?? '';
     final sedeId =
         log['sedeNombre'] as String? ?? log['sedeId'] as String? ?? '';
@@ -674,7 +697,11 @@ class _LogDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: SelectableText(
-                        detalle.toString(),
+                        detalle is Map || detalle is List
+                            ? const JsonEncoder.withIndent(
+                                '  ',
+                              ).convert(detalle)
+                            : detalle.toString(),
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 12,
@@ -688,6 +715,77 @@ class _LogDetailScreen extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AuditKpis extends StatelessWidget {
+  const _AuditKpis({required this.total, required this.logs});
+
+  final int total;
+  final List<Map<String, dynamic>> logs;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = logs
+        .map((log) => log['accion'])
+        .whereType<String>()
+        .toSet();
+    final entities = logs
+        .map((log) => log['entidad'])
+        .whereType<String>()
+        .toSet();
+    final users = logs
+        .map(auditUsername)
+        .where((name) => name.isNotEmpty)
+        .toSet();
+    final values = [
+      ('Registros', total, AppColors.primary),
+      ('Acciones', actions.length, AppColors.warning),
+      ('Entidades', entities.length, AppColors.info),
+      ('Usuarios', users.length, AppColors.success),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: GridView.count(
+        crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+        childAspectRatio: 2.8,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          for (final value in values)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: value.$3.withValues(alpha: 0.09),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '${value.$2}',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: value.$3,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      value.$1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.labelSmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

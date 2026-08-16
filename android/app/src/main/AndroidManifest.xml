@@ -2,6 +2,9 @@
 
     <!-- Permiso de acceso a Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Permiso de cámara para escanear QR de asistencia -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:label="BarBeer"

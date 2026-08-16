@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -9,6 +10,7 @@ import '../../../../core/widgets/app_badge.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 class PermisosState {
   final bool isLoading;
@@ -62,7 +64,7 @@ class PermisosNotifier extends StateNotifier<PermisosState> {
   Future<void> load({int page = 1, String? modulo}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final params = <String, dynamic>{'pagina': page, 'limite': 50};
+      final params = <String, dynamic>{'pagina': page, 'limite': 25};
       if (modulo != null) params['modulo'] = modulo;
       final responses = await Future.wait([
         _api.get(ApiConstants.permissions, queryParameters: params),
@@ -108,6 +110,20 @@ class PermisosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Guard de permiso — igual que en web (permisos:leer)
+    final auth = ref.watch(authProvider);
+    if (!auth.hasPermission('permisos:leer')) {
+      return Scaffold(
+        backgroundColor: context.colors.background,
+        body: const Center(
+          child: AppEmptyState(
+            icon: Icons.lock_outline_rounded,
+            title: 'Sin acceso',
+            description: 'No tienes permiso para ver los permisos del sistema.',
+          ),
+        ),
+      );
+    }
     final state = ref.watch(permisosProvider);
     final filtered = state.searchQuery.isEmpty
         ? state.permisos
@@ -140,9 +156,16 @@ class PermisosScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   child: Row(
                     children: [
-                      Text(
-                        '${state.total} total',
-                        style: AppTextStyles.bodySmall,
+                      Expanded(
+                        child: Text(
+                          '${state.total} total',
+                          style: AppTextStyles.bodySmall,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => context.go('/roles'),
+                        icon: const Icon(Icons.admin_panel_settings_outlined),
+                        label: const Text('Configurar roles'),
                       ),
                     ],
                   ),
@@ -253,6 +276,12 @@ class PermisosScreen extends ConsumerWidget {
                                 PermissionModuleBadge(
                                   module: perm['modulo'] as String? ?? '',
                                 ),
+                                const SizedBox(width: 6),
+                                _ActionBadge(
+                                  action: _permissionAction(
+                                    perm['nombre'] as String? ?? '',
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -273,6 +302,35 @@ class PermisosScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _permissionAction(String name) {
+  final separator = name.indexOf(':');
+  return separator < 0 ? name : name.substring(separator + 1);
+}
+
+class _ActionBadge extends StatelessWidget {
+  const _ActionBadge({required this.action});
+
+  final String action;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+    decoration: BoxDecoration(
+      color: context.colors.backgroundAlt,
+      borderRadius: BorderRadius.circular(AppRadius.full),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: Text(
+      action.toUpperCase(),
+      style: TextStyle(
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
+        color: context.colors.textSecondary,
+      ),
+    ),
+  );
 }
 
 class _PermissionKpis extends StatelessWidget {
@@ -324,7 +382,12 @@ class _PermissionKpis extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(value.$1, style: AppTextStyles.labelSmall),
+                    child: Text(
+                      value.$1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.labelSmall,
+                    ),
                   ),
                 ],
               ),

@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -291,12 +292,11 @@ class CategoriasSheet extends ConsumerWidget {
       '${value.month.toString().padLeft(2, '0')}/${value.year}';
 
   void _message(BuildContext context, String text, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: error ? AppColors.error : null,
-      ),
-    );
+    if (error) {
+      AppFeedback.error(context, text);
+    } else {
+      AppFeedback.success(context, text);
+    }
   }
 }
 
@@ -444,12 +444,7 @@ class _CategoriaFormState extends State<_CategoriaForm> {
       if (mounted) Navigator.pop(context);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error.toString()),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.error(context, error.toString());
       }
     } finally {
       if (mounted) setState(() => _saving = false);

@@ -43,7 +43,7 @@ void main() {
     expect(tester.getSize(find.byKey(const Key('desktop-sidebar'))).width, 272);
     expect(tester.getSize(find.byKey(const Key('desktop-header'))).height, 56);
     expect(find.text('Productos'), findsWidgets);
-    expect(find.text('Billeteras'), findsOneWidget);
+    expect(find.text('Etiquetas'), findsOneWidget);
     expect(find.text('Ventas'), findsNothing);
     expect(find.byTooltip('Cerrar sesion'), findsOneWidget);
 

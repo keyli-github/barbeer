@@ -12,6 +12,7 @@ class InventarioItem {
       estado;
   final double stock, min, max, costo;
   final String updatedAt;
+  final String? imagenUrl;
 
   const InventarioItem({
     required this.id,
@@ -28,6 +29,7 @@ class InventarioItem {
     required this.max,
     required this.costo,
     required this.updatedAt,
+    this.imagenUrl,
   });
 
   factory InventarioItem.fromJson(Map<String, dynamic> j) => InventarioItem(
@@ -45,6 +47,7 @@ class InventarioItem {
     max: (j['max'] as num?)?.toDouble() ?? 0,
     costo: (j['costo'] as num?)?.toDouble() ?? 0,
     updatedAt: j['updatedAt'] as String? ?? '',
+    imagenUrl: j['imagenUrl'] as String?,
   );
 }
 

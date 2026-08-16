@@ -49,6 +49,7 @@ class ApiClient {
     '/auth/login',
     '/auth/refresh',
     '/auth/logout',
+    '/branding',
     '/health',
   };
 

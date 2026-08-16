@@ -103,13 +103,17 @@ class DSButton extends StatelessWidget {
           Icon(icon, size: fs + 2, color: fg),
           const SizedBox(width: 6),
         ],
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: fs,
-            fontWeight: FontWeight.w600,
-            color: fg,
-            letterSpacing: -0.1,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: fs,
+              fontWeight: FontWeight.w600,
+              color: fg,
+              letterSpacing: -0.1,
+            ),
           ),
         ),
         if (icon != null && iconTrailing && !loading) ...[

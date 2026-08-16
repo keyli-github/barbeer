@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/upload_client.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../../data/ventas_repository.dart';
@@ -59,10 +60,13 @@ class VentasListState {
 class VentasListNotifier extends StateNotifier<VentasListState> {
   final VentasRepository _repo;
   final bool useMisVentas;
+  final String? sedeId;
   int _requestVersion = 0;
 
-  VentasListNotifier(this._repo, {required this.useMisVentas})
-    : super(const VentasListState());
+  VentasListNotifier(this._repo, {required this.useMisVentas, this.sedeId})
+    : super(const VentasListState()) {
+    load();
+  }
 
   Future<void> load({String? estado}) async {
     final version = ++_requestVersion;
@@ -170,7 +174,7 @@ class VentasListNotifier extends StateNotifier<VentasListState> {
     required String? estado,
   }) => useMisVentas
       ? _repo.listMisVentas(pagina: pagina, estado: estado)
-      : _repo.listVentas(pagina: pagina, estado: estado);
+      : _repo.listVentas(pagina: pagina, estado: estado, sedeId: sedeId);
 
   List<Venta> _uniqueVentas(Iterable<Venta> ventas) => <String, Venta>{
     for (final venta in ventas) venta.id: venta,
@@ -191,13 +195,17 @@ class VentasListNotifier extends StateNotifier<VentasListState> {
 
 /// Provider para la lista de ventas.
 /// Usa `misVentas` si la vendedora solo puede ver las propias.
+/// La sede activa (`globalSedeIdProvider`) alimenta el filtro: un SUPERADMIN
+/// ve la sede elegida en el selector (null = todas); los demás roles siempre
+/// ven su propia sede. Al cambiar de sede el notifier se recrea y recarga.
 final ventasListProvider =
     StateNotifierProvider.family<VentasListNotifier, VentasListState, bool>((
       ref,
       useMisVentas,
     ) {
       final repo = ref.watch(ventasRepositoryProvider);
-      return VentasListNotifier(repo, useMisVentas: useMisVentas);
+      final sedeId = ref.watch(globalSedeIdProvider);
+      return VentasListNotifier(repo, useMisVentas: useMisVentas, sedeId: sedeId);
     });
 
 // ── Etiquetas activas ────────────────────────────────────────────────────────

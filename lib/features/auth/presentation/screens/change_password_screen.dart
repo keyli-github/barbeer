@@ -23,12 +23,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   bool _loading = false;
   String? _error;
 
-  bool get _len => _new.text.length >= 12;
-  bool get _upper => _new.text.contains(RegExp(r'[A-Z]'));
+  bool get _len => _new.text.length >= 6 && _new.text.length <= 72;
   bool get _lower => _new.text.contains(RegExp(r'[a-z]'));
   bool get _digit => _new.text.contains(RegExp(r'[0-9]'));
   bool get _match => _new.text == _confirm.text && _confirm.text.isNotEmpty;
-  bool get _allOk => _len && _upper && _lower && _digit && _match;
+  bool get _allOk => _len && _lower && _digit && _match;
 
   @override
   void dispose() {
@@ -141,7 +140,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                   const SizedBox(height: 14),
                   AppTextField(
                     label: 'Nueva contrasena',
-                    hint: 'Minimo 12 caracteres',
+                    hint: 'Entre 6 y 72 caracteres',
                     controller: _new,
                     prefixIcon: Icons.lock_outline_rounded,
                     obscureText: true,
@@ -149,9 +148,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     onChanged: (_) => setState(() {}),
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Requerido';
-                      if (v.length < 12) return 'Minimo 12 caracteres';
-                      if (!v.contains(RegExp(r'[A-Z]')))
-                        return 'Necesita mayuscula';
+                      if (v.length < 6 || v.length > 72) {
+                        return 'Debe tener entre 6 y 72 caracteres';
+                      }
                       if (!v.contains(RegExp(r'[a-z]')))
                         return 'Necesita minuscula';
                       if (!v.contains(RegExp(r'[0-9]')))
@@ -200,8 +199,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     ),
     child: Column(
       children: [
-        _req('Al menos 12 caracteres', _len),
-        _req('Al menos una mayuscula (A-Z)', _upper),
+        _req('Entre 6 y 72 caracteres', _len),
         _req('Al menos una minuscula (a-z)', _lower),
         _req('Al menos un numero (0-9)', _digit),
         _req('Las contrasenas coinciden', _match),

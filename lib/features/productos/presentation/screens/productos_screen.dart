@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -75,6 +76,8 @@ class _ProductosState {
 class _ProductosNotifier extends StateNotifier<_ProductosState> {
   final ProductosRepository _repo;
   final String? _sedeId;
+  Timer? _searchDebounce;
+  int _loadGeneration = 0;
 
   _ProductosNotifier(this._repo, this._sedeId)
     : super(const _ProductosState()) {
@@ -82,6 +85,7 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
   }
 
   Future<void> load({bool resetPage = false}) async {
+    final generation = ++_loadGeneration;
     final currentPage = resetPage ? 1 : state.page;
     state = state.copyWith(loading: true, clearError: true, page: currentPage);
     try {
@@ -100,6 +104,7 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
       ]);
       final page = results[0] as ProductosPage;
       final resumen = results[1] as ProductosResumen;
+      if (generation != _loadGeneration) return;
       state = state.copyWith(
         items: page.data,
         resumen: resumen,
@@ -109,13 +114,18 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
         loading: false,
       );
     } catch (e) {
+      if (generation != _loadGeneration) return;
       state = state.copyWith(loading: false, error: e.toString());
     }
   }
 
   void setSearch(String s) {
     state = state.copyWith(search: s);
-    load(resetPage: true);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => load(resetPage: true),
+    );
   }
 
   void setCategoria(String id) {
@@ -141,6 +151,17 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
   Future<void> toggleActivo(Producto p) async {
     await _repo.update(p.id, {'activo': !p.activo});
     await load();
+  }
+
+  Future<void> togglePos(Producto product) async {
+    await _repo.update(product.id, {'disponiblePos': !product.disponiblePos});
+    await load();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 }
 
@@ -229,56 +250,67 @@ class ProductosScreen extends ConsumerWidget {
                         final columns = desktop
                             ? (constraints.maxWidth / 230).floor().clamp(3, 6)
                             : 2;
-                        return GridView.builder(
-                          key: ValueKey('grid'),
-                          padding: EdgeInsets.all(AppSpacing.md),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: columns,
-                                childAspectRatio: desktop ? 0.72 : 0.62,
-                                crossAxisSpacing: AppSpacing.sm,
-                                mainAxisSpacing: AppSpacing.sm,
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: GridView.builder(
+                                key: ValueKey('grid'),
+                                padding: EdgeInsets.all(AppSpacing.md),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: columns,
+                                      childAspectRatio: desktop ? 0.68 : 0.56,
+                                      crossAxisSpacing: AppSpacing.sm,
+                                      mainAxisSpacing: AppSpacing.sm,
+                                    ),
+                                itemCount: state.items.length,
+                                itemBuilder: (_, i) => _ProductCard(
+                                  product: state.items[i],
+                                  canEdit: canEdit,
+                                  canDelete: canDelete,
+                                  onOpen: () => _showProductDetail(
+                                    context,
+                                    ref,
+                                    state.items[i],
+                                  ),
+                                  onEdit: () =>
+                                      _showForm(context, ref, state.items[i]),
+                                  onToggleActivo: () =>
+                                      notifier.toggleActivo(state.items[i]),
+                                  onTogglePos: () =>
+                                      notifier.togglePos(state.items[i]),
+                                  onDelete: () async {
+                                    final ok = await ConfirmationDialog.show(
+                                      context: context,
+                                      title: 'Dar de baja producto',
+                                      message:
+                                          '¿Dar de baja "${state.items[i].nombre}"? Podrás reactivarlo después.',
+                                      confirmText: 'Dar de baja',
+                                      isDestructive: true,
+                                      icon: Icons.delete_outline,
+                                    );
+                                    if (ok) {
+                                      await notifier.delete(state.items[i].id);
+                                    }
+                                  },
+                                ),
                               ),
-                          itemCount: state.items.length + 2,
-                          itemBuilder: (_, i) {
-                            if (i == state.items.length) {
-                              return SizedBox.shrink();
-                            }
-                            if (i == state.items.length + 1) {
-                              return AppPagination(
+                            ),
+                            Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                0,
+                                AppSpacing.md,
+                                AppSpacing.md,
+                              ),
+                              child: AppPagination(
                                 page: state.page,
                                 totalPages: state.totalPages,
                                 total: state.total,
                                 onPageChange: notifier.setPage,
-                              );
-                            }
-                            return _ProductCard(
-                              product: state.items[i],
-                              canEdit: canEdit,
-                              canDelete: canDelete,
-                              onEdit: () => _showProductDetail(
-                                context,
-                                ref,
-                                state.items[i],
                               ),
-                              onToggle: () =>
-                                  notifier.toggleActivo(state.items[i]),
-                              onDelete: () async {
-                                final ok = await ConfirmationDialog.show(
-                                  context: context,
-                                  title: 'Eliminar producto',
-                                  message:
-                                      '¿Eliminar "${state.items[i].nombre}"? Esta acción no se puede deshacer.',
-                                  confirmText: 'Eliminar',
-                                  isDestructive: true,
-                                  icon: Icons.delete_outline,
-                                );
-                                if (ok) {
-                                  await notifier.delete(state.items[i].id);
-                                }
-                              },
-                            );
-                          },
+                            ),
+                          ],
                         );
                       },
                     ),
@@ -305,7 +337,7 @@ class ProductosScreen extends ConsumerWidget {
         product: product,
         canEdit: canEdit,
         canDelete: canDelete,
-        onEdit: () => AppNav.push(
+        onEdit: () async => AppNav.push(
           context,
           _ProductFormScreen(
             product: product,
@@ -427,56 +459,82 @@ class _FiltersSectionState extends State<_FiltersSection> {
             ),
           ),
           SizedBox(height: AppSpacing.sm),
-          // Chips de filtro de estado
-          Row(
-            children: [
-              for (final e in [
-                ('', 'Todos'),
-                ('true', 'Activos'),
-                ('false', 'Inactivos'),
-              ])
-                Padding(
-                  padding: EdgeInsets.only(right: AppSpacing.xs),
-                  child: GestureDetector(
-                    onTap: () => widget.onEstado(e.$1),
-                    child: AnimatedContainer(
-                      duration: Duration(milliseconds: 180),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: spacing.AppSpacing.xxs + 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: widget.estadoFilter == e.$1
-                            ? context.colors.primarySurface
-                            : context.colors.backgroundAlt,
-                        borderRadius: BorderRadius.circular(
-                          spacing.AppSpacing.radiusRound,
-                        ),
-                        border: Border.all(
-                          color: widget.estadoFilter == e.$1
-                              ? context.colors.primaryBorder
-                              : context.colors.border,
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        e.$2,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: widget.estadoFilter == e.$1
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: widget.estadoFilter == e.$1
-                              ? AppColors.primary
-                              : context.colors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          // Filtro de estado (dropdown compacto, mismo comportamiento que los chips)
+          _EstadoDropdown(
+            value: widget.estadoFilter,
+            onChanged: widget.onEstado,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EstadoDropdown extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _EstadoDropdown({required this.value, required this.onChanged});
+
+  static const _opciones = [
+    ('', 'Todos'),
+    ('true', 'Activos'),
+    ('false', 'Inactivos'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return InputDecorator(
+      key: const ValueKey('productos-estado-filter'),
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        prefixIcon: Icon(
+          Icons.filter_alt_outlined,
+          size: 18,
+          color: context.colors.textTertiary,
+        ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+        filled: true,
+        fillColor: context.colors.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+          borderSide: BorderSide(color: context.colors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+          borderSide: BorderSide(color: context.colors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(spacing.AppSpacing.radiusMD),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          key: const ValueKey('productos-estado-dropdown'),
+          value: value.isEmpty ? '' : value,
+          isDense: true,
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(12),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: context.colors.textTertiary,
+          ),
+          style: TextStyle(fontSize: 14, color: context.colors.textPrimary),
+          items: _opciones
+              .map(
+                (e) => DropdownMenuItem(
+                  value: e.$1,
+                  child: Text(e.$2, style: const TextStyle(fontSize: 14)),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => onChanged(v ?? ''),
+        ),
       ),
     );
   }
@@ -630,14 +688,16 @@ class _KpiChip extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Producto product;
   final bool canEdit, canDelete;
-  final VoidCallback onEdit, onToggle, onDelete;
+  final VoidCallback onOpen, onEdit, onToggleActivo, onTogglePos, onDelete;
 
   const _ProductCard({
     required this.product,
     required this.canEdit,
     required this.canDelete,
+    required this.onOpen,
     required this.onEdit,
-    required this.onToggle,
+    required this.onToggleActivo,
+    required this.onTogglePos,
     required this.onDelete,
   });
 
@@ -649,127 +709,254 @@ class _ProductCard extends StatelessWidget {
         ? AppColors.warning
         : AppColors.error;
 
-    return GestureDetector(
-      onTap: onEdit,
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.colors.borderLight),
-          boxShadow: AppShadows.card,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─ Imagen cuadrada (proporción fija)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(11),
-              ),
-              child: AspectRatio(
-                aspectRatio: 1.2,
-                child: DSProductImage(
-                  imageUrl: product.imagenUrl,
-                  productName: product.nombre,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.borderLight),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ─ Imagen cuadrada (proporción fija)
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(11),
+                ),
+                child: AspectRatio(
+                  aspectRatio: 1.2,
+                  child: DSProductImage(
+                    imageUrl: product.imagenUrl,
+                    productName: product.nombre,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
                 ),
               ),
-            ),
-            // ─ Info compacta (se expande para llenar el espacio restante)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        product.nombre,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: context.colors.textPrimary,
-                          height: 1.2,
+              if (canEdit || canDelete)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'pos') onTogglePos();
+                      if (value == 'active') onToggleActivo();
+                      if (value == 'delete') onDelete();
+                    },
+                    itemBuilder: (_) => [
+                      if (canEdit)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Editar'),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      if (canEdit)
+                        PopupMenuItem(
+                          value: 'pos',
+                          child: Text(
+                            product.disponiblePos
+                                ? 'Ocultar de venta'
+                                : 'Mostrar en venta',
+                          ),
+                        ),
+                      if (canEdit)
+                        PopupMenuItem(
+                          value: 'active',
+                          child: Text(
+                            product.activo ? 'Desactivar' : 'Activar',
+                          ),
+                        ),
+                      if (canDelete && product.activo)
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Dar de baja'),
+                        ),
+                    ],
+                    icon: const Icon(Icons.more_vert_rounded),
+                  ),
+                ),
+            ],
+          ),
+          // ─ Info compacta (se expande para llenar el espacio restante)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.categoria,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: context.colors.textTertiary,
                     ),
-                    Text(
-                      product.codigo,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Expanded(
+                    child: Text(
+                      product.nombre,
                       style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.textPrimary,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    product.codigo,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: context.colors.textTertiary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (product.descripcion?.isNotEmpty == true)
+                    Text(
+                      product.descripcion!,
+                      style: TextStyle(
+                        fontSize: 9,
                         color: context.colors.textTertiary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'S/ ${product.precioVenta.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'S/ ${product.precioVenta.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: marginColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${product.margin.toStringAsFixed(0)}%',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: marginColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Estado inactivo
-                    if (!product.activo) ...[
-                      const SizedBox(height: 3),
+                      ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
+                          horizontal: 4,
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: context.colors.textTertiary.withValues(
-                            alpha: 0.1,
-                          ),
+                          color: marginColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          'Inactivo',
+                          '${product.margin.toStringAsFixed(0)}%',
                           style: TextStyle(
                             fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textTertiary,
+                            fontWeight: FontWeight.w700,
+                            color: marginColor,
                           ),
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.stockDisponible == null
+                              ? 'Stock sin configurar'
+                              : 'Stock ${product.stockDisponible}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: context.colors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        product.disponiblePos ? 'VENTA' : 'NO POS',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: product.disponiblePos
+                              ? AppColors.success
+                              : context.colors.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Estado inactivo
+                  if (!product.activo) ...[
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: context.colors.textTertiary.withValues(
+                          alpha: 0.1,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Inactivo',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.textTertiary,
+                        ),
+                      ),
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          // ─ Ver detalle: control único y claro para abrir el detalle
+          GestureDetector(
+            onTap: onOpen,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: context.colors.borderLight),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.visibility_outlined,
+                    size: 14,
+                    color: context.colors.textSecondary,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Ver detalle',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: context.colors.textTertiary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -777,10 +964,11 @@ class _ProductCard extends StatelessWidget {
 
 // ─── Subpantalla: Detalle de Producto ────────────────────────────────────────
 
-class _ProductDetailScreen extends StatelessWidget {
+class _ProductDetailScreen extends ConsumerStatefulWidget {
   final Producto product;
   final bool canEdit, canDelete;
-  final VoidCallback onEdit, onToggle, onDelete;
+  final Future<void> Function() onEdit;
+  final VoidCallback onToggle, onDelete;
 
   const _ProductDetailScreen({
     required this.product,
@@ -792,7 +980,37 @@ class _ProductDetailScreen extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_ProductDetailScreen> createState() =>
+      _ProductDetailScreenState();
+}
+
+class _ProductDetailScreenState extends ConsumerState<_ProductDetailScreen> {
+  late Producto _product;
+
+  @override
+  void initState() {
+    super.initState();
+    _product = widget.product;
+    _refresh();
+  }
+
+  /// Refresca el detalle desde `GET /productos/:id` usando la sede global,
+  /// para que stock/costo coincidan siempre con la web y el listado.
+  Future<void> _refresh() async {
+    final sedeId = ref.read(globalSedeIdProvider);
+    try {
+      final fresh = await ref
+          .read(_repoProvider)
+          .getById(widget.product.id, sedeId: sedeId);
+      if (mounted) setState(() => _product = fresh);
+    } catch (_) {
+      // Mantiene los datos del listado si el refetch falla.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final product = _product;
     final marginColor = product.margin >= 40
         ? AppColors.success
         : product.margin >= 20
@@ -822,14 +1040,17 @@ class _ProductDetailScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          if (canEdit)
+          if (widget.canEdit)
             IconButton(
               icon: Icon(
                 Icons.settings_outlined,
                 size: 20,
                 color: context.colors.textSecondary,
               ),
-              onPressed: onEdit,
+              onPressed: () async {
+                await widget.onEdit();
+                if (mounted) await _refresh();
+              },
             ),
         ],
       ),
@@ -950,14 +1171,14 @@ class _ProductDetailScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ─ Acciones rápidas
-            if (canEdit)
+            if (widget.canEdit)
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        onEdit();
+                        widget.onEdit(); // fire-and-forget: abre el form desde la lista
                       },
                       icon: const Icon(Icons.edit_outlined, size: 16),
                       label: const Text('Editar'),
@@ -972,7 +1193,7 @@ class _ProductDetailScreen extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        onToggle();
+                        widget.onToggle();
                       },
                       icon: Icon(
                         product.activo
@@ -989,7 +1210,7 @@ class _ProductDetailScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            if (canDelete) ...[
+            if (widget.canDelete) ...[
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
@@ -1019,7 +1240,7 @@ class _ProductDetailScreen extends StatelessWidget {
                     if (ok == true) {
                       if (!context.mounted) return;
                       Navigator.pop(context);
-                      onDelete();
+                      widget.onDelete();
                     }
                   },
                   icon: const Icon(Icons.delete_outline, size: 16),
@@ -1039,13 +1260,16 @@ class _ProductDetailScreen extends StatelessWidget {
               _InfoRow('Categoría', product.categoria),
               if (product.presentacion != null)
                 _InfoRow('Presentación', product.presentacion!),
-              _InfoRow('Unidad', product.unidad),
               _InfoRow(
                 'Costo unitario',
                 'S/ ${product.precioCosto.toStringAsFixed(2)}',
               ),
-              if (product.stockDisponible != null)
-                _InfoRow('Stock disponible', '${product.stockDisponible}'),
+              _InfoRow(
+                'Stock disponible',
+                product.stockDisponible == null
+                    ? 'Sin configurar'
+                    : '${product.stockDisponible}',
+              ),
             ]),
 
             if (product.descripcion?.isNotEmpty == true) ...[
@@ -1118,18 +1342,26 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 10),
     child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
+          ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: context.colors.textPrimary,
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+            ),
           ),
         ),
       ],
@@ -1160,12 +1392,10 @@ class _ProductFormScreen extends StatefulWidget {
 }
 
 class _ProductFormState extends State<_ProductFormScreen> {
-  final _codigoCtrl = TextEditingController();
   final _nombreCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _ventaCtrl = TextEditingController();
   final _costoCtrl = TextEditingController();
-  final _unidadCtrl = TextEditingController();
   Uint8List? _imageBytes;
   String? _imageFilename;
   bool _removeExistingImage = false;
@@ -1179,12 +1409,10 @@ class _ProductFormState extends State<_ProductFormScreen> {
     super.initState();
     final p = widget.product;
     if (p != null) {
-      _codigoCtrl.text = p.codigo;
       _nombreCtrl.text = p.nombre;
       _descCtrl.text = p.descripcion ?? '';
       _ventaCtrl.text = p.precioVenta.toString();
       _costoCtrl.text = p.precioCosto.toString();
-      _unidadCtrl.text = p.unidad;
       _categoriaId = p.categoriaId;
       _posEnabled = p.disponiblePos;
       _activo = p.activo;
@@ -1195,12 +1423,10 @@ class _ProductFormState extends State<_ProductFormScreen> {
 
   @override
   void dispose() {
-    _codigoCtrl.dispose();
     _nombreCtrl.dispose();
     _descCtrl.dispose();
     _ventaCtrl.dispose();
     _costoCtrl.dispose();
-    _unidadCtrl.dispose();
     super.dispose();
   }
 
@@ -1212,12 +1438,10 @@ class _ProductFormState extends State<_ProductFormScreen> {
 
   Future<void> _submit() async {
     final nombre = _nombreCtrl.text.trim();
-    final codigo = _codigoCtrl.text.trim();
     final venta = double.tryParse(_ventaCtrl.text);
     final costo = double.tryParse(_costoCtrl.text);
 
     if (nombre.isEmpty ||
-        codigo.isEmpty ||
         _categoriaId.isEmpty ||
         venta == null ||
         costo == null) {
@@ -1232,7 +1456,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
       if (widget.product == null) {
         await _creationSession.submit(
           create: () => widget.repo.create(
-            codigo: codigo,
             nombre: nombre,
             categoriaId: _categoriaId,
             precioVenta: venta,
@@ -1240,9 +1463,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
             descripcion: _descCtrl.text.trim().isEmpty
                 ? null
                 : _descCtrl.text.trim(),
-            unidad: _unidadCtrl.text.trim().isEmpty
-                ? null
-                : _unidadCtrl.text.trim(),
             disponiblePos: _posEnabled,
             activo: _activo,
           ),
@@ -1263,9 +1483,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
           'precioCosto': costo,
           if (_descCtrl.text.trim().isNotEmpty)
             'descripcion': _descCtrl.text.trim(),
-          'unidad': _unidadCtrl.text.trim().isEmpty
-              ? 'un'
-              : _unidadCtrl.text.trim(),
           'disponiblePos': _posEnabled,
           'activo': _activo,
         });
@@ -1354,14 +1571,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.product == null) ...[
-              AppTextField(
-                label: 'Código *',
-                hint: 'Ej. CKT001',
-                controller: _codigoCtrl,
-              ),
-              const SizedBox(height: 14),
-            ],
             AppTextField(
               label: 'Nombre *',
               hint: 'Nombre del producto',
@@ -1531,12 +1740,6 @@ class _ProductFormState extends State<_ProductFormScreen> {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Unidad (Ej. botella, kg)',
-              hint: 'un',
-              controller: _unidadCtrl,
             ),
             const SizedBox(height: 12),
             _SwitchRow(

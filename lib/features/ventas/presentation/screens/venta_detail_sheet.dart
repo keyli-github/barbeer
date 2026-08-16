@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/ds_product_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/anular_venta_dialog.dart';
-import '../../../../core/widgets/ds_states.dart';
 
 class VentaDetailSheet extends ConsumerStatefulWidget {
   final Venta venta;
@@ -43,7 +43,7 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
       if (mounted) {
         Navigator.pop(context);
         widget.onChanged?.call();
-        DSSuccessOverlay.show(context, title: 'Venta anulada');
+        AppFeedback.success(context, 'Venta anulada');
       }
     } catch (e) {
       setState(() {
@@ -198,13 +198,21 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                             color: AppColors.primary,
                           ),
                         ),
-                        Text(
-                          FormatUtils.currency(v.total),
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                            letterSpacing: -0.5,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              FormatUtils.currency(v.total),
+                              maxLines: 1,
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
                           ),
                         ),
                       ],

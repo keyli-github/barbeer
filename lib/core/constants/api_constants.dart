@@ -93,7 +93,13 @@ class ApiConstants {
   // ── Attendance ───────────────────────────────────────────────────────────
   static const String attendance = '/asistencia';
   static const String attendanceResumen = '/asistencia/resumen';
+  static const String attendanceQrKiosco = '/asistencia/qr-kiosco';
+  static const String attendanceMarcar = '/asistencia/marcar';
   static String attendanceById(String id) => '/asistencia/$id';
+
+  // ── Turnos ────────────────────────────────────────────────────────────────
+  static const String turnos = '/turnos';
+  static String turnoById(String id) => '/turnos/$id';
 
   // ── Cash Register (Caja) ─────────────────────────────────────────────────
   static const String cajaActual = '/caja/actual';

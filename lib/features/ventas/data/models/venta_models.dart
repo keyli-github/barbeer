@@ -38,10 +38,11 @@ class Etiqueta {
 
 bool isBilleteraEtiqueta(Etiqueta etiqueta) {
   final nombre = etiqueta.nombre.trim().toUpperCase();
+  // El tipo (ENTRADA/SALIDA/AMBOS) no se filtra porque el usuario puede haber
+  // configurado sus billeteras con tipo SALIDA y aun necesita usarlas para cobrar
   return etiqueta.activo &&
       !etiqueta.esSistema &&
-      nombre != 'TOTAL DE VENTAS' &&
-      (etiqueta.tipo == 'ENTRADA' || etiqueta.tipo == 'AMBOS');
+      nombre != 'TOTAL DE VENTAS';
 }
 
 // ─── Analisis de comprobante ────────────────────────────────────────────────
@@ -143,6 +144,15 @@ class ComprobanteAnalisis {
   bool get esApto => estado == 'APTO' && !posibleDuplicado;
   bool get expirado => expiraAt?.isBefore(DateTime.now()) ?? false;
 
+  /// El monto del comprobante supera el total a cobrar (bloquea la venta).
+  bool montoExcede(double total) =>
+      monto != null && (monto! * 100).round() > (total * 100).round();
+
+  /// El monto del comprobante es menor al total (pago parcial: NO bloquea).
+  bool montoEsMenor(double total) =>
+      monto != null && (monto! * 100).round() < (total * 100).round();
+
+  /// Coincide exactamente (a céntimos) con el total.
   bool montoCoincide(double total) =>
       monto != null && (monto! * 100).round() == (total * 100).round();
 }
@@ -165,11 +175,19 @@ String? comprobanteAnalysisError({
   if (!analysis.esApto) {
     return 'El comprobante requiere revisión y no permite continuar';
   }
-  if (!analysis.montoCoincide(total)) {
-    return 'El monto del comprobante no coincide con el total de la venta';
+  // Regla de negocio compartida con web y backend: solo bloquea si el monto
+  // del comprobante SUPERA el total. Un monto menor es un pago parcial válido.
+  if (analysis.montoExcede(total)) {
+    return 'El monto del comprobante supera el total a cobrar';
   }
+  if (analysis.monto == null) {
+    return 'El comprobante tiene datos incompletos. Selecciona otro comprobante.';
+  }
+  // Si la IA identificó una billetera distinta a la seleccionada, bloquea.
+  // Sin sugerencia, la billetera manual seleccionada es válida (igual que el backend).
   if (selectedEtiquetaId != null &&
-      analysis.etiquetaSugerida?.id != selectedEtiquetaId) {
+      analysis.etiquetaSugerida != null &&
+      analysis.etiquetaSugerida!.id != selectedEtiquetaId) {
     return 'La billetera analizada no coincide con la seleccionada';
   }
   return null;

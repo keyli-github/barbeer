@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:barbeer/core/navigation/app_nav.dart';
 import 'package:barbeer/core/theme/app_colors.dart';
 import 'package:barbeer/core/widgets/app_button.dart';
+import 'package:barbeer/core/widgets/app_feedback.dart';
 import 'package:barbeer/core/widgets/app_text_field.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
@@ -16,14 +17,19 @@ String _money(double v) => 'S/ ${v.toStringAsFixed(2)}';
 void showPrecuadreSheet(
   BuildContext context, {
   required VoidCallback onSuccess,
+  Map<double, int> initialCounts = const {},
 }) {
-  AppNav.push<void>(context, _PrecuadreSheet(onSuccess: onSuccess));
+  AppNav.push<void>(
+    context,
+    _PrecuadreSheet(onSuccess: onSuccess, initialCounts: initialCounts),
+  );
 }
 
 class _PrecuadreSheet extends ConsumerStatefulWidget {
   final VoidCallback onSuccess;
+  final Map<double, int> initialCounts;
 
-  const _PrecuadreSheet({required this.onSuccess});
+  const _PrecuadreSheet({required this.onSuccess, required this.initialCounts});
 
   @override
   ConsumerState<_PrecuadreSheet> createState() => _PrecuadreSheetState();
@@ -32,7 +38,10 @@ class _PrecuadreSheet extends ConsumerStatefulWidget {
 class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
   final _formKey = GlobalKey<FormState>();
   late final Map<double, TextEditingController> _controllers = {
-    for (final value in cajaDenominaciones) value: TextEditingController(),
+    for (final value in cajaDenominaciones)
+      value: TextEditingController(
+        text: widget.initialCounts[value]?.toString() ?? '',
+      ),
   };
   bool _loading = false;
 
@@ -287,7 +296,7 @@ class _DenominationFields extends StatelessWidget {
         crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 2.5,
+        childAspectRatio: MediaQuery.sizeOf(context).width < 380 ? 1.9 : 2.5,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
         children: [
@@ -336,14 +345,26 @@ class _TotalBand extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Text(label, style: const TextStyle(fontSize: 14)),
-        const Spacer(),
-        Text(
-          _money(value),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            _money(value),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+            ),
           ),
         ),
       ],
@@ -438,13 +459,7 @@ class _ForzarSection extends StatelessWidget {
 }
 
 void _showError(BuildContext context, Object error) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(error.toString()),
-      backgroundColor: AppColors.error,
-      behavior: SnackBarBehavior.floating,
-    ),
-  );
+  AppFeedback.error(context, error.toString());
 }
 
 String _denomination(double value) =>

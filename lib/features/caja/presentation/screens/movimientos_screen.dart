@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caja_repository.dart';
 import '../providers/movimientos_provider.dart';
@@ -23,65 +24,77 @@ class MovimientosScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: notifier.load,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
-          children: [
-            Text('Movimientos del día', style: AppTextStyles.headlineLarge),
-            const SizedBox(height: 4),
-            Text(
-              'Historial de ventas, ingresos y egresos de caja.',
-              style: AppTextStyles.bodySmall,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: notifier.load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+              children: [
+                Text(
+                  'Movimientos del día',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.headlineLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Historial de ventas, ingresos y egresos de caja.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall,
+                ),
+                const SizedBox(height: 18),
+                if (state.sedeId == null)
+                  AppCard(
+                    child: Text(
+                      isSuperAdmin
+                          ? 'Selecciona una sede en el encabezado para consultar sus movimientos.'
+                          : 'Tu usuario no tiene una sede asignada.',
+                      style: AppTextStyles.bodyMedium,
+                    ),
+                  )
+                else ...[
+                  _Filters(state: state, notifier: notifier),
+                  const SizedBox(height: 14),
+                  if (state.error != null)
+                    SizedBox(
+                      height: 300,
+                      child: AppErrorState(
+                        message: state.error!,
+                        onRetry: notifier.load,
+                      ),
+                    )
+                  else if (state.isLoading)
+                    const _LoadingRows()
+                  else if (state.movimientos.isEmpty)
+                    const SizedBox(
+                      height: 300,
+                      child: AppEmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Sin movimientos',
+                        description:
+                            'No se encontraron registros para los filtros seleccionados.',
+                      ),
+                    )
+                  else
+                    LayoutBuilder(
+                      builder: (context, constraints) =>
+                          constraints.maxWidth >= 800
+                          ? _DesktopTable(items: state.movimientos)
+                          : Column(
+                              children: [
+                                for (final movement in state.movimientos)
+                                  _MovementCard(movement: movement),
+                              ],
+                            ),
+                    ),
+                  _Pager(state: state, onPage: notifier.cambiarPagina),
+                ],
+              ],
             ),
-            const SizedBox(height: 16),
-            if (state.sedeId == null)
-              AppCard(
-                child: Text(
-                  isSuperAdmin
-                      ? 'Selecciona una sede en el encabezado para consultar sus movimientos.'
-                      : 'Tu usuario no tiene una sede asignada.',
-                  style: AppTextStyles.bodyMedium,
-                ),
-              )
-            else ...[
-              _Filters(state: state, notifier: notifier),
-              const SizedBox(height: 14),
-              if (state.error != null)
-                SizedBox(
-                  height: 300,
-                  child: AppErrorState(
-                    message: state.error!,
-                    onRetry: notifier.load,
-                  ),
-                )
-              else if (state.isLoading)
-                const _LoadingRows()
-              else if (state.movimientos.isEmpty)
-                const SizedBox(
-                  height: 300,
-                  child: AppEmptyState(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'Sin movimientos',
-                    description:
-                        'No se encontraron registros para los filtros seleccionados.',
-                  ),
-                )
-              else
-                LayoutBuilder(
-                  builder: (context, constraints) => constraints.maxWidth >= 800
-                      ? _DesktopTable(items: state.movimientos)
-                      : Column(
-                          children: [
-                            for (final movement in state.movimientos)
-                              _MovementCard(movement: movement),
-                          ],
-                        ),
-                ),
-              _Pager(state: state, onPage: notifier.cambiarPagina),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -96,46 +109,53 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AppCard(
-    child: Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        OutlinedButton.icon(
-          onPressed: state.isLoading ? null : () => _pickDate(context, true),
-          icon: const Icon(Icons.calendar_today_outlined, size: 17),
-          label: Text(
-            'Desde ${DateFormat('dd/MM/yyyy').format(state.fechaInicio)}',
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: state.isLoading ? null : () => _pickDate(context, false),
-          icon: const Icon(Icons.event_outlined, size: 17),
-          label: Text(
-            'Hasta ${DateFormat('dd/MM/yyyy').format(state.fechaFin)}',
-          ),
-        ),
-        SizedBox(
-          width: 190,
-          child: DropdownButtonFormField<String?>(
-            key: ValueKey(state.tipo),
-            initialValue: state.tipo,
-            decoration: const InputDecoration(
-              labelText: 'Tipo',
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-            ),
-            items: const [
-              DropdownMenuItem(value: null, child: Text('Todos los tipos')),
-              DropdownMenuItem(value: 'ENTRADA', child: Text('Entradas')),
-              DropdownMenuItem(value: 'SALIDA', child: Text('Salidas')),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 640;
+        final desde = _DateButton(
+          label: 'Desde ${DateFormat('dd/MM/yyyy').format(state.fechaInicio)}',
+          icon: Icons.calendar_today_outlined,
+          enabled: !state.isLoading,
+          onTap: () => _pickDate(context, true),
+        );
+        final hasta = _DateButton(
+          label: 'Hasta ${DateFormat('dd/MM/yyyy').format(state.fechaFin)}',
+          icon: Icons.event_outlined,
+          enabled: !state.isLoading,
+          onTap: () => _pickDate(context, false),
+        );
+        final tipo = _TipoDropdown(
+          value: state.tipo,
+          enabled: !state.isLoading,
+          onChanged: notifier.filtrarTipo,
+        );
+        if (wide) {
+          return Row(
+            children: [
+              Expanded(flex: 3, child: desde),
+              const SizedBox(width: 10),
+              Expanded(flex: 3, child: hasta),
+              const SizedBox(width: 12),
+              Expanded(flex: 2, child: tipo),
             ],
-            onChanged: state.isLoading ? null : notifier.filtrarTipo,
-          ),
-        ),
-      ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: desde),
+                const SizedBox(width: 10),
+                Expanded(child: hasta),
+              ],
+            ),
+            const SizedBox(height: 10),
+            tipo,
+          ],
+        );
+      },
     ),
   );
 
@@ -152,14 +172,90 @@ class _Filters extends StatelessWidget {
     final fin = start ? state.fechaFin : picked;
     if (inicio.isAfter(fin)) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('La fecha inicial no puede ser posterior a la final.'),
-        ),
+      AppFeedback.error(
+        context,
+        'La fecha inicial no puede ser posterior a la final.',
       );
       return;
     }
     await notifier.filtrarFechas(inicio, fin);
+  }
+}
+
+class _DateButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _DateButton({
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 44,
+    child: OutlinedButton(
+      onPressed: enabled ? onTap : null,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: context.colors.textSecondary),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyMedium.copyWith(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _TipoDropdown extends StatelessWidget {
+  final String? value;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  const _TipoDropdown({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value ?? '';
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: 'Tipo',
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          key: const ValueKey('movimientos-tipo'),
+          value: selected,
+          isExpanded: true,
+          isDense: true,
+          items: const [
+            DropdownMenuItem(value: '', child: Text('Todos los tipos')),
+            DropdownMenuItem(value: 'ENTRADA', child: Text('Entradas')),
+            DropdownMenuItem(value: 'SALIDA', child: Text('Salidas')),
+          ],
+          onChanged: enabled ? (v) => onChanged(v == '' ? null : v) : null,
+        ),
+      ),
+    );
   }
 }
 
@@ -180,6 +276,7 @@ class _DesktopTable extends StatelessWidget {
           DataColumn(label: Text('Etiqueta')),
           DataColumn(label: Text('Concepto')),
           DataColumn(label: Text('Monto'), numeric: true),
+          DataColumn(label: Text('Comprobante')),
           DataColumn(label: Text('Usuario')),
         ],
         rows: items
@@ -199,6 +296,7 @@ class _DesktopTable extends StatelessWidget {
                     ),
                   ),
                   DataCell(Text(_money(item.monto))),
+                  DataCell(_ComprobanteButton(url: item.comprobante)),
                   DataCell(Text(_user(item))),
                 ],
               ),
@@ -222,10 +320,22 @@ class _MovementCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(
-              incoming ? Icons.south_west_rounded : Icons.north_east_rounded,
-              color: color,
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                incoming
+                    ? Icons.south_west_rounded
+                    : Icons.north_east_rounded,
+                color: color,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -239,19 +349,37 @@ class _MovementCard extends StatelessWidget {
                     style: AppTextStyles.bodyMedium.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
                   Text(
                     '${_dateTime(movement.createdAt)} · ${_label(movement)} · ${_user(movement)}',
                     style: AppTextStyles.labelSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (movement.comprobante?.isNotEmpty == true) ...[
+                    const SizedBox(height: 3),
+                    _ComprobanteButton(url: movement.comprobante),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              '${incoming ? '+' : '-'} ${_money(movement.monto)}',
-              style: AppTextStyles.labelLarge.copyWith(color: color),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${incoming ? '+' : '-'} ${_money(movement.monto)}',
+                  style: AppTextStyles.labelLarge.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                _TypeChip(type: movement.tipo),
+              ],
             ),
           ],
         ),
@@ -337,3 +465,97 @@ String _dateTime(DateTime value) =>
     DateFormat('dd/MM/yyyy HH:mm').format(value.toLocal());
 
 String _money(double value) => 'S/ ${value.toStringAsFixed(2)}';
+
+// ─── Botón/visor comprobante ─────────────────────────────────────────────────
+
+class _ComprobanteButton extends StatelessWidget {
+  final String? url;
+  const _ComprobanteButton({this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null || url!.isEmpty) {
+      return Text('—', style: TextStyle(color: context.colors.textTertiary));
+    }
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: AppColors.primary,
+      ),
+      icon: const Icon(Icons.visibility_outlined, size: 14),
+      label: const Text(
+        'Ver comprobante',
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+      ),
+      onPressed: () => _show(context),
+    );
+  }
+
+  void _show(BuildContext context) {
+    final normalised = (url!.startsWith('http') || url!.startsWith('/'))
+        ? url!
+        : 'https://$url';
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: context.colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Comprobante',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    normalised,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, chunk) => chunk == null
+                        ? child
+                        : const Center(child: CircularProgressIndicator()),
+                    errorBuilder: (_, __, ___) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'No se pudo cargar la imagen.\n$normalised',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.colors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  label: const Text('Cerrar'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

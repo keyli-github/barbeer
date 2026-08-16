@@ -58,11 +58,15 @@ class PrimaryButton extends StatelessWidget {
                     Icon(icon, size: AppSpacing.iconSM),
                     SizedBox(width: AppSpacing.xs),
                   ],
-                  Text(
-                    text,
-                    style: TextStyle(
-                      fontSize: fontSize ?? 15,
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: fontSize ?? 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -123,9 +127,13 @@ class SecondaryButton extends StatelessWidget {
                     Icon(icon, size: AppSpacing.iconSM),
                     SizedBox(width: AppSpacing.xs),
                   ],
-                  Text(
-                    text,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
@@ -188,9 +196,13 @@ class DestructiveButton extends StatelessWidget {
                     Icon(icon, size: AppSpacing.iconSM),
                     SizedBox(width: AppSpacing.xs),
                   ],
-                  Text(
-                    text,
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),

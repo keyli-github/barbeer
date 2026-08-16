@@ -8,10 +8,10 @@ export 'app_theme_colors.dart';
 class AppColors {
   AppColors._();
 
-  // ── Azul primario (acciones, tabs activos, botones) ──────────────────────
-  static const Color primary = Color(0xFF2563EB);
-  static const Color primaryDark = Color(0xFF1D4ED8);
-  static const Color primaryLight = Color(0xFF60A5FA);
+  // ── Primario BarBeer (acciones, tabs activos, botones) ───────────────────
+  static const Color primary = Color(0xFFF97316);
+  static const Color primaryDark = Color(0xFFEA580C);
+  static const Color primaryLight = Color(0xFFFB923C);
 
   // ── Naranja BarBeer (marca, etiqueta de rol, acentos) ───────────────────
   static const Color brand = Color(0xFFF97316);
@@ -27,7 +27,7 @@ class AppColors {
   static const Color info = Color(0xFF3B82F6);
 
   // ── Navegación ───────────────────────────────────────────────────────────
-  static const Color navActive = Color(0xFF2563EB);
+  static const Color navActive = Color(0xFFF97316);
 
   // ── Roles ────────────────────────────────────────────────────────────────
   static const Color roleSuperadmin = Color(0xFF7C3AED);

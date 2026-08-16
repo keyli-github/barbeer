@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -12,6 +13,7 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
@@ -92,38 +94,66 @@ class UsuariosState {
 
 class UsuariosNotifier extends StateNotifier<UsuariosState> {
   final ApiClient _api;
-  UsuariosNotifier(this._api) : super(const UsuariosState()) {
+  final bool _canReadRoles;
+  final bool _canReadSedes;
+  final String? _sedeId;
+
+  UsuariosNotifier(
+    this._api,
+    this._canReadRoles,
+    this._canReadSedes,
+    this._sedeId,
+  ) : super(const UsuariosState()) {
     load();
   }
 
   Future<void> load({int page = 1}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final rs = await Future.wait([
-        _api.get(
-          ApiConstants.users,
-          queryParameters: {'pagina': page, 'limite': 25},
-        ),
-        _api.get(
-          ApiConstants.roles,
-          queryParameters: {'pagina': 1, 'limite': 50},
-        ),
-        _api.get(
-          ApiConstants.establishments,
-          queryParameters: {'pagina': 1, 'limite': 50},
-        ),
-      ]);
-      final ud = rs[0].data as Map;
-      final rd = rs[1].data as Map;
-      final sd = rs[2].data as Map;
+      final usersResponse = await _api.get(
+        ApiConstants.users,
+        queryParameters: {
+          'pagina': page,
+          'limite': 25,
+          if (_sedeId != null) 'sedeId': _sedeId,
+        },
+      );
+      final ud = usersResponse.data as Map;
+      var roles = state.roles;
+      var sedes = state.sedes;
+
+      if (_canReadRoles) {
+        try {
+          final response = await _api.get(
+            ApiConstants.roles,
+            queryParameters: {'pagina': 1, 'limite': 50},
+          );
+          final data = response.data as Map;
+          roles = List<Map<String, dynamic>>.from(data['data'] ?? []);
+        } catch (_) {
+          // El listado de usuarios sigue siendo útil sin el catálogo de roles.
+        }
+      }
+      if (_canReadSedes) {
+        try {
+          final response = await _api.get(
+            ApiConstants.establishments,
+            queryParameters: {'pagina': 1, 'limite': 50},
+          );
+          final data = response.data as Map;
+          sedes = List<Map<String, dynamic>>.from(data['data'] ?? []);
+        } catch (_) {
+          // El listado de usuarios sigue siendo útil sin el catálogo de sedes.
+        }
+      }
       state = state.copyWith(
         isLoading: false,
         users: List<Map<String, dynamic>>.from(ud['data'] ?? []),
         total: ud['total'] as int? ?? 0,
         page: ud['pagina'] as int? ?? 1,
         totalPages: ud['totalPaginas'] as int? ?? 1,
-        roles: List<Map<String, dynamic>>.from(rd['data'] ?? []),
-        sedes: List<Map<String, dynamic>>.from(sd['data'] ?? []),
+        roles: roles,
+        sedes: sedes,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -169,16 +199,33 @@ class UsuariosNotifier extends StateNotifier<UsuariosState> {
 }
 
 final usuariosProvider = StateNotifierProvider<UsuariosNotifier, UsuariosState>(
-  (ref) => UsuariosNotifier(ApiClient.instance),
+  (ref) {
+    final auth = ref.watch(authProvider);
+    return UsuariosNotifier(
+      ApiClient.instance,
+      auth.hasPermission('roles:leer'),
+      auth.hasPermission('establecimientos:leer'),
+      ref.watch(globalSedeIdProvider),
+    );
+  },
 );
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class UsuariosScreen extends ConsumerWidget {
+class UsuariosScreen extends ConsumerStatefulWidget {
   const UsuariosScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UsuariosScreen> createState() => _UsuariosScreenState();
+}
+
+class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
+  String _search = '';
+  String _roleFilter = '';
+  String _statusFilter = '';
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(usuariosProvider);
     final auth = ref.watch(authProvider);
     final availableRoles = assignableRoles(
@@ -189,6 +236,29 @@ class UsuariosScreen extends ConsumerWidget {
     final activeSedes = state.sedes
         .where((sede) => sede['activo'] == true)
         .toList();
+    final query = _search.trim().toLowerCase();
+    final filteredUsers = state.users.where((user) {
+      final role = user['rol'] is Map ? user['rol'] as Map : const {};
+      final sede = user['sede'] is Map ? user['sede'] as Map : const {};
+      final text = [
+        user['username'],
+        user['nombres'],
+        user['apellidos'],
+        role['nombre'],
+        sede['nombre'],
+      ].whereType<Object>().join(' ').toLowerCase();
+      final matchesSearch = query.isEmpty || text.contains(query);
+      final matchesRole =
+          _roleFilter.isEmpty || role['id']?.toString() == _roleFilter;
+      final matchesStatus =
+          _statusFilter.isEmpty ||
+          (user['activo'] == true).toString() == _statusFilter;
+      return matchesSearch && matchesRole && matchesStatus;
+    }).toList();
+    final adminCount = state.users.where((user) {
+      final role = user['rol'] is Map ? user['rol'] as Map : const {};
+      return const ['SUPERADMIN', 'ADMIN'].contains(role['nombre']);
+    }).length;
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -212,6 +282,67 @@ class UsuariosScreen extends ConsumerWidget {
         onRefresh: () => ref.read(usuariosProvider.notifier).load(),
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: TextField(
+                onChanged: (value) => setState(() => _search = value),
+                decoration: const InputDecoration(
+                  hintText: 'Buscar usuario...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: AppCard(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _FilterDropdown<String>(
+                        label: 'Rol',
+                        initialValue: _roleFilter,
+                        items: [
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('Todos'),
+                          ),
+                          for (final role in state.roles)
+                            DropdownMenuItem(
+                              value: role['id'] as String? ?? '',
+                              child: Text(role['nombre'] as String? ?? ''),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _roleFilter = value ?? ''),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: _FilterDropdown<String>(
+                        label: 'Estado',
+                        initialValue: _statusFilter,
+                        items: const [
+                          DropdownMenuItem(value: '', child: Text('Todos')),
+                          DropdownMenuItem(value: 'true', child: Text('Activos')),
+                          DropdownMenuItem(
+                            value: 'false',
+                            child: Text('Inactivos'),
+                          ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _statusFilter = value ?? ''),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             // Content
             Expanded(
               child: state.isLoading
@@ -221,7 +352,7 @@ class UsuariosScreen extends ConsumerWidget {
                       message: state.error!,
                       onRetry: () => ref.read(usuariosProvider.notifier).load(),
                     )
-                  : state.users.isEmpty
+                  : filteredUsers.isEmpty
                   ? const AppEmptyState(
                       icon: Icons.people_outline_rounded,
                       title: 'Sin usuarios',
@@ -231,39 +362,50 @@ class UsuariosScreen extends ConsumerWidget {
                       children: [
                         // Stats
                         Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _StatChip(
-                                  label: 'Total',
-                                  value: '${state.total}',
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _StatChip(
-                                  label: 'Activos',
-                                  value:
-                                      '${state.users.where((u) => u['activo'] == true).length}',
-                                  color: AppColors.success,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _StatChip(
-                                  label: 'Inactivos',
-                                  value:
-                                      '${state.users.where((u) => u['activo'] != true).length}',
-                                  color: context.colors.textTertiary,
-                                ),
-                              ),
-                            ],
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                          child: AppCard(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final cols = constraints.maxWidth >= 700 ? 4 : 2;
+                                return GridView.count(
+                                  crossAxisCount: cols,
+                                  childAspectRatio: cols == 4 ? 2.6 : 1.9,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  children: [
+                                    _StatChip(
+                                      label: 'Administradores',
+                                      value: '$adminCount',
+                                      color: AppColors.primary,
+                                    ),
+                                    _StatChip(
+                                      label: 'Empleados',
+                                      value:
+                                          '${state.users.length - adminCount}',
+                                      color: AppColors.info,
+                                    ),
+                                    _StatChip(
+                                      label: 'Activos',
+                                      value:
+                                          '${state.users.where((u) => u['activo'] == true).length}',
+                                      color: AppColors.success,
+                                    ),
+                                    _StatChip(
+                                      label: 'Inactivos',
+                                      value:
+                                          '${state.users.where((u) => u['activo'] != true).length}',
+                                      color: context.colors.textTertiary,
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                         ),
                         // User list
-                        for (final user in state.users)
+                        for (final user in filteredUsers)
                           _UserTile(
                             user: user,
                             auth: auth,
@@ -408,14 +550,9 @@ class UsuariosScreen extends ConsumerWidget {
             .read(usuariosProvider.notifier)
             .deactivateUser(user['id'] as String);
         if (context.mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Usuario desactivado')));
+          AppFeedback.success(context, 'Usuario desactivado');
       } catch (e) {
-        if (context.mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (context.mounted) AppFeedback.error(context, 'Error: $e');
       }
     }
   }
@@ -434,21 +571,43 @@ class UsuariosScreen extends ConsumerWidget {
     try {
       await ref.read(usuariosProvider.notifier).resetPassword(id, password);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Contraseña actualizada')));
+        AppFeedback.success(context, 'Contraseña actualizada');
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        AppFeedback.error(context, 'Error: $e');
       }
     }
   }
 }
 
 // ─── User Tile ────────────────────────────────────────────────────────────────
+
+class _FilterDropdown<T> extends StatelessWidget {
+  final String label;
+  final T? initialValue;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+  const _FilterDropdown({
+    required this.label,
+    required this.initialValue,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<T>(
+    initialValue: initialValue,
+    isExpanded: true,
+    isDense: true,
+    decoration: InputDecoration(
+      labelText: label,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    ),
+    items: items,
+    onChanged: onChanged,
+  );
+}
 
 class _UserTile extends StatelessWidget {
   final Map<String, dynamic> user;
@@ -497,7 +656,14 @@ class _UserTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(username, style: AppTextStyles.titleMedium),
+                      Flexible(
+                        child: Text(
+                          username,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.titleMedium,
+                        ),
+                      ),
                       if (mustChange) ...[
                         const SizedBox(width: 6),
                         const Icon(
@@ -514,7 +680,14 @@ class _UserTile extends StatelessWidget {
                       RoleBadge(role: role),
                       if (sede != null) ...[
                         const SizedBox(width: 6),
-                        Text(sede, style: AppTextStyles.labelSmall),
+                        Flexible(
+                          child: Text(
+                            sede,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -522,11 +695,11 @@ class _UserTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 StatusBadge(activo: activo),
-                const SizedBox(height: 4),
+                const SizedBox(width: 2),
                 _ActionsMenu(
                   user: user,
                   auth: auth,
@@ -742,11 +915,13 @@ class _UserDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       _Badge(rol, AppColors.roleColor(rol.toUpperCase())),
-                      const SizedBox(width: 8),
                       _Badge(
                         activo ? 'Activo' : 'Inactivo',
                         activo
@@ -1023,7 +1198,15 @@ class _UserFormState extends State<_UserForm> {
               _label('Rol'),
               DropdownButtonFormField<String>(
                 value: _rolId,
-                hint: const Text('Seleccionar rol'),
+                isExpanded: true,
+                isDense: true,
+                decoration: const InputDecoration(
+                  hintText: 'Seleccionar rol',
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                ),
                 items: widget.roles
                     .map(
                       (r) => DropdownMenuItem(
@@ -1040,7 +1223,15 @@ class _UserFormState extends State<_UserForm> {
                 _label('Sede'),
                 DropdownButtonFormField<String>(
                   value: _sedeId,
-                  hint: const Text('Seleccionar sede'),
+                  isExpanded: true,
+                  isDense: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Seleccionar sede',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                  ),
                   items: widget.sedes
                       .map(
                         (s) => DropdownMenuItem(
@@ -1089,15 +1280,10 @@ class _UserFormState extends State<_UserForm> {
       });
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuario creado exitosamente')),
-        );
+        AppFeedback.success(context, 'Usuario creado exitosamente');
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) AppFeedback.error(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1150,6 +1336,14 @@ class _UserEditFormState extends State<_UserEditForm> {
             _label('Rol'),
             DropdownButtonFormField<String>(
               value: _rolId,
+              isExpanded: true,
+              isDense: true,
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+              ),
               items: widget.roles
                   .map(
                     (r) => DropdownMenuItem(
@@ -1165,6 +1359,14 @@ class _UserEditFormState extends State<_UserEditForm> {
               _label('Sede'),
               DropdownButtonFormField<String>(
                 value: _sedeId,
+                isExpanded: true,
+                isDense: true,
+                decoration: const InputDecoration(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                ),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('Sin sede')),
                   ...widget.sedes.map(
@@ -1209,15 +1411,10 @@ class _UserEditFormState extends State<_UserEditForm> {
       await widget.onSave(data);
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Usuario actualizado')));
+        AppFeedback.success(context, 'Usuario actualizado');
       }
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) AppFeedback.error(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1258,11 +1455,10 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
     icon: const Icon(Icons.lock_reset_rounded, color: AppColors.primary),
     title: const Text('Nueva contraseña'),
-    content: SizedBox(
-      width: 420,
-      child: Column(
+    content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1312,7 +1508,6 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
             ),
           ],
         ],
-      ),
     ),
     actions: [
       TextButton(
@@ -1349,7 +1544,12 @@ class _StatChip extends StatelessWidget {
             color: color,
           ),
         ),
-        Text(label, style: AppTextStyles.labelSmall),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.labelSmall,
+        ),
       ],
     ),
   );

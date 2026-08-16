@@ -42,10 +42,16 @@ class AppButton extends StatelessWidget {
             children: [
               Icon(icon, size: 18),
               const SizedBox(width: 8),
-              Text(label),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           )
-        : Text(label) as Widget;
+        : Text(label, maxLines: 1, overflow: TextOverflow.ellipsis) as Widget;
     Widget btn;
     switch (variant) {
       case AppButtonVariant.danger:

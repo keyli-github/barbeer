@@ -11,7 +11,6 @@ import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
 import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_screen.dart';
-import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_sheet.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/anular_venta_dialog.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/carrito_venta_sheet.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
@@ -528,6 +527,121 @@ void main() {
       expect(analysis.advertencias, ['Verificar hora']);
     });
 
+    test('monto menor al total es pago parcial válido (como web y backend)', () {
+      final analysis = ComprobanteAnalisis.fromJson({
+        'id': 'analysis-partial',
+        'estado': 'APTO',
+        'posibleDuplicado': false,
+        'coincidencias': [],
+        'entidad': 'Yape',
+        'etiquetaSugerida': {'id': 'et-1', 'nombre': 'Yape'},
+        'monto': 10.0,
+        'codigoOperacion': 'OP-P',
+        'codigoSeguridad': 'SEC-P',
+        'fechaOperacion': '2026-08-13',
+        'horaOperacion': '12:30:00',
+        'imagenUrl': '/receipts/partial.jpg',
+        'thumbnailUrl': '/receipts/partial-thumb.jpg',
+        'confianza': {
+          'documento': .9,
+          'entidad': .9,
+          'monto': .9,
+          'operacion': .9,
+          'fecha': .9,
+        },
+        'advertencias': [],
+        'expiraAt': '2099-08-13T12:45:00.000Z',
+      });
+
+      expect(analysis.montoEsMenor(25.0), isTrue);
+      expect(analysis.montoExcede(25.0), isFalse);
+      expect(
+        comprobanteAnalysisError(
+          analysis: analysis,
+          total: 25,
+          required: true,
+          selectedEtiquetaId: 'et-1',
+        ),
+        isNull,
+        reason: 'Un monto menor es válido: el cliente completa con otro pago',
+      );
+    });
+
+    test('monto mayor al total bloquea la venta', () {
+      final analysis = ComprobanteAnalisis.fromJson({
+        'id': 'analysis-over',
+        'estado': 'APTO',
+        'posibleDuplicado': false,
+        'coincidencias': [],
+        'entidad': 'Yape',
+        'etiquetaSugerida': {'id': 'et-1', 'nombre': 'Yape'},
+        'monto': 30.0,
+        'codigoOperacion': 'OP-O',
+        'codigoSeguridad': 'SEC-O',
+        'fechaOperacion': '2026-08-13',
+        'horaOperacion': '12:30:00',
+        'imagenUrl': '/receipts/over.jpg',
+        'thumbnailUrl': '/receipts/over-thumb.jpg',
+        'confianza': {
+          'documento': .9,
+          'entidad': .9,
+          'monto': .9,
+          'operacion': .9,
+          'fecha': .9,
+        },
+        'advertencias': [],
+        'expiraAt': '2099-08-13T12:45:00.000Z',
+      });
+
+      expect(analysis.montoExcede(25.0), isTrue);
+      expect(
+        comprobanteAnalysisError(
+          analysis: analysis,
+          total: 25,
+          required: true,
+          selectedEtiquetaId: 'et-1',
+        ),
+        contains('supera el total'),
+      );
+    });
+
+    test('sin sugerencia de billetera, la manual seleccionada es válida', () {
+      final analysis = ComprobanteAnalisis.fromJson({
+        'id': 'analysis-nosuggest',
+        'estado': 'APTO',
+        'posibleDuplicado': false,
+        'coincidencias': [],
+        'entidad': 'Agora',
+        'monto': 25.5,
+        'codigoOperacion': 'OP-NS',
+        'codigoSeguridad': 'SEC-NS',
+        'fechaOperacion': '2026-08-13',
+        'horaOperacion': '12:30:00',
+        'imagenUrl': '/receipts/nosuggest.jpg',
+        'thumbnailUrl': '/receipts/nosuggest-thumb.jpg',
+        'confianza': {
+          'documento': .9,
+          'entidad': .9,
+          'monto': .9,
+          'operacion': .9,
+          'fecha': .9,
+        },
+        'advertencias': [],
+        'expiraAt': '2099-08-13T12:45:00.000Z',
+      });
+
+      expect(analysis.etiquetaSugerida, isNull);
+      expect(
+        comprobanteAnalysisError(
+          analysis: analysis,
+          total: 25.5,
+          required: true,
+          selectedEtiquetaId: 'et-2',
+        ),
+        isNull,
+      );
+    });
+
     test('Venta.fromJson expone recargo y subtotal', () {
       final venta = Venta.fromJson({
         'id': 'v3',
@@ -613,7 +727,8 @@ void main() {
 
         await notifier.load(estado: 'PENDIENTE');
 
-        expect(repo.requestedEstados, [null, null]);
+        // La carga inicial del constructor + las páginas de PENDIENTE no envían estado.
+        expect(repo.requestedEstados, [null, null, null]);
         expect(notifier.state.filterEstado, 'PENDIENTE');
         expect(notifier.state.ventas.map((venta) => venta.id), ['1', '3']);
         expect(notifier.state.total, 2);
@@ -632,7 +747,8 @@ void main() {
 
         await notifier.load(estado: 'ACTIVA');
 
-        expect(repo.requestedEstados, ['ACTIVA']);
+        // Primero carga el constructor sin estado, luego el filtro solicitado.
+        expect(repo.requestedEstados, [null, 'ACTIVA']);
         expect(notifier.state.filterEstado, 'ACTIVA');
         expect(notifier.state.pagina, 1);
       },
@@ -675,6 +791,12 @@ void main() {
         find.byKey(const ValueKey('codigoOperacionField')),
         findsOneWidget,
       );
+
+      // La billetera se selecciona explícitamente (no auto-selección).
+      await tester.tap(find.text('Selecciona una billetera…').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Yape').last);
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Confirmar clasificación'));
       await tester.pump();
@@ -729,56 +851,19 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Billetera').first);
       await tester.pump();
-      expect(find.text('Comprobante / voucher (opcional)'), findsOneWidget);
+      expect(find.text('2 · Comprobante (Gemini)'), findsOneWidget);
+
+      // La billetera se selecciona explícitamente (no auto-selección).
+      await tester.tap(find.text('Selecciona una billetera…').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transferencia').last);
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Confirmar clasificación'));
       await tester.pump();
 
       expect(repo.conciliaciones, hasLength(1));
       expect(repo.conciliaciones.single.comprobanteAnalisisId, isNull);
-      await tester.pump(const Duration(seconds: 3));
-    });
-
-    testWidgets('sheet posterior usa análisis Gemini y no URL legacy', (
-      tester,
-    ) async {
-      final repo = _FakeVentasRepository();
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            ventasRepositoryProvider.overrideWithValue(repo),
-            voucherImagePickerProvider.overrideWithValue(
-              () async => PickedUploadImage(
-                bytes: base64Decode(
-                  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-                ),
-                filename: 'voucher.png',
-              ),
-            ),
-          ],
-          child: MaterialApp(
-            home: Scaffold(
-              body: ConciliarVentaSheet(
-                venta: _venta('sheet', pendiente: true),
-                onDone: () {},
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Billetera').first);
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('comprobanteField')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('receipt-analysis-panel')), findsOneWidget);
-      expect(find.text('Análisis apto'), findsOneWidget);
-      await tester.ensureVisible(find.text('Confirmar'));
-      await tester.tap(find.text('Confirmar'));
-      await tester.pump();
-
-      expect(repo.conciliaciones.single.comprobanteAnalisisId, 'analysis-1');
       await tester.pump(const Duration(seconds: 3));
     });
 

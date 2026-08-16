@@ -1,26 +1,18 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/providers/theme_mode_provider.dart';
-import '../../../../core/constants/api_constants.dart';
+import '../../../../core/providers/branding_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_badge.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
-import '../../../../core/widgets/app_loading.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-
-final sessionListProvider = FutureProvider<List<Map<String, dynamic>>>((
-  ref,
-) async {
-  final r = await ApiClient.instance.get(ApiConstants.sessions);
-  return List<Map<String, dynamic>>.from(r.data ?? []);
-});
 
 class PerfilScreen extends ConsumerWidget {
   const PerfilScreen({super.key});
@@ -29,7 +21,6 @@ class PerfilScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final user = auth.user;
-    final sessionsAsync = ref.watch(sessionListProvider);
     final username = user?.username ?? '';
 
     return Scaffold(
@@ -110,11 +101,6 @@ class PerfilScreen extends ConsumerWidget {
                               ),
                             ),
                             _QuickAction(
-                              icon: Icons.devices_rounded,
-                              label: 'Mis\nsesiones',
-                              onTap: () => context.go('/seguridad'),
-                            ),
-                            _QuickAction(
                               icon: Icons.logout_rounded,
                               label: 'Cerrar\nsesion',
                               color: AppColors.error,
@@ -159,124 +145,13 @@ class PerfilScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  _SectionHeader(title: 'Apariencia'),
-                  const SizedBox(height: 8),
-                  const AppCard(child: _AppearanceSelector()),
-                  const SizedBox(height: 20),
-
-                  // Sessions
-                  _SectionHeader(title: 'Sesiones activas'),
-                  const SizedBox(height: 8),
-                  sessionsAsync.when(
-                    loading: () => const AppLoading(),
-                    error: (e, _) =>
-                        Text('Error: $e', style: AppTextStyles.bodySmall),
-                    data: (sessions) => AppCard(
-                      child: Column(
-                        children: [
-                          for (int i = 0; i < sessions.length; i++) ...[
-                            _SessionRow(
-                              session: sessions[i],
-                              onRevoke: sessions[i]['actual'] == true
-                                  ? null
-                                  : () async {
-                                      try {
-                                        await ApiClient.instance.delete(
-                                          ApiConstants.revokeSession(
-                                            sessions[i]['id'] as String,
-                                          ),
-                                        );
-                                        ref.invalidate(sessionListProvider);
-                                        if (context.mounted)
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Sesion cerrada'),
-                                            ),
-                                          );
-                                      } catch (e) {
-                                        if (context.mounted)
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Error: $e'),
-                                            ),
-                                          );
-                                      }
-                                    },
-                            ),
-                            if (i < sessions.length - 1)
-                              const Divider(height: 1),
-                          ],
-                          if (sessions
-                              .where((s) => s['actual'] != true)
-                              .isNotEmpty) ...[
-                            const Divider(height: 16),
-                            TextButton(
-                              onPressed: () async {
-                                final ok = await ConfirmDialog.show(
-                                  context: context,
-                                  title: 'Cerrar otras sesiones',
-                                  description:
-                                      'Se cerraran todas las sesiones excepto esta.',
-                                  confirmLabel: 'Confirmar',
-                                  isDanger: true,
-                                );
-                                if (ok && context.mounted) {
-                                  try {
-                                    await ApiClient.instance.delete(
-                                      ApiConstants.sessions,
-                                    );
-                                    ref.invalidate(sessionListProvider);
-                                    if (context.mounted)
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Sesiones cerradas'),
-                                        ),
-                                      );
-                                  } catch (e) {
-                                    if (context.mounted)
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(content: Text('Error: $e')),
-                                      );
-                                  }
-                                }
-                              },
-                              child: const Text(
-                                'Cerrar todas las otras sesiones',
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Logout all
-                  AppButton(
-                    label: 'Cerrar todas las sesiones y salir',
-                    isFullWidth: true,
-                    variant: AppButtonVariant.danger,
-                    onPressed: () async {
-                      final ok = await ConfirmDialog.show(
-                        context: context,
-                        title: 'Cerrar todas las sesiones',
-                        description:
-                            'Se cerraran todas tus sesiones en todos los dispositivos.',
-                        confirmLabel: 'Cerrar todo',
-                        isDanger: true,
-                      );
-                      if (ok && context.mounted)
-                        await ref.read(authProvider.notifier).logoutAll();
-                    },
-                  ),
+                  // Branding (solo SUPERADMIN)
+                  if (user?.isSuperAdmin == true) ...[
+                    _SectionHeader(title: 'Personalización del sistema'),
+                    const SizedBox(height: 8),
+                    const _BrandingSection(),
+                    const SizedBox(height: 20),
+                  ],
                 ]),
               ),
             ),
@@ -295,66 +170,6 @@ class PerfilScreen extends ConsumerWidget {
       isDanger: true,
     );
     if (ok && context.mounted) await ref.read(authProvider.notifier).logout();
-  }
-}
-
-class _AppearanceSelector extends ConsumerWidget {
-  const _AppearanceSelector();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(themeModeProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Tema', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(
-          'Usa el tema del dispositivo o elige uno.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: Semantics(
-            label: 'Seleccionar apariencia',
-            child: SegmentedButton<ThemeMode>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  icon: Icon(Icons.brightness_auto_rounded, size: 17),
-                  label: Text('Sistema'),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  icon: Icon(Icons.light_mode_outlined, size: 17),
-                  label: Text('Claro'),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  icon: Icon(Icons.dark_mode_outlined, size: 17),
-                  label: Text('Oscuro'),
-                ),
-              ],
-              selected: {selected},
-              onSelectionChanged: (selection) {
-                ref.read(themeModeProvider.notifier).setMode(selection.single);
-              },
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                ),
-                textStyle: const WidgetStatePropertyAll(
-                  TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
 
@@ -447,97 +262,220 @@ class _InfoRow extends StatelessWidget {
   );
 }
 
-class _SessionRow extends StatelessWidget {
-  final Map<String, dynamic> session;
-  final VoidCallback? onRevoke;
-  const _SessionRow({required this.session, this.onRevoke});
+// ─── Branding section (SUPERADMIN only) ──────────────────────────────────────
+
+class _BrandingSection extends ConsumerWidget {
+  const _BrandingSection();
+
   @override
-  Widget build(BuildContext context) {
-    final device = session['deviceName'] as String? ?? 'Dispositivo';
-    final type = session['deviceType'] as String? ?? 'web';
-    final ip = session['ip'] as String?;
-    final isCurrent = session['actual'] as bool? ?? false;
-    DateTime? last;
-    try {
-      last = DateTime.parse(session['lastUsedAt'] ?? '').toLocal();
-    } catch (_) {}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final branding = ref.watch(brandingProvider);
 
-    IconData icon;
-    switch (type) {
-      case 'android':
-        icon = Icons.android_rounded;
-      case 'ios':
-        icon = Icons.phone_iphone_rounded;
-      default:
-        icon = Icons.computer_rounded;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
+    return AppCard(
+      child: Column(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: isCurrent ? AppColors.primary : context.colors.textSecondary,
+          _BrandingItem(
+            label: 'Logo del sistema',
+            description: 'JPEG/PNG/WebP · máx. 5 MB',
+            icon: Icons.image_rounded,
+            imageUrl: branding.logoUrl,
+            mutating: branding.mutating,
+            onPick: (bytes, filename) async {
+              await ref
+                  .read(brandingProvider.notifier)
+                  .setLogo(bytes, filename);
+              if (context.mounted)
+                AppFeedback.success(context, 'Logo actualizado');
+            },
+            onRemove: () async {
+              await ref.read(brandingProvider.notifier).removeLogo();
+              if (context.mounted)
+                AppFeedback.success(context, 'Logo restaurado al original');
+            },
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      device,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: context.colors.textPrimary,
-                      ),
-                    ),
-                    if (isCurrent) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: context.colors.successLight,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Actual',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.success,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if (ip != null) Text(ip, style: AppTextStyles.labelSmall),
-                if (last != null)
-                  Text(
-                    'Ultima actividad: ${FormatUtils.timeAgo(last)}',
-                    style: AppTextStyles.labelSmall,
-                  ),
-              ],
-            ),
+          const Divider(height: 24),
+          _BrandingItem(
+            label: 'Portada del login',
+            description: 'JPEG/PNG/WebP · máx. 5 MB',
+            icon: Icons.wallpaper_rounded,
+            imageUrl: branding.coverUrl,
+            mutating: branding.mutating,
+            onPick: (bytes, filename) async {
+              await ref
+                  .read(brandingProvider.notifier)
+                  .setCover(bytes, filename);
+              if (context.mounted)
+                AppFeedback.success(context, 'Portada actualizada');
+            },
+            onRemove: () async {
+              await ref.read(brandingProvider.notifier).removeCover();
+              if (context.mounted)
+                AppFeedback.success(context, 'Portada restaurada al original');
+            },
           ),
-          if (onRevoke != null)
-            IconButton(
-              icon: const Icon(
-                Icons.close_rounded,
-                size: 18,
-                color: AppColors.error,
-              ),
-              onPressed: onRevoke,
-            ),
         ],
       ),
+    );
+  }
+}
+
+class _BrandingItem extends StatefulWidget {
+  final String label;
+  final String description;
+  final IconData icon;
+  final String? imageUrl;
+  final bool mutating;
+  // bytes + filename → the backend needs multipart with a real filename
+  final Future<void> Function(Uint8List bytes, String filename) onPick;
+  final Future<void> Function() onRemove;
+
+  const _BrandingItem({
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.imageUrl,
+    required this.mutating,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  @override
+  State<_BrandingItem> createState() => _BrandingItemState();
+}
+
+class _BrandingItemState extends State<_BrandingItem> {
+  static const _maxBytes = 5 * 1024 * 1024; // 5 MB
+
+  Future<void> _pick() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null) return;
+      if (file.bytes!.length > _maxBytes) {
+        if (mounted)
+          AppFeedback.error(context, 'Archivo demasiado grande (máx. 5 MB)');
+        return;
+      }
+      final filename = file.name.isNotEmpty ? file.name : 'image.jpg';
+      await widget.onPick(file.bytes!, filename);
+    } catch (e) {
+      if (mounted) AppFeedback.error(context, 'Error: $e');
+    }
+  }
+
+  Future<void> _remove() async {
+    try {
+      await widget.onRemove();
+    } catch (e) {
+      if (mounted) AppFeedback.error(context, 'Error: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCustom = widget.imageUrl != null;
+    final loading = widget.mutating;
+
+    return Row(
+      children: [
+        // Preview
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: context.colors.backgroundAlt,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: context.colors.borderLight),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: hasCustom
+              ? Image.network(
+                  widget.imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    widget.icon,
+                    color: context.colors.textTertiary,
+                    size: 26,
+                  ),
+                )
+              : Icon(widget.icon, color: context.colors.textTertiary, size: 26),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.label,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+              Text(widget.description, style: AppTextStyles.labelSmall),
+              if (hasCustom)
+                Text(
+                  'Personalizado',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.success,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        if (loading)
+          const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else
+          Column(
+            children: [
+              GestureDetector(
+                onTap: _pick,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.colors.primarySurface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.colors.primaryBorder),
+                  ),
+                  child: const Text(
+                    'Cambiar',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ),
+              if (hasCustom) ...[
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: _remove,
+                  child: Text(
+                    'Restaurar',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.error,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+      ],
     );
   }
 }

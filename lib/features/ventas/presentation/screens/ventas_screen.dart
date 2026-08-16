@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/ventas_provider.dart';
-import 'nueva_venta_view.dart';
 import 'historial_ventas_view.dart';
+import 'nueva_venta_view.dart';
 
 class VentasScreen extends ConsumerWidget {
   const VentasScreen({super.key});
@@ -13,138 +15,90 @@ class VentasScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final canCreate = canCreateVenta(auth);
-    final canReadAll = canReadAllVentas(auth);
-    final canReadOwn = canReadOwnVentas(auth);
+    final canRead = canReadAllVentas(auth) || canReadOwnVentas(auth);
 
-    if (!canCreate && !canReadAll && !canReadOwn) {
+    if (!canCreate && !canRead) {
       return const Scaffold(
         body: Center(child: Text('Sin acceso al módulo de ventas')),
       );
     }
-    if (canCreate && !canReadAll) return const _VendedoraView();
-    if (!canCreate && canReadAll) return const _HistorialView();
-    return const _AdminView();
+
+    // Igual que el responsive web: el módulo abre en el historial y Nueva
+    // venta es un flujo independiente accesible desde su CTA.
+    return Scaffold(
+      backgroundColor: context.colors.background,
+      body: canRead
+          ? HistorialVentasView(
+              onCreate: canCreate ? () => _openNewSale(context) : null,
+            )
+          : _CreateOnly(onCreate: () => _openNewSale(context)),
+    );
+  }
+
+  void _openNewSale(BuildContext context) {
+    AppNav.push(context, const _NuevaVentaPage());
   }
 }
 
-// ─── Solo historial ───────────────────────────────────────────────────────────
+class _CreateOnly extends StatelessWidget {
+  final VoidCallback onCreate;
 
-class _HistorialView extends StatelessWidget {
-  const _HistorialView();
+  const _CreateOnly({required this.onCreate});
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: context.colors.surface,
-    body: HistorialVentasView(),
+  Widget build(BuildContext context) => Center(
+    child: ElevatedButton.icon(
+      onPressed: onCreate,
+      icon: const Icon(Icons.shopping_cart_outlined),
+      label: const Text('NUEVA VENTA'),
+    ),
   );
 }
 
-// ─── Vendedora ────────────────────────────────────────────────────────────────
-
-class _VendedoraView extends StatefulWidget {
-  const _VendedoraView();
-  @override
-  State<_VendedoraView> createState() => _VendedoraViewState();
-}
-
-class _VendedoraViewState extends State<_VendedoraView>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
+class _NuevaVentaPage extends StatelessWidget {
+  const _NuevaVentaPage();
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: context.colors.surface,
-    body: Column(
-      children: [
-        _TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'Nueva venta'),
-            Tab(text: 'Mis ventas'),
-          ],
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabs,
-            children: const [NuevaVentaView(), HistorialVentasView()],
+    backgroundColor: context.colors.background,
+    appBar: AppBar(
+      leading: IconButton(
+        onPressed: () => Navigator.of(context).pop(),
+        icon: const Icon(Icons.arrow_back_rounded, size: 20),
+      ),
+      titleSpacing: 0,
+      title: Row(
+        children: [
+          Text(
+            'Ventas',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: context.colors.textTertiary,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
-// ─── Admin ────────────────────────────────────────────────────────────────────
-
-class _AdminView extends StatefulWidget {
-  const _AdminView();
-  @override
-  State<_AdminView> createState() => _AdminViewState();
-}
-
-class _AdminViewState extends State<_AdminView>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: context.colors.surface,
-    body: Column(
-      children: [
-        _TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'Nueva venta'),
-            Tab(text: 'Historial'),
-          ],
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabs,
-            children: const [NuevaVentaView(), HistorialVentasView()],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9),
+            child: Text(
+              '/',
+              style: TextStyle(color: context.colors.textTertiary),
+            ),
           ),
-        ),
-      ],
+          Text(
+            'Nueva Venta',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: context.colors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(height: 1, color: context.colors.border),
+      ),
     ),
-  );
-}
-
-class _TabBar extends StatelessWidget {
-  final TabController controller;
-  final List<Widget> tabs;
-  const _TabBar({required this.controller, required this.tabs});
-  @override
-  Widget build(BuildContext context) => Container(
-    color: context.colors.surface,
-    child: TabBar(
-      controller: controller,
-      labelColor: AppColors.primary,
-      unselectedLabelColor: context.colors.textTertiary,
-      indicatorColor: AppColors.primary,
-      indicatorSize: TabBarIndicatorSize.label,
-      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      tabs: tabs,
-    ),
+    body: const NuevaVentaView(),
   );
 }

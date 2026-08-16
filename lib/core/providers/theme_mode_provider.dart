@@ -29,6 +29,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   static ThemeMode _decode(String? value) => switch (value) {
     'light' => ThemeMode.light,
     'dark' => ThemeMode.dark,
-    _ => ThemeMode.system,
+    // Igual que frontend_bar: una instalación nueva inicia en modo oscuro.
+    _ => ThemeMode.dark,
   };
 }

@@ -10,6 +10,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 
 class SecuritySessionsRepository {
@@ -115,24 +116,37 @@ class _SessionsContentState extends ConsumerState<_SessionsContent> {
         .toList();
     return Column(
       children: [
-        Row(
+        GridView.count(
+          crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+          childAspectRatio: 2.1,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
-            Expanded(
-              child: _Metric(
-                label: 'Activas',
-                value: '${widget.sessions.length}',
-                icon: Icons.devices_rounded,
-                color: AppColors.primary,
-              ),
+            _Metric(
+              label: 'Dispositivos conectados',
+              value: '${widget.sessions.length}',
+              icon: Icons.devices_rounded,
+              color: AppColors.primary,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _Metric(
-                label: 'Otros equipos',
-                value: '${others.length}',
-                icon: Icons.laptop_rounded,
-                color: AppColors.warning,
-              ),
+            _Metric(
+              label: 'Fuera de este equipo',
+              value: '${others.length}',
+              icon: Icons.laptop_rounded,
+              color: AppColors.warning,
+            ),
+            _Metric(
+              label: current?['deviceType'] as String? ?? 'Desconocido',
+              value: current != null ? 'Activa' : 'Inactiva',
+              icon: Icons.verified_user_outlined,
+              color: current != null ? AppColors.success : AppColors.error,
+            ),
+            _Metric(
+              label: 'Política cumplida',
+              value: 'Vigente',
+              icon: Icons.key_rounded,
+              color: AppColors.success,
             ),
           ],
         ),
@@ -206,6 +220,32 @@ class _SessionsContentState extends ConsumerState<_SessionsContent> {
         ),
         const SizedBox(height: 12),
         AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Medidas de protección', style: AppTextStyles.titleMedium),
+              SizedBox(height: 10),
+              _ProtectionRow(
+                icon: Icons.autorenew_rounded,
+                text: 'Rotación segura de sesiones',
+              ),
+              _ProtectionRow(
+                icon: Icons.phonelink_lock_rounded,
+                text: 'Revocación por dispositivo',
+              ),
+              _ProtectionRow(
+                icon: Icons.lock_clock_outlined,
+                text: 'Bloqueo ante intentos fallidos',
+              ),
+              _ProtectionRow(
+                icon: Icons.history_rounded,
+                text: 'Actividad registrada en auditoría',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        AppCard(
           child: Row(
             children: [
               Container(
@@ -263,14 +303,10 @@ class _SessionsContentState extends ConsumerState<_SessionsContent> {
           .revoke(session['id'] as String);
       if (!mounted) return;
       widget.onChanged();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Sesión cerrada')));
+      AppFeedback.success(context, 'Sesión cerrada');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo cerrar la sesión: $error')),
-      );
+      AppFeedback.error(context, 'No se pudo cerrar la sesión: $error');
     } finally {
       if (mounted && _loadingAction == action) {
         setState(() => _loadingAction = null);
@@ -294,14 +330,10 @@ class _SessionsContentState extends ConsumerState<_SessionsContent> {
       await ref.read(securitySessionsRepositoryProvider).revokeOthers();
       if (!mounted) return;
       widget.onChanged();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Otras sesiones cerradas')));
+      AppFeedback.success(context, 'Otras sesiones cerradas');
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudieron cerrar las sesiones: $error')),
-      );
+      AppFeedback.error(context, 'No se pudieron cerrar las sesiones: $error');
     } finally {
       if (mounted && _loadingAction == 'others') {
         setState(() => _loadingAction = null);
@@ -325,25 +357,45 @@ class _Metric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     decoration: BoxDecoration(
       color: context.colors.surface,
       borderRadius: BorderRadius.circular(AppRadius.md),
       border: Border.all(color: context.colors.borderLight),
     ),
-    child: Row(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
           children: [
-            Text(
-              value,
-              style: TextStyle(fontWeight: FontWeight.w800, color: color),
+            Icon(icon, color: color.withValues(alpha: 0.7), size: 11),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.textTertiary,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
-            Text(label, style: AppTextStyles.labelSmall),
           ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
         ),
       ],
     ),
@@ -365,9 +417,17 @@ class _SessionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final actual = session['actual'] as bool? ?? false;
     final type = session['deviceType'] as String?;
-    final date = DateTime.tryParse(
-      session['lastUsedAt'] as String? ?? session['createdAt'] as String? ?? '',
-    );
+    final created = DateTime.tryParse(session['createdAt'] as String? ?? '');
+    final lastUsed = DateTime.tryParse(session['lastUsedAt'] as String? ?? '');
+    final rawIp = session['ip'] as String? ?? '';
+    // Normalización de IP (igual que en web):
+    // • loopback → 'Local'
+    // • ::ffff:x.x.x.x  → x.x.x.x (IPv4-mapped IPv6)
+    final ip = const ['::1', '127.0.0.1', '::ffff:127.0.0.1'].contains(rawIp)
+        ? 'Local'
+        : rawIp.startsWith('::ffff:')
+        ? rawIp.substring(7) // strip ::ffff: prefix
+        : rawIp;
     final icon = type == 'android'
         ? Icons.android_rounded
         : type == 'ios'
@@ -410,11 +470,17 @@ class _SessionTile extends StatelessWidget {
                 ),
                 Text(
                   [
-                    session['ip'] as String?,
-                    if (date != null) FormatUtils.dateTime(date.toLocal()),
-                  ].whereType<String>().join(' · '),
+                    if (ip.isNotEmpty) ip,
+                    if (created != null)
+                      'Creada ${FormatUtils.dateTime(created.toLocal())}',
+                  ].join(' · '),
                   style: AppTextStyles.labelSmall,
                 ),
+                if (lastUsed != null)
+                  Text(
+                    'Última actividad ${FormatUtils.dateTime(lastUsed.toLocal())}',
+                    style: AppTextStyles.labelSmall,
+                  ),
               ],
             ),
           ),
@@ -440,4 +506,29 @@ class _SessionTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProtectionRow extends StatelessWidget {
+  const _ProtectionRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.check_circle_rounded,
+          size: 16,
+          color: AppColors.success,
+        ),
+        const SizedBox(width: 8),
+        Icon(icon, size: 17, color: context.colors.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: AppTextStyles.bodySmall)),
+      ],
+    ),
+  );
 }

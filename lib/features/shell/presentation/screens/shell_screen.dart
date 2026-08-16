@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/navigation/app_destinations.dart';
+import '../../../../core/providers/branding_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/format_utils.dart';
@@ -46,6 +47,7 @@ class ShellScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final visible = _visibleModules(auth);
     final subtitle = _subtitleFor(currentPath, auth);
+    final logoUrl = ref.watch(brandingProvider).logoUrl;
 
     if (MediaQuery.sizeOf(context).width >= 1024) {
       return DesktopShell(
@@ -55,15 +57,21 @@ class ShellScreen extends ConsumerWidget {
         onNavigate: context.go,
         onLogout: () => ref.read(authProvider.notifier).logout(),
         headerAction: const SedeScopeSelector(),
+        logoUrl: logoUrl,
         child: child,
       );
     }
 
-    const maxInBar = 4;
-    final barModules = visible.take(maxInBar).toList();
-    final moreModules = visible.length > maxInBar
-        ? visible.sublist(maxInBar)
-        : <AppDestination>[];
+    const preferredBarPaths = ['/dashboard', '/ventas', '/caja', '/usuarios'];
+    final barModules = preferredBarPaths
+        .map((path) => visible.where((item) => item.path == path).firstOrNull)
+        .whereType<AppDestination>()
+        .toList();
+    // El panel "Ver más" muestra únicamente los módulos que NO están en la
+    // barra inferior (evita duplicados) respetando los permisos del usuario.
+    final moreModules = visible
+        .where((item) => !barModules.any((barItem) => barItem.path == item.path))
+        .toList();
     final showMore = moreModules.isNotEmpty;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -74,11 +82,16 @@ class ShellScreen extends ConsumerWidget {
         // ── Header único para toda la app ─────────────────────────────
         appBar: AppHeader(
           subtitle: subtitle,
-          actions: const [SedeScopeSelector(compact: true)],
+          actions: const [
+            SedeScopeSelector(compact: true),
+            _ProfileButton(),
+          ],
         ),
         // Panel derecho "Ver más"
         endDrawer: showMore
             ? _MorePanel(
+                // El panel replica el sidebar responsive de la web pero solo
+                // con los módulos que no están en la barra inferior.
                 modules: moreModules,
                 current: currentPath,
                 auth: auth,
@@ -153,7 +166,7 @@ class _BottomNavBar extends StatelessWidget {
                   final active = current.startsWith(m.path);
                   return Expanded(
                     child: _NavBarItem(
-                      label: m.label,
+                      label: m.navigationLabel,
                       icon: m.icon,
                       activeIcon: m.activeIcon,
                       active: active,
@@ -231,6 +244,8 @@ class _NavBarItem extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 10,
             fontWeight: active ? FontWeight.w700 : FontWeight.w400,
@@ -260,7 +275,13 @@ List<_Section> _buildSections(List<AppDestination> modules) {
       .toList();
 
   final op = from(['/ventas', '/caja', '/movimientos']);
-  final inv = from(['/productos', '/inventario', '/kardex', '/compras']);
+  final inv = from([
+    '/productos',
+    '/categorias',
+    '/inventario',
+    '/kardex',
+    '/compras',
+  ]);
   final pers = from(['/asistencia']);
   final admin = from([
     '/etiquetas',
@@ -276,6 +297,9 @@ List<_Section> _buildSections(List<AppDestination> modules) {
     ...inv,
     ...pers,
     ...admin,
+    ...modules.where(
+      (item) => item.path == '/dashboard' || item.path == '/perfil',
+    ),
   }.map((m) => m.path).toSet();
   final other = modules.where((m) => !classified.contains(m.path)).toList();
 
@@ -313,13 +337,15 @@ class _MorePanelState extends State<_MorePanel> {
   @override
   void initState() {
     super.initState();
-    // Todas las secciones inician CERRADAS — se abren al tocar
+    final currentSection = appDestinationForPath(
+      widget.current,
+    )?.section?.label;
     _expanded = {
-      'OPERACIONES': false,
-      'INVENTARIO': false,
-      'PERSONAL': false,
-      'ADMINISTRACIÓN': false,
-      'OTROS': false,
+      'OPERACIONES': currentSection == 'OPERACIONES',
+      'INVENTARIO': currentSection == 'INVENTARIO',
+      'PERSONAL': currentSection == 'PERSONAL',
+      'ADMINISTRACIÓN': currentSection == 'ADMINISTRACION',
+      'OTROS': currentSection == null,
     };
   }
 
@@ -331,7 +357,7 @@ class _MorePanelState extends State<_MorePanel> {
     final sections = _buildSections(widget.modules);
 
     return Drawer(
-      backgroundColor: context.colors.background,
+      backgroundColor: context.colors.navBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -343,26 +369,33 @@ class _MorePanelState extends State<_MorePanel> {
           children: [
             // ── Marca + botón de cierre ─────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(18, 18, 16, 14),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 42,
-                    height: 28,
-                    child: Image.asset(
-                      'assets/images/barbeer_Log.png',
-                      fit: BoxFit.contain,
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BarBeerWordmark(fontSize: 21),
+                        SizedBox(height: 2),
+                        Text(
+                          'ERP SYSTEM',
+                          style: TextStyle(
+                            fontSize: 9,
+                            letterSpacing: 1.4,
+                            color: Color(0xFF7E839E),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(child: BarBeerWordmark(fontSize: 21)),
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: context.colors.surfaceAlt,
+                        color: Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -379,104 +412,123 @@ class _MorePanelState extends State<_MorePanel> {
             // ── Secciones con animación ──────────────────────────────────
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: sections.map((sec) {
-                  final isOpen = _expanded[sec.title] ?? false;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Encabezado colapsable
-                      InkWell(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _expanded[sec.title] = !isOpen);
-                        },
-                        splashColor: Colors.transparent,
-                        highlightColor: context.colors.primarySurface,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  sec.title,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: context.colors.textTertiary,
-                                    letterSpacing: 0.8,
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+                children: [
+                  ...sections.map((sec) {
+                    final isOpen = _expanded[sec.title] ?? false;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _expanded[sec.title] = !isOpen);
+                          },
+                          splashColor: Colors.transparent,
+                          highlightColor: context.colors.primarySurface,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 12, 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    sec.title,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: context.colors.textSecondary
+                                          .withValues(alpha: 0.55),
+                                      letterSpacing: 0.8,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              // Flecha rotatoria animada
-                              AnimatedRotation(
-                                turns: isOpen ? 0.5 : 0,
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeOutCubic,
-                                child: Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  size: 18,
-                                  color: context.colors.textTertiary,
+                                AnimatedRotation(
+                                  turns: isOpen ? 0.5 : 0,
+                                  duration: const Duration(milliseconds: 250),
+                                  curve: Curves.easeOutCubic,
+                                  child: Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 18,
+                                    color: context.colors.textTertiary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOutCubic,
+                          child: isOpen
+                              ? Column(
+                                  children: sec.items.map((module) {
+                                    final active = widget.current.startsWith(
+                                      module.path,
+                                    );
+                                    return _PanelItem(
+                                      module: module,
+                                      active: active,
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        widget.go(module.path);
+                                      },
+                                    );
+                                  }).toList(),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                        const SizedBox(height: 2),
+                      ],
+                    );
+                  }),
+                ],
+              ),
+            ),
+
+            Divider(height: 1, color: context.colors.border),
+
+            // ── Usuario (enlace al perfil) + Logout ─────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  // Igual que el sidebar web: el área del usuario es un
+                  // acceso directo al perfil.
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () => widget.go('/perfil'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              _Avatar(username: un),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      un,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: context.colors.textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 3),
+                                    _RoleBadge(rol),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      // Items con animación de altura
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                        child: isOpen
-                            ? Column(
-                                children: sec.items.map((m) {
-                                  final active = widget.current.startsWith(
-                                    m.path,
-                                  );
-                                  return _PanelItem(
-                                    module: m,
-                                    active: active,
-                                    onTap: () {
-                                      HapticFeedback.selectionClick();
-                                      widget.go(m.path);
-                                    },
-                                  );
-                                }).toList(),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      const SizedBox(height: 2),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-
-            Divider(height: 1, color: context.colors.border),
-
-            // ── Usuario + Logout ─────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  _Avatar(username: un),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          un,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        _RoleBadge(rol),
-                      ],
                     ),
                   ),
                   GestureDetector(
@@ -520,37 +572,35 @@ class _PanelItem extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
     child: Material(
-      color: active ? context.colors.primarySurface : Colors.transparent,
+      color: active ? AppColors.brand : Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
             children: [
               Container(
                 width: 2,
                 height: 16,
                 margin: const EdgeInsets.only(right: 10),
-                color: active ? context.colors.primary : Colors.transparent,
+                color: active
+                    ? Colors.black
+                    : context.colors.border.withValues(alpha: 0.8),
               ),
               Icon(
                 active ? module.activeIcon : module.icon,
                 size: 20,
-                color: active
-                    ? context.colors.primary
-                    : context.colors.textSecondary,
+                color: active ? Colors.black : context.colors.textTertiary,
               ),
               const SizedBox(width: 12),
               Text(
                 module.label,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                  color: active
-                      ? context.colors.primary
-                      : context.colors.textPrimary,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  color: active ? Colors.black : context.colors.textSecondary,
                 ),
               ),
             ],
@@ -559,6 +609,53 @@ class _PanelItem extends StatelessWidget {
       ),
     ),
   );
+}
+
+// ─── Botón de perfil en el header móvil ──────────────────────────────────────
+// Replica el menú de usuario del header web: acceso directo a /perfil.
+
+class _ProfileButton extends ConsumerWidget {
+  const _ProfileButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final username = ref.watch(authProvider).user?.username ?? '';
+    final color = AppColors.avatarColor(username);
+    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Tooltip(
+        message: 'Perfil',
+        child: GestureDetector(
+          key: const Key('header-profile-button'),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            context.go('/perfil');
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Widgets auxiliares ───────────────────────────────────────────────────────

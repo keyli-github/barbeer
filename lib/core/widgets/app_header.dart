@@ -71,10 +71,16 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const BarBeerWordmark(fontSize: 21),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: const BarBeerWordmark(fontSize: 21),
+                            ),
                             if (subtitle != null)
                               Text(
                                 subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -86,20 +92,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                         ),
                 ),
 
-                // ── Actions + Logo ──
+                // ── Actions ──
                 if (actions != null) ...actions!,
-                // Logo derecha — más grande y visible
-                if (!showBackButton)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Image.asset(
-                      'assets/images/barbeer_Log.png',
-                      height: 52,
-                      width: 52,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ),
               ],
             ),
           ),

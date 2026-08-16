@@ -14,6 +14,7 @@ class DesktopShell extends StatefulWidget {
   final ValueChanged<String> onNavigate;
   final VoidCallback onLogout;
   final Widget? headerAction;
+  final String? logoUrl;
 
   const DesktopShell({
     super.key,
@@ -24,6 +25,7 @@ class DesktopShell extends StatefulWidget {
     required this.onNavigate,
     required this.onLogout,
     this.headerAction,
+    this.logoUrl,
   });
 
   @override
@@ -56,6 +58,7 @@ class _DesktopShellState extends State<DesktopShell> {
               onToggle: () => setState(() => _collapsed = !_collapsed),
               onNavigate: widget.onNavigate,
               onLogout: widget.onLogout,
+              logoUrl: widget.logoUrl,
             ),
           ),
           VerticalDivider(width: 1, thickness: 1, color: context.colors.border),
@@ -118,6 +121,7 @@ class _Sidebar extends StatelessWidget {
   final VoidCallback onToggle;
   final ValueChanged<String> onNavigate;
   final VoidCallback onLogout;
+  final String? logoUrl;
 
   const _Sidebar({
     required this.collapsed,
@@ -127,6 +131,7 @@ class _Sidebar extends StatelessWidget {
     required this.onToggle,
     required this.onNavigate,
     required this.onLogout,
+    this.logoUrl,
   });
 
   @override
@@ -150,12 +155,25 @@ class _Sidebar extends StatelessWidget {
                     ? MainAxisAlignment.center
                     : MainAxisAlignment.start,
                 children: [
-                  Image.asset(
-                    'assets/images/barbeer_Log.png',
-                    width: 38,
-                    height: 38,
-                    fit: BoxFit.contain,
-                  ),
+                  logoUrl == null
+                      ? Image.asset(
+                          'assets/images/barbeer_Log.png',
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.contain,
+                        )
+                      : Image.network(
+                          logoUrl!,
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                            'assets/images/barbeer_Log.png',
+                            width: 38,
+                            height: 38,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                   if (!collapsed) ...[
                     const SizedBox(width: 10),
                     Expanded(

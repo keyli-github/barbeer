@@ -47,17 +47,21 @@ class VentaListItem extends StatelessWidget {
               // Header: código + estado + total
               Row(
                 children: [
-                  Text(
-                    venta.codigo,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
+                  Expanded(
+                    child: Text(
+                      venta.codigo,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   _EstadoBadge(venta: venta),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Text(
                     _fmtCurrency(venta.total),
                     style: const TextStyle(
@@ -71,21 +75,29 @@ class VentaListItem extends StatelessWidget {
               // Info: vendedora + fecha
               Row(
                 children: [
-                  if (venta.vendedoraUsername != null)
-                    Text(
-                      venta.vendedoraUsername!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: context.colors.textSecondary,
+                  if (venta.vendedoraUsername != null) ...[
+                    Flexible(
+                      child: Text(
+                        venta.vendedoraUsername!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: context.colors.textSecondary,
+                        ),
                       ),
                     ),
-                  if (venta.vendedoraUsername != null)
                     const SizedBox(width: 12),
-                  Text(
-                    _formatDate(venta.createdAt),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.colors.textTertiary,
+                  ],
+                  Flexible(
+                    child: Text(
+                      _formatDate(venta.createdAt),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: context.colors.textTertiary,
+                      ),
                     ),
                   ),
                 ],

@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -146,6 +147,13 @@ class CategoriasScreen extends ConsumerWidget {
                             '${categoria.productosCount} producto${categoria.productosCount == 1 ? '' : 's'}',
                             style: AppTextStyles.labelSmall,
                           ),
+                          if (categoria.descripcion?.isNotEmpty == true)
+                            Text(
+                              categoria.descripcion!,
+                              style: AppTextStyles.bodySmall,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                         ],
                       ),
                     ),
@@ -161,6 +169,8 @@ class CategoriasScreen extends ConsumerWidget {
                         onSelected: (value) {
                           if (value == 'edit') {
                             _showForm(context, ref, categoria: categoria);
+                          } else if (value == 'toggle') {
+                            _toggle(context, ref, categoria);
                           } else {
                             _delete(context, ref, categoria);
                           }
@@ -171,15 +181,15 @@ class CategoriasScreen extends ConsumerWidget {
                               value: 'edit',
                               child: Text('Editar'),
                             ),
-                          if (auth.hasPermission('categorias:eliminar') &&
-                              categoria.activo)
-                            const PopupMenuItem(
-                              value: 'delete',
+                          if (auth.hasPermission('categorias:editar'))
+                            PopupMenuItem(
+                              value: 'toggle',
                               child: Text(
-                                'Desactivar',
-                                style: TextStyle(color: AppColors.error),
+                                categoria.activo ? 'Desactivar' : 'Activar',
                               ),
                             ),
+                          // 'delete' (baja lógica) es idéntico a desactivar:
+                          // se omite para evitar la opción duplicada.
                         ],
                       ),
                   ],
@@ -279,17 +289,41 @@ class CategoriasScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _toggle(
+    BuildContext context,
+    WidgetRef ref,
+    Categoria categoria,
+  ) async {
+    try {
+      await ref
+          .read(categoriasProvider.notifier)
+          .save(
+            categoria: categoria,
+            nombre: categoria.nombre,
+            descripcion: categoria.descripcion ?? '',
+            activo: !categoria.activo,
+          );
+      if (context.mounted) {
+        _message(
+          context,
+          categoria.activo ? 'Categoria desactivada' : 'Categoria activada',
+        );
+      }
+    } catch (error) {
+      if (context.mounted) _message(context, error.toString(), error: true);
+    }
+  }
+
   String _date(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/'
       '${value.month.toString().padLeft(2, '0')}/${value.year}';
 
   void _message(BuildContext context, String text, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: error ? AppColors.error : null,
-      ),
-    );
+    if (error) {
+      AppFeedback.error(context, text);
+    } else {
+      AppFeedback.success(context, text);
+    }
   }
 }
 
@@ -300,36 +334,76 @@ class _CategoryFilters extends ConsumerWidget {
 
   const _CategoryFilters({required this.state});
 
+  static const _opciones = [
+    (null, 'Todas'),
+    (true, 'Activas'),
+    (false, 'Inactivas'),
+  ];
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) => ScrollConfiguration(
-    behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentValue = state.activo;
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: Row(
-        children: [
-          _FilterChip(
-            label: 'Todas',
-            selected: state.activo == null,
-            onTap: () =>
-                ref.read(categoriasProvider.notifier).filterActivo(null),
+      child: InputDecorator(
+        key: const ValueKey('categorias-estado-filter'),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
           ),
-          _FilterChip(
-            label: 'Activas',
-            selected: state.activo == true,
-            onTap: () =>
-                ref.read(categoriasProvider.notifier).filterActivo(true),
+          prefixIcon: Icon(
+            Icons.filter_alt_outlined,
+            size: 18,
+            color: context.colors.textTertiary,
           ),
-          _FilterChip(
-            label: 'Inactivas',
-            selected: state.activo == false,
-            onTap: () =>
-                ref.read(categoriasProvider.notifier).filterActivo(false),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 40,
+            minHeight: 0,
           ),
-        ],
+          filled: true,
+          fillColor: context.colors.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: BorderSide(color: context.colors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: BorderSide(color: context.colors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+          ),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<bool?>(
+            key: const ValueKey('categorias-estado-dropdown'),
+            value: currentValue,
+            isDense: true,
+            isExpanded: true,
+            borderRadius: BorderRadius.circular(12),
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: context.colors.textTertiary,
+            ),
+            style: TextStyle(fontSize: 14, color: context.colors.textPrimary),
+            items: _opciones
+                .map(
+                  (e) => DropdownMenuItem<bool?>(
+                    value: e.$1,
+                    child: Text(e.$2, style: const TextStyle(fontSize: 14)),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) =>
+                ref.read(categoriasProvider.notifier).filterActivo(v),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────
@@ -441,12 +515,7 @@ class _CategoriaFormState extends State<_CategoriaForm> {
       if (mounted) Navigator.pop(context);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error.toString()),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.error(context, error.toString());
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -455,48 +524,6 @@ class _CategoriaFormState extends State<_CategoriaForm> {
 }
 
 // ─── Widgets auxiliares ───────────────────────────────────────────────────────
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(right: 7),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.full),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? context.colors.primarySurface
-              : context.colors.backgroundAlt,
-          borderRadius: BorderRadius.circular(AppRadius.full),
-          border: Border.all(
-            color: selected
-                ? context.colors.primaryBorder
-                : context.colors.border,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.labelLarge.copyWith(
-            color: selected ? AppColors.primary : context.colors.textSecondary,
-          ),
-        ),
-      ),
-    ),
-  );
-}
 
 class _ActivePill extends StatelessWidget {
   final bool active;
