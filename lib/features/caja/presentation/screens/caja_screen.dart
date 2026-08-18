@@ -289,6 +289,17 @@ class _Actual extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = state.actual;
     if (session == null) {
+      // SUPERADMIN sin sede: mostrar sedes con cajas abiertas del historial
+      if (isSuperAdmin && !hasSedeScope) {
+        final openSessions = state.historial
+            .where((s) => s.estado == 'ABIERTA')
+            .toList();
+        return _SuperAdminNoSedeView(
+          openSessions: openSessions,
+          canOpen: canOpen,
+          onOpen: onOpen,
+        );
+      }
       return AppEmptyState(
         icon: Icons.lock_clock_outlined,
         title: 'No hay una caja abierta',
@@ -503,6 +514,8 @@ class _Actual extends StatelessWidget {
                 description: 'El turno aun no registra entradas ni salidas.',
               ),
             )
+          else if (MediaQuery.sizeOf(context).width >= 1024)
+            _MovementsDesktopTable(movements: state.movimientos)
           else
             for (final movement in state.movimientos)
               _MovementTile(movement: movement),
@@ -514,6 +527,161 @@ class _Actual extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shown to SUPERADMIN when no sede is selected — displays a grid of
+/// sedes that have an open caja session, matching the web's behavior.
+class _SuperAdminNoSedeView extends StatelessWidget {
+  final List<CajaSesion> openSessions;
+  final bool canOpen;
+  final VoidCallback onOpen;
+
+  const _SuperAdminNoSedeView({
+    required this.openSessions,
+    required this.canOpen,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Instruction
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.info.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 20,
+                color: AppColors.info,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Selecciona una sede en el encabezado para gestionar su caja.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Section heading
+        Text(
+          'Sedes con caja abierta',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: context.colors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (openSessions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.lock_rounded,
+                  size: 40,
+                  color: context.colors.textTertiary.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'No hay cajas abiertas',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Ninguna sede tiene un turno activo actualmente.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.sizeOf(context).width >= 1024 ? 3 : 1,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: openSessions.length,
+            itemBuilder: (context, i) {
+              final s = openSessions[i];
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: context.colors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.colors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            s.sede,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: context.colors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Saldo: S/ ${(s.saldoActual ?? 0).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.success,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 }
@@ -1408,6 +1576,111 @@ class _MovementTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Desktop DataTable for caja movements — matches web's table layout.
+class _MovementsDesktopTable extends StatelessWidget {
+  final List<CajaMovimiento> movements;
+  const _MovementsDesktopTable({required this.movements});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: MediaQuery.sizeOf(context).width - 400,
+          ),
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(
+              context.colors.backgroundAlt,
+            ),
+            columnSpacing: 16,
+            horizontalMargin: 16,
+            columns: const [
+              DataColumn(label: Text('Fecha')),
+              DataColumn(label: Text('Tipo')),
+              DataColumn(label: Text('Concepto')),
+              DataColumn(label: Text('Origen/Método')),
+              DataColumn(label: Text('Monto'), numeric: true),
+              DataColumn(label: Text('Usuario')),
+            ],
+            rows: movements.map((m) {
+              final incoming = m.tipo == 'ENTRADA';
+              final color = incoming ? AppColors.success : AppColors.error;
+              return DataRow(cells: [
+                DataCell(Text(
+                  _dateTime(m.createdAt),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    color: context.colors.textSecondary,
+                  ),
+                )),
+                DataCell(Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    m.tipo,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                )),
+                DataCell(Text(
+                  m.concepto,
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                )),
+                DataCell(Text(
+                  [
+                    if (m.medioPago?.isNotEmpty ?? false) m.medioPago!,
+                    if (m.etiqueta?.isNotEmpty ?? false) m.etiqueta!,
+                    if (m.origen.isNotEmpty) m.origen,
+                  ].join(' · '),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colors.textTertiary,
+                  ),
+                )),
+                DataCell(Text(
+                  '${incoming ? '+' : '-'} ${_money(m.monto)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                    color: color,
+                  ),
+                )),
+                DataCell(Text(
+                  m.usuario ?? '',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.colors.textSecondary,
+                  ),
+                )),
+              ]);
+            }).toList(),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _FilterRow extends StatelessWidget {

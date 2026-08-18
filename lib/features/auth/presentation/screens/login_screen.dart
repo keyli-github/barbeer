@@ -10,9 +10,9 @@ import '../providers/auth_provider.dart';
 
 /// Superficie del panel del login: siempre oscura, igual en web y app,
 /// sin importar el tema del sistema (evita que "se ponga blanco").
-const Color _loginPanel = Color(0xFF0B0A08);
+const Color _loginPanel = Color(0xFF000000);
 const Color _loginInputFill = Color(0xFF171512);
-const Color _loginInputBorder = Color(0xFF2B2A26);
+const Color _loginInputBorder = Color(0x33F97316);
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -125,7 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       child: Container(
                         key: const Key('login-desktop-panel'),
                         height: pageHeight,
-                        color: const Color(0xFF0B0A08),
+                        color: Colors.black,
                         child: SingleChildScrollView(
                           key: const Key('login-desktop-scroll-view'),
                           padding: const EdgeInsets.symmetric(
@@ -370,7 +370,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               _showPass
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
-              color: Colors.white.withValues(alpha: 0.45),
+              color: AppColors.brand.withValues(alpha: 0.60),
               size: 20,
             ),
           ),
@@ -395,30 +395,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         SizedBox(
           width: double.infinity,
           height: desktop ? 54 : 50,
-          child: ElevatedButton(
-            onPressed: _loading ? null : _login,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.brand,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.brand.withValues(alpha: 0.6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF97316), Color(0xFFF59E0B)],
               ),
-              elevation: 0,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _login,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Ingresar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
                     ),
-                  )
-                : const Text(
-                    'Ingresar',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
+            ),
           ),
         ),
         SizedBox(height: desktop ? 20 : 10),
@@ -456,7 +469,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           )
         else
           Text(
-            'BarBeer © 2026',
+            'Yacare © 2026',
             style: TextStyle(
               fontSize: 11,
               color: Colors.white.withValues(alpha: 0.32),
@@ -484,7 +497,7 @@ class _LoginHero extends StatelessWidget {
         Positioned.fill(
           child: coverUrl == null
               ? Image.asset(
-                  'assets/images/bebb1.webp',
+                  'assets/images/login.webp',
                   fit: BoxFit.cover,
                   alignment: desktop ? Alignment.center : Alignment.topCenter,
                 )
@@ -493,7 +506,7 @@ class _LoginHero extends StatelessWidget {
                   fit: BoxFit.cover,
                   alignment: desktop ? Alignment.center : Alignment.topCenter,
                   errorBuilder: (_, __, ___) => Image.asset(
-                    'assets/images/bebb1.webp',
+                    'assets/images/login.webp',
                     fit: BoxFit.cover,
                     alignment: desktop ? Alignment.center : Alignment.topCenter,
                   ),
@@ -533,7 +546,7 @@ class _LoginHero extends StatelessWidget {
   Widget _desktopContent({required bool compact}) => Column(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
-      const Center(child: BarBeerWordmark(fontSize: 30, beerColor: Colors.white)),
+      const Center(child: BarBeerWordmark(fontSize: 30)),
       const Spacer(),
       const Text(
         'SISTEMA INTERNO',
@@ -546,21 +559,29 @@ class _LoginHero extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 10),
-      const Text(
-        'Sistema interno\nde gestión',
+      RichText(
         textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 42,
-          height: 1.05,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
-          letterSpacing: -1,
+        text: const TextSpan(
+          style: TextStyle(
+            fontSize: 42,
+            height: 1.05,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -1,
+          ),
+          children: [
+            TextSpan(text: 'Sistema interno\nde '),
+            TextSpan(
+              text: 'gestión',
+              style: TextStyle(color: AppColors.brand),
+            ),
+          ],
         ),
       ),
       const SizedBox(height: 14),
       const Text(
         'Accede de forma segura a la plataforma\n'
-        'de administración de BarBeer.',
+        'de administración de Yacare.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 14, color: Color(0xE6FFFFFF), height: 1.5),
       ),
@@ -590,7 +611,7 @@ class _LoginHero extends StatelessWidget {
       const Spacer(),
       const Center(
         child: Text(
-          '© 2026 BarBeer ERP. Todos los derechos reservados.',
+          '© 2026 Yacare ERP. Todos los derechos reservados.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
         ),
@@ -602,11 +623,11 @@ class _LoginHero extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Center(child: BarBeerWordmark(fontSize: 28, beerColor: Colors.white)),
+      Center(child: BarBeerWordmark(fontSize: 28)),
       SizedBox(height: 8),
       Text(
         'Accede de forma segura a la plataforma\n'
-        'de administración de BarBeer.',
+        'de administración de Yacare.',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 12.5,
@@ -643,35 +664,24 @@ class _LoginLogo extends StatelessWidget {
   final String? url;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
     key: const Key('login-logo-circle'),
     width: 64,
     height: 64,
-    decoration: BoxDecoration(
-      color: _loginInputFill,
-      shape: BoxShape.circle,
-      border: Border.all(
-        color: Colors.white.withValues(alpha: 0.15),
-        width: 2,
-      ),
-    ),
-    clipBehavior: Clip.antiAlias,
-    padding: const EdgeInsets.all(10),
-    alignment: Alignment.center,
     child: url == null
         ? Image.asset(
-            'assets/images/barbeer_Log.png',
+            'assets/images/yacare.png',
             fit: BoxFit.contain,
-            semanticLabel: 'Logo de BarBeer',
+            semanticLabel: 'Logo de Yacare',
           )
         : Image.network(
             url!,
             fit: BoxFit.contain,
-            semanticLabel: 'Logo de BarBeer',
+            semanticLabel: 'Logo de Yacare',
             errorBuilder: (_, __, ___) => Image.asset(
-              'assets/images/barbeer_Log.png',
+              'assets/images/yacare.png',
               fit: BoxFit.contain,
-              semanticLabel: 'Logo de BarBeer',
+              semanticLabel: 'Logo de Yacare',
             ),
           ),
   );
@@ -687,24 +697,24 @@ class _BrandingLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) => url == null
       ? Image.asset(
-          'assets/images/barbeer_Log.png',
+          'assets/images/yacare.png',
           width: width,
           height: height,
           fit: BoxFit.contain,
-          semanticLabel: 'Logo de BarBeer',
+          semanticLabel: 'Logo de Yacare',
         )
       : Image.network(
           url!,
           width: width,
           height: height,
           fit: BoxFit.contain,
-          semanticLabel: 'Logo de BarBeer',
+          semanticLabel: 'Logo de Yacare',
           errorBuilder: (_, __, ___) => Image.asset(
-            'assets/images/barbeer_Log.png',
+            'assets/images/yacare.png',
             width: width,
             height: height,
             fit: BoxFit.contain,
-            semanticLabel: 'Logo de BarBeer',
+            semanticLabel: 'Logo de Yacare',
           ),
         );
 }
@@ -808,12 +818,12 @@ class _LoginField extends StatelessWidget {
       hintText: hint,
       hintStyle: const TextStyle(
         fontSize: 15,
-        color: Color(0x66FFFFFF),
+        color: Color(0x66F9A03F),
         fontWeight: FontWeight.w400,
       ),
       prefixIcon: Icon(
         icon,
-        color: Colors.white.withValues(alpha: 0.45),
+        color: AppColors.brand.withValues(alpha: 0.70),
         size: 20,
       ),
       suffixIcon: trailing,

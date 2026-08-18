@@ -70,6 +70,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               child: _Greeting(auth: auth),
             ),
             const SizedBox(height: 14),
+            // ── Mi Asistencia (non-SUPERADMIN, desktop) ──
+            if (auth.user != null &&
+                auth.user!.nivel < 100 &&
+                !auth.user!.isSuperAdmin)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                child: _MyAttendanceCard(auth: auth),
+              ),
             if (data.cajaConDiferencia != null &&
                 auth.hasPermission('caja:leer'))
               Padding(
@@ -198,6 +206,86 @@ class _Greeting extends StatelessWidget {
           style: TextStyle(fontSize: 14, color: context.colors.textTertiary),
         ),
       ],
+    );
+  }
+}
+
+/// "Mi Asistencia" card — shown to non-admin employees (nivel < 100).
+/// Matches the web dashboard's attendance section that lets employees
+/// see their attendance status and navigate to mark attendance.
+class _MyAttendanceCard extends ConsumerWidget {
+  final AuthState auth;
+  const _MyAttendanceCard({required this.auth});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.brand.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.badge_rounded,
+                  color: AppColors.brand,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mi Asistencia',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Registra tu asistencia del día',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => GoRouter.of(context).go('/asistencia'),
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+              label: const Text('Marcar Asistencia'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

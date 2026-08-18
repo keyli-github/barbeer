@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import '../routes/route_paths.dart';
 
 enum AppDestinationSection {
-  operations('OPERACIONES'),
-  inventory('INVENTARIO'),
-  staff('PERSONAL'),
-  administration('ADMINISTRACION');
+  operations('OPERACIONES', Icons.bar_chart_rounded),
+  inventory('INVENTARIO', Icons.inventory_2_rounded),
+  staff('PERSONAL', Icons.assignment_outlined),
+  administration('ADMINISTRACION', Icons.settings_rounded);
 
   final String label;
-  const AppDestinationSection(this.label);
+  final IconData icon;
+  const AppDestinationSection(this.label, this.icon);
 }
 
 class AppDestination {

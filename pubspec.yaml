@@ -45,8 +45,8 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/images/barbeer_launcher.png"
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/barbeer_launcher.png"
+  image_path: "assets/images/yacare.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/images/yacare.png"
   adaptive_icon_foreground_inset: 16
   remove_alpha_ios: true

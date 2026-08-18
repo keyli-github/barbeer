@@ -403,13 +403,13 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                 description: 'No hay usuarios registrados',
               )
             else ...[
-              for (final user in filteredUsers)
-                _UserTile(
-                  user: user,
+              if (MediaQuery.sizeOf(context).width >= 1024)
+                _UsersDesktopTable(
+                  users: filteredUsers,
                   auth: auth,
-                  onTap: () =>
+                  onTap: (user) =>
                       _showDetail(context, ref, user['id'] as String),
-                  onEdit: () => _showEditModal(
+                  onEdit: (user) => _showEditModal(
                     context,
                     ref,
                     user,
@@ -417,16 +417,41 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                     availableRoles,
                     activeSedes,
                   ),
-                  onDeactivate: () => _deactivate(context, ref, user),
-                  onReactivate: () => ref
+                  onDeactivate: (user) => _deactivate(context, ref, user),
+                  onReactivate: (user) => ref
                       .read(usuariosProvider.notifier)
                       .reactivateUser(user['id'] as String),
-                  onResetPassword: () => _resetPassword(
+                  onResetPassword: (user) => _resetPassword(
                     context,
                     ref,
                     user['id'] as String,
                   ),
-                ),
+                )
+              else
+                for (final user in filteredUsers)
+                  _UserTile(
+                    user: user,
+                    auth: auth,
+                    onTap: () =>
+                        _showDetail(context, ref, user['id'] as String),
+                    onEdit: () => _showEditModal(
+                      context,
+                      ref,
+                      user,
+                      state,
+                      availableRoles,
+                      activeSedes,
+                    ),
+                    onDeactivate: () => _deactivate(context, ref, user),
+                    onReactivate: () => ref
+                        .read(usuariosProvider.notifier)
+                        .reactivateUser(user['id'] as String),
+                    onResetPassword: () => _resetPassword(
+                      context,
+                      ref,
+                      user['id'] as String,
+                    ),
+                  ),
               AppPagination(
                 page: state.page,
                 totalPages: state.totalPages,
@@ -601,6 +626,238 @@ class _FilterDropdown<T> extends StatelessWidget {
     items: items,
     onChanged: onChanged,
   );
+}
+
+/// Desktop DataTable for users — matches web's table layout with columns:
+/// Cuenta, Rol, Sede, Estado, Alta, Acciones
+class _UsersDesktopTable extends StatelessWidget {
+  final List<Map<String, dynamic>> users;
+  final AuthState auth;
+  final ValueChanged<Map<String, dynamic>> onTap;
+  final ValueChanged<Map<String, dynamic>> onEdit;
+  final ValueChanged<Map<String, dynamic>> onDeactivate;
+  final ValueChanged<Map<String, dynamic>> onReactivate;
+  final ValueChanged<Map<String, dynamic>> onResetPassword;
+
+  const _UsersDesktopTable({
+    required this.users,
+    required this.auth,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDeactivate,
+    required this.onReactivate,
+    required this.onResetPassword,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canEdit = auth.hasPermission('usuarios:editar');
+    final canDelete = auth.hasPermission('usuarios:eliminar');
+    final canReset = auth.hasPermission('usuarios:resetear-password');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: MediaQuery.sizeOf(context).width - 400,
+            ),
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(
+                context.colors.backgroundAlt,
+              ),
+              columnSpacing: 20,
+              horizontalMargin: 16,
+              columns: const [
+                DataColumn(label: Text('Cuenta')),
+                DataColumn(label: Text('Rol')),
+                DataColumn(label: Text('Sede')),
+                DataColumn(label: Text('Estado')),
+                DataColumn(label: Text('Alta')),
+                DataColumn(label: Text('Acciones')),
+              ],
+              rows: users.map((user) {
+                final role = user['rol'] is Map
+                    ? user['rol'] as Map
+                    : const {};
+                final sede = user['sede'] is Map
+                    ? user['sede'] as Map
+                    : const {};
+                final username = user['username'] as String? ?? '';
+                final roleName = role['nombre'] as String? ?? '';
+                final sedeName = sede['nombre'] as String? ?? '—';
+                final activo = user['activo'] == true;
+                final createdAt = user['createdAt'] as String? ?? '';
+                final roleColor = AppColors.roleColor(roleName);
+                final avatarColor = AppColors.avatarColor(username);
+                final isSuperadmin = roleName.toUpperCase() == 'SUPERADMIN';
+
+                return DataRow(
+                  cells: [
+                    // Cuenta (avatar + username)
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: avatarColor.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              username.isNotEmpty
+                                  ? username[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: avatarColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '@$username',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      onTap: () => onTap(user),
+                    ),
+                    // Rol
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: roleColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        roleName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: roleColor,
+                        ),
+                      ),
+                    )),
+                    // Sede
+                    DataCell(Text(
+                      sedeName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: context.colors.textSecondary,
+                      ),
+                    )),
+                    // Estado
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: activo
+                            ? AppColors.success.withValues(alpha: 0.1)
+                            : AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        activo ? 'Activo' : 'Inactivo',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: activo ? AppColors.success : AppColors.error,
+                        ),
+                      ),
+                    )),
+                    // Alta (createdAt)
+                    DataCell(Text(
+                      _formatDate(createdAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textTertiary,
+                      ),
+                    )),
+                    // Acciones
+                    DataCell(Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.visibility_outlined, size: 18),
+                          tooltip: 'Detalle',
+                          onPressed: () => onTap(user),
+                          color: context.colors.textSecondary,
+                        ),
+                        if (canEdit)
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            tooltip: 'Editar',
+                            onPressed: () => onEdit(user),
+                            color: context.colors.textSecondary,
+                          ),
+                        if (canReset)
+                          IconButton(
+                            icon: const Icon(Icons.key_outlined, size: 18),
+                            tooltip: 'Reset contraseña',
+                            onPressed: () => onResetPassword(user),
+                            color: context.colors.textSecondary,
+                          ),
+                        if (canDelete && activo && !isSuperadmin)
+                          IconButton(
+                            icon: const Icon(
+                              Icons.person_off_outlined,
+                              size: 18,
+                            ),
+                            tooltip: 'Desactivar',
+                            onPressed: () => onDeactivate(user),
+                            color: AppColors.error,
+                          ),
+                        if (canEdit && !activo)
+                          IconButton(
+                            icon: const Icon(
+                              Icons.person_add_outlined,
+                              size: 18,
+                            ),
+                            tooltip: 'Reactivar',
+                            onPressed: () => onReactivate(user),
+                            color: AppColors.success,
+                          ),
+                      ],
+                    )),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(String iso) {
+    if (iso.isEmpty) return '—';
+    try {
+      final date = DateTime.parse(iso);
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
 }
 
 class _UserTile extends StatelessWidget {

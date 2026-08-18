@@ -326,6 +326,7 @@ class _SearchBarState extends State<_SearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -349,7 +350,7 @@ class _SearchBarState extends State<_SearchBar> {
             ),
           ),
           const SizedBox(height: 8),
-          // ─ Filtros en fila: Estado + Categoría
+          // ─ Filtros: Estado dropdown + Categoría (chips on desktop, dropdown on mobile)
           Row(
             children: [
               // Estado
@@ -367,22 +368,46 @@ class _SearchBarState extends State<_SearchBar> {
                   onChanged: widget.onEstado,
                 ),
               ),
-              const SizedBox(width: 8),
-              // Categoría
-              Expanded(
-                child: _FilterDropdown<String>(
-                  key: const ValueKey('inv-cat-drop'),
-                  value: widget.categoriaFilter,
-                  label: 'Categoría',
-                  items: [
-                    ('', 'Todas'),
-                    for (final c in widget.cats) (c.id, c.nombre),
-                  ],
-                  onChanged: widget.onCategoria,
+              if (!desktop) ...[
+                const SizedBox(width: 8),
+                // Categoría dropdown (mobile only)
+                Expanded(
+                  child: _FilterDropdown<String>(
+                    key: const ValueKey('inv-cat-drop'),
+                    value: widget.categoriaFilter,
+                    label: 'Categoría',
+                    items: [
+                      ('', 'Todas'),
+                      for (final c in widget.cats) (c.id, c.nombre),
+                    ],
+                    onChanged: widget.onCategoria,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
+          // ─ Category chips (desktop only — matches web horizontal tab style)
+          if (desktop && widget.cats.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _CatChip(
+                    label: 'Todos',
+                    selected: widget.categoriaFilter.isEmpty,
+                    onTap: () => widget.onCategoria(''),
+                  ),
+                  for (final c in widget.cats)
+                    _CatChip(
+                      label: c.nombre,
+                      selected: widget.categoriaFilter == c.id,
+                      onTap: () => widget.onCategoria(c.id),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -453,6 +478,50 @@ class _FilterDropdown<T extends Object> extends StatelessWidget {
         onChanged: (v) {
           if (v != null) onChanged(v);
         },
+      ),
+    ),
+  );
+}
+
+/// Horizontal category chip for desktop inventory filter (matches web).
+class _CatChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CatChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? context.colors.primarySurface
+              : context.colors.backgroundAlt,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? context.colors.primaryBorder
+                : context.colors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? AppColors.brand : context.colors.textSecondary,
+          ),
+        ),
       ),
     ),
   );

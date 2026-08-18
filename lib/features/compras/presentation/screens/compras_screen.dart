@@ -36,6 +36,7 @@ class _OrdenesState {
   final String? error;
   final int page, totalPages, total;
   final String estadoFilter;
+  final String search;
 
   const _OrdenesState({
     this.items = const [],
@@ -46,6 +47,7 @@ class _OrdenesState {
     this.totalPages = 1,
     this.total = 0,
     this.estadoFilter = '',
+    this.search = '',
   });
 
   _OrdenesState copyWith({
@@ -58,6 +60,7 @@ class _OrdenesState {
     int? totalPages,
     int? total,
     String? estadoFilter,
+    String? search,
   }) => _OrdenesState(
     items: items ?? this.items,
     resumen: resumen ?? this.resumen,
@@ -67,12 +70,14 @@ class _OrdenesState {
     totalPages: totalPages ?? this.totalPages,
     total: total ?? this.total,
     estadoFilter: estadoFilter ?? this.estadoFilter,
+    search: search ?? this.search,
   );
 }
 
 class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
   final ComprasRepository _repo;
   final String? _sedeId;
+  Timer? _searchDebounce;
 
   _OrdenesNotifier(this._repo, this._sedeId) : super(const _OrdenesState()) {
     load();
@@ -86,6 +91,7 @@ class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
         _repo.listCompras(
           pagina: p,
           estado: state.estadoFilter.isEmpty ? null : state.estadoFilter,
+          q: state.search.isEmpty ? null : state.search,
           sedeId: _sedeId,
         ),
         _repo.resumen(
@@ -108,6 +114,15 @@ class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
     }
   }
 
+  void setSearch(String s) {
+    state = state.copyWith(search: s);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => load(resetPage: true),
+    );
+  }
+
   void setEstado(String v) {
     state = state.copyWith(estadoFilter: v);
     load(resetPage: true);
@@ -121,6 +136,12 @@ class _OrdenesNotifier extends StateNotifier<_OrdenesState> {
   Future<void> cambiarEstado(String id, String estado) async {
     await _repo.cambiarEstado(id, estado);
     await load();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 }
 
@@ -365,13 +386,26 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
 
 // ─── Órdenes Tab ──────────────────────────────────────────────────────────────
 
-class _OrdenesTab extends ConsumerWidget {
+class _OrdenesTab extends ConsumerStatefulWidget {
   final bool canEdit;
   final ValueChanged<String> onDetail;
   const _OrdenesTab({required this.canEdit, required this.onDetail});
 
+  @override
+  ConsumerState<_OrdenesTab> createState() => _OrdenesTabState();
+}
+
+class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
 @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(_ordenesProvider);
     final notifier = ref.read(_ordenesProvider.notifier);
 
@@ -381,6 +415,41 @@ class _OrdenesTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
+          // ─── Search field (matches web) ───────────────────
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: notifier.setSearch,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Buscar por orden o proveedor...',
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: context.colors.textTertiary,
+                  size: 20,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                filled: true,
+                fillColor: context.colors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide(color: context.colors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide(color: context.colors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
           if (state.resumen != null && !state.loading)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -476,7 +545,7 @@ class _OrdenesTab extends ConsumerWidget {
             for (final compra in state.items)
               _OrdenTile(
                 compra: compra,
-                onTap: () => onDetail(compra.id),
+                onTap: () => widget.onDetail(compra.id),
               ),
             AppPagination(
               page: state.page,

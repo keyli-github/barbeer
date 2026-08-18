@@ -2,7 +2,7 @@ class ApiConstants {
   ApiConstants._();
   static const String localBaseUrl = 'http://127.0.0.1:3001/api';
   static const String productionBaseUrl =
-      'https://hia-server.tail99b0ec.ts.net/backend-bar/api';
+      'https://api-production-79856.up.railway.app/api';
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURACIÓN DE URL
