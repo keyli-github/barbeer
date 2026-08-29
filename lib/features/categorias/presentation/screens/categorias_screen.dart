@@ -124,6 +124,8 @@ class CategoriasScreen extends ConsumerWidget {
                       Text(
                         categoria.nombre,
                         style: AppTextStyles.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         '${categoria.productosCount} producto${categoria.productosCount == 1 ? '' : 's'}',

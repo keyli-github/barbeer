@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/errors/app_exception.dart';
-import '../../../../core/navigation/app_destinations.dart';
+import '../../../../core/navigation/route_access_policy.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../data/models/auth_models.dart';
@@ -50,9 +50,23 @@ class AuthState {
   bool get isMustChangePassword => status == AuthStatus.mustChangePassword;
   List<String> get permisos => user?.permisos ?? [];
   bool hasPermission(String p) => user?.hasPermission(p) ?? false;
-  bool canAccess(String path) {
-    final destination = appDestinationForPath(path);
-    return destination == null || destination.canAccess(hasPermission);
+  bool canAccess(String path) => RouteAccessPolicy.canAccess(
+    path,
+    role: user?.rol ?? '',
+    permissions: permisos,
+  );
+  bool canPerform(RouteAccessRule rule) =>
+      rule.allows(role: user?.rol ?? '', permissions: permisos);
+}
+
+Future<AuthState> preserveAuthorizationRefresh(
+  AuthState previous,
+  Future<AuthState> Function() refresh,
+) async {
+  try {
+    return await refresh();
+  } catch (_) {
+    return previous;
   }
 }
 
@@ -178,6 +192,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logoutAll() async {
     await _repo.logoutAll();
     state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  Future<void> refreshAuthorizationAfterForbidden() async {
+    final previous = state;
+    if (!previous.isAuthenticated) return;
+    state = await preserveAuthorizationRefresh(previous, () async {
+      final auth = await _repo.refreshToken();
+      if (auth == null) return previous;
+      final payload = AuthRepository.decodeJwt(auth.accessToken);
+      final permissions = (payload?['permisos'] as List?)?.cast<String>() ?? [];
+      final profile = await _repo.getProfile();
+      return AuthState(
+        status: AuthStatus.authenticated,
+        user: _merge(profile, permissions),
+      );
+    });
   }
 
   Future<void> changePassword({

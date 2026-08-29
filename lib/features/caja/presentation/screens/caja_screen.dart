@@ -779,6 +779,8 @@ class _Historial extends StatelessWidget {
                         style: AppTextStyles.labelLarge.copyWith(
                           color: context.colors.textPrimary,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ],
                   ),
@@ -1543,9 +1545,14 @@ class _MovementTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${incoming ? '+' : '-'} ${_money(movement.monto)}',
-                  style: AppTextStyles.labelLarge.copyWith(color: color),
+                Flexible(
+                  child: Text(
+                    '${incoming ? '+' : '-'} ${_money(movement.monto)}',
+                    style: AppTextStyles.labelLarge.copyWith(color: color),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    textAlign: TextAlign.right,
+                  ),
                 ),
               ],
             ),

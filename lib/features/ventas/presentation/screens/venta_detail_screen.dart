@@ -310,12 +310,18 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                                 ],
                               ),
                             ),
-                            Text(
-                              FormatUtils.currency(item.subtotal),
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: context.colors.textPrimary,
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                FormatUtils.currency(item.subtotal),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.colors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                textAlign: TextAlign.right,
                               ),
                             ),
                           ],
@@ -352,7 +358,15 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Subtotal'),
-                          Text(FormatUtils.currency(_venta.subtotalSinRecargo)),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              FormatUtils.currency(_venta.subtotalSinRecargo),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -367,13 +381,19 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                           color: AppColors.primary,
                         ),
                       ),
-                      Text(
-                        FormatUtils.currency(_venta.total),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                          letterSpacing: -0.5,
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          FormatUtils.currency(_venta.total),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                            letterSpacing: -0.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          textAlign: TextAlign.right,
                         ),
                       ),
                     ],

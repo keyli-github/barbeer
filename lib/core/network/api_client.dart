@@ -172,7 +172,7 @@ class ApiClient {
           );
         }
       }
-      throw _mapError(e);
+      throw mapDioException(e);
     }
   }
 
@@ -221,61 +221,40 @@ class ApiClient {
     await SecureStorageService.instance.clearSession();
     _onSessionExpired?.call();
   }
+}
 
-  AppException _mapError(DioException e) {
-    // Sin red o timeout de conexión
-    if (e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout ||
-        e.type == DioExceptionType.sendTimeout) {
-      return const NetworkException();
-    }
-    // Sin respuesta del servidor
-    final resp = e.response;
-    if (resp == null) return const NetworkException();
-
-    final msg = _extractMessage(resp.data);
-    final code = resp.statusCode ?? 0;
-
-    switch (code) {
-      case 400:
-        return ValidationException(message: msg);
-      case 401:
-        // Para el endpoint de login, el 401 trae "Credenciales incorrectas"
-        // Para otros endpoints, es sesión expirada
-        if (msg.isNotEmpty &&
-            msg != 'Ocurrio un error inesperado' &&
-            !msg.toLowerCase().contains('sesion') &&
-            !msg.toLowerCase().contains('session')) {
-          return AppException(message: msg, statusCode: 401);
-        }
-        return const SessionExpiredException();
-      case 403:
-        return UnauthorizedException(message: msg);
-      case 404:
-        return NotFoundException(message: msg);
-      case 409:
-        return ConflictException(message: msg);
-      case 422:
-        return ValidationException(message: msg);
-      case 429:
-        return const AppException(
-          message: 'Demasiados intentos. Espera un momento.',
-          statusCode: 429,
-        );
-      case 423:
-        return AppException(message: msg, statusCode: 423); // cuenta bloqueada
-      default:
-        return AppException(message: msg, statusCode: code);
-    }
+AppException mapDioException(DioException error) {
+  if (error.type == DioExceptionType.connectionError ||
+      error.type == DioExceptionType.connectionTimeout ||
+      error.type == DioExceptionType.receiveTimeout ||
+      error.type == DioExceptionType.sendTimeout) {
+    return const NetworkException();
   }
 
-  String _extractMessage(dynamic d) {
-    if (d is Map) {
-      final m = d['message'];
-      if (m is String) return m;
-      if (m is List) return m.join(', ');
-    }
-    return 'Ocurrio un error inesperado';
-  }
+  final response = error.response;
+  if (response == null) return const NetworkException();
+
+  final body = response.data is Map
+      ? Map<String, dynamic>.from(response.data as Map)
+      : const <String, dynamic>{};
+  final rawMessage = body['message'];
+  final details = rawMessage is List
+      ? rawMessage.whereType<String>().toList(growable: false)
+      : const <String>[];
+  final fallback = body['error'];
+  final message = switch (rawMessage) {
+    String value when value.isNotEmpty => value,
+    List _ when details.isNotEmpty => details.first,
+    _ when fallback is String && fallback.isNotEmpty => fallback,
+    _ => 'Ocurrio un error inesperado',
+  };
+
+  return AppException(
+    message: message,
+    statusCode:
+        (body['statusCode'] as num?)?.toInt() ?? response.statusCode ?? 0,
+    path: body['path'] as String? ?? error.requestOptions.path,
+    code: body['code'] as String?,
+    details: details,
+  );
 }

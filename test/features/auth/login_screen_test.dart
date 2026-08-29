@@ -18,30 +18,13 @@ void main() {
   testWidgets('renders without overflow on a compact phone', (tester) async {
     await pumpLogin(tester, const Size(320, 568));
 
-    expect(find.text('BarBeer', findRichText: true), findsOneWidget);
-    expect(find.byKey(const Key('login-hero')), findsOneWidget);
-    expect(
-      find.image(const AssetImage('assets/images/bebb1.webp')),
-      findsOneWidget,
-    );
-    expect(
-      find.image(const AssetImage('assets/images/barbeer_Log.png')),
-      findsOneWidget,
-    );
-    final panel = tester.widget<Container>(
-      find.byKey(const Key('login-panel')),
-    );
-    final panelDecoration = panel.decoration as BoxDecoration;
-    expect(panelDecoration.color, const Color(0xFF0B0A08));
-    expect((panelDecoration.borderRadius! as BorderRadius).topLeft.x, 28);
-    expect((panelDecoration.borderRadius! as BorderRadius).topRight.x, 28);
-    final logoCircle = tester.widget<Container>(
-      find.byKey(const Key('login-logo-circle')),
-    );
-    expect((logoCircle.decoration as BoxDecoration).color, const Color(0xFF171512));
+    expect(find.text('Yacare'), findsOneWidget);
     expect(find.text('Iniciar sesión'), findsOneWidget);
-    expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
-    expect(find.byKey(const Key('login-scroll-view')), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Usuario'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Contraseña'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Ingresar'), findsOneWidget);
+    expect(find.textContaining('¿Olvidaste tu contraseña?'), findsOneWidget);
+    expect(find.text('SOLO PERSONAL AUTORIZADO'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -50,29 +33,28 @@ void main() {
   ) async {
     await pumpLogin(tester, const Size(1280, 800));
 
-    expect(find.byKey(const Key('login-desktop-composition')), findsOneWidget);
-    expect(tester.getSize(find.byKey(const Key('login-hero'))).width, 640);
-    expect(
-      tester.getSize(find.byKey(const Key('login-desktop-panel'))).width,
-      640,
-    );
-    expect(find.byKey(const Key('login-panel')), findsNothing);
-    expect(find.text('Sistema interno\nde gestión'), findsOneWidget);
+    expect(find.text('Yacare'), findsOneWidget);
+    expect(find.text('SISTEMA INTERNO'), findsOneWidget);
     expect(find.text('SOLO PERSONAL AUTORIZADO'), findsOneWidget);
     expect(find.text('Caja y reportes'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Ingresar'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('extends the dark panel to the bottom of the viewport', (
+  testWidgets('keeps the complete login action accessible on a tall phone', (
     tester,
   ) async {
     await pumpLogin(tester, const Size(390, 844));
 
-    expect(tester.getBottomRight(find.byKey(const Key('login-panel'))).dy, 844);
-    final panel = tester.widget<Container>(
-      find.byKey(const Key('login-panel')),
+    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Ingresar'), findsOneWidget);
+    expect(find.text('SOLO PERSONAL AUTORIZADO'), findsOneWidget);
+    await tester.ensureVisible(find.text('SOLO PERSONAL AUTORIZADO'));
+    await tester.pump();
+    expect(
+      tester.getBottomRight(find.text('SOLO PERSONAL AUTORIZADO')).dy,
+      lessThanOrEqualTo(844),
     );
-    expect((panel.margin as EdgeInsets).bottom, 24);
     expect(tester.takeException(), isNull);
   });
 

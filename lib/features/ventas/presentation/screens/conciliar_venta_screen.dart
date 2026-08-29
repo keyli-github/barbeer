@@ -510,15 +510,19 @@ class _MethodChip extends StatelessWidget {
                     : context.colors.textSecondary,
           ),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: !enabled
-                  ? context.colors.textSecondary.withValues(alpha: 0.4)
-                  : selected
-                      ? AppColors.primary
-                      : context.colors.textSecondary,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: !enabled
+                    ? context.colors.textSecondary.withValues(alpha: 0.4)
+                    : selected
+                        ? AppColors.primary
+                        : context.colors.textSecondary,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
         ],

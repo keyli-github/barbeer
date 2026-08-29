@@ -217,12 +217,14 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           color: met ? AppColors.success : context.colors.textTertiary,
         ),
         const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12,
-            color: met ? AppColors.success : context.colors.textSecondary,
-            fontWeight: met ? FontWeight.w600 : FontWeight.w400,
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: met ? AppColors.success : context.colors.textSecondary,
+              fontWeight: met ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
         ),
       ],

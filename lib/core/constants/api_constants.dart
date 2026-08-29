@@ -13,9 +13,7 @@ class ApiConstants {
   //   3. Usa esta URL:
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: bool.fromEnvironment('dart.vm.product')
-        ? productionBaseUrl
-        : localBaseUrl,
+    defaultValue: productionBaseUrl,
   );
   //
   // OPCIÓN B — WiFi (ambos en la misma red):

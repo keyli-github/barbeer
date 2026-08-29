@@ -312,11 +312,9 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: desktop
-                        ? (MediaQuery.sizeOf(context).width / 230)
-                              .floor()
-                              .clamp(3, 6)
-                        : 2,
+                    crossAxisCount: ((MediaQuery.sizeOf(context).width - 2 * AppSpacing.md) / 180)
+                        .floor()
+                        .clamp(1, 6),
                     childAspectRatio: desktop ? 0.68 : 0.56,
                     crossAxisSpacing: AppSpacing.sm,
                     mainAxisSpacing: AppSpacing.sm,
@@ -750,37 +748,45 @@ class _ProductsTable extends StatelessWidget {
                 cells: [
                   // Producto (image + nombre + código)
                   DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        DSProductImageSquare(
-                          imageUrl: p.imagenUrl,
-                          size: 36,
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p.nombre,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DSProductImageSquare(
+                            imageUrl: p.imagenUrl,
+                            size: 36,
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.nombre,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  p.codigo,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.colors.textTertiary,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            Text(
-                              p.codigo,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: context.colors.textTertiary,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   // Categoría

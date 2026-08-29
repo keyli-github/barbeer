@@ -31,7 +31,12 @@ class ShellScreen extends ConsumerWidget {
 
   /// Módulos visibles para este usuario según permisos
   List<AppDestination> _visibleModules(AuthState auth) => appDestinations
-      .where((destination) => destination.canAccess(auth.hasPermission))
+      .where(
+        (destination) => destination.canAccess(
+          auth.hasPermission,
+          role: auth.user?.rol ?? '',
+        ),
+      )
       .toList();
 
   /// Subtítulo que se muestra debajo de BarBeer según la ruta activa
@@ -70,7 +75,9 @@ class ShellScreen extends ConsumerWidget {
     // El panel "Ver más" muestra únicamente los módulos que NO están en la
     // barra inferior (evita duplicados) respetando los permisos del usuario.
     final moreModules = visible
-        .where((item) => !barModules.any((barItem) => barItem.path == item.path))
+        .where(
+          (item) => !barModules.any((barItem) => barItem.path == item.path),
+        )
         .toList();
     final showMore = moreModules.isNotEmpty;
 
@@ -82,10 +89,7 @@ class ShellScreen extends ConsumerWidget {
         // ── Header único para toda la app ─────────────────────────────
         appBar: AppHeader(
           subtitle: subtitle,
-          actions: const [
-            SedeScopeSelector(compact: true),
-            _ProfileButton(),
-          ],
+          actions: const [SedeScopeSelector(compact: true), _ProfileButton()],
         ),
         // Panel derecho "Ver más"
         endDrawer: showMore
@@ -639,7 +643,10 @@ class _ProfileButton extends ConsumerWidget {
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+              border: Border.all(
+                color: color.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
             ),
             child: Center(
               child: Text(

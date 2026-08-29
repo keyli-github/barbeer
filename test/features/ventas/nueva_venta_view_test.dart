@@ -309,7 +309,7 @@ Future<void> _pumpNuevaVenta(
 
 void main() {
   group('NuevaVentaView responsive', () {
-    testWidgets('desktop muestra catálogo horizontal y carrito fijo', (
+    testWidgets('desktop shows the redesigned dense grid and fixed cart', (
       tester,
     ) async {
       await _pumpNuevaVenta(
@@ -331,8 +331,8 @@ void main() {
       );
       final delegate =
           grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
-      expect(delegate.crossAxisCount, 3);
-      expect(delegate.mainAxisExtent, 148);
+      expect(delegate.crossAxisCount, 5);
+      expect(delegate.childAspectRatio, 0.72);
 
       final disabledConfirm = tester.widget<ElevatedButton>(
         find.byKey(const Key('desktop-cart-confirm')),
@@ -419,7 +419,7 @@ void main() {
       expect(find.text('Reintentar'), findsOneWidget);
     });
 
-    testWidgets('permite precio positivo y muestra detalles de pago', (
+    testWidgets('shows approved payment actions after adding an item', (
       tester,
     ) async {
       await _pumpNuevaVenta(
@@ -446,9 +446,10 @@ void main() {
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('sale-details')), findsOneWidget);
-      expect(find.byKey(const ValueKey('payment-pendiente')), findsOneWidget);
+      expect(find.byKey(const ValueKey('payment-pendiente')), findsNothing);
       expect(find.byKey(const ValueKey('payment-efectivo')), findsOneWidget);
       expect(find.byKey(const ValueKey('payment-billetera')), findsOneWidget);
+      expect(find.byKey(const Key('desktop-cart-save-pending')), findsOneWidget);
       expect(find.textContaining('16.50'), findsWidgets);
     });
 

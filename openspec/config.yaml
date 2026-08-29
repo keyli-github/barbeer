@@ -1,0 +1,77 @@
+schema: spec-driven
+strict_tdd: true
+
+context: |
+  Project: barbeer, a Flutter 3.44.8 / Dart 3.12.2 application.
+  Targets: Android and Windows, with web-aware runtime branches.
+  Architecture: feature-first modules with core shared infrastructure and presentation/data layers.
+  State and navigation: Riverpod 2.6.1 and go_router 14.6.3.
+  Data access: Dio repositories, secure token storage, and shared preferences.
+  Testing: flutter_test unit/widget suites plus integration_test acceptance coverage.
+  Quality: flutter analyze with flutter_lints 6.0.0 and dart format.
+  Delivery: interactive, ask on risk, with a 400-line review budget.
+
+testing:
+  detected: "2026-08-28"
+  strict_tdd_source: test-runner-fallback
+  runner:
+    framework: flutter_test
+    command: flutter test
+  layers:
+    unit:
+      available: true
+      tool: flutter_test
+    widget:
+      available: true
+      tool: flutter_test testWidgets
+    integration:
+      available: false
+      tool: null
+    e2e:
+      available: true
+      tool: integration_test
+      command: "flutter test integration_test/acceptance_test.dart -d <device> --dart-define=UI_TEST_VENDOR_USER=... --dart-define=UI_TEST_CASHIER_USER=... --dart-define=UI_TEST_ADMIN_USER=... --dart-define=UI_TEST_PASSWORD=..."
+  coverage:
+    available: true
+    command: flutter test --coverage
+    output: coverage/lcov.info
+    threshold: null
+  quality:
+    linter:
+      available: true
+      command: flutter analyze
+      configuration: analysis_options.yaml
+    type_checker:
+      available: true
+      command: flutter analyze
+    formatter:
+      available: true
+      command: dart format --output=none --set-exit-if-changed .
+
+rules:
+  proposal:
+    - Identify user-change collision risks and include rollback for risky changes.
+    - Flag changes expected to exceed the 400-line review budget.
+  specs:
+    - Use Given/When/Then for scenarios.
+    - Use RFC 2119 keywords for normative requirements.
+  design:
+    - Preserve the feature-first architecture and existing Riverpod boundaries.
+    - Document significant architecture decisions and risky migration paths.
+  tasks:
+    - Group work into reviewable units that remain within the 400-line budget where practical.
+    - Keep tests and documentation with the implementation they validate.
+  apply:
+    guidelines:
+      - Preserve unrelated local changes and follow existing code patterns.
+      - Ask before any operation that could overwrite or conflict with user-authored work.
+    tdd: true
+    test_command: flutter test
+  verify:
+    test_command: flutter test
+    build_command: flutter build windows
+    coverage_command: flutter test --coverage
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.
+    - Preserve archived changes as an immutable audit trail.

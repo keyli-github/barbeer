@@ -240,7 +240,6 @@ class _VentaCardState extends State<_VentaCard> {
   @override
   Widget build(BuildContext context) {
     final venta = widget.venta;
-    final status = _status(venta);
     final date = DateTime.tryParse(venta.createdAt)?.toLocal();
 
     return AnimatedOpacity(
@@ -255,15 +254,18 @@ class _VentaCardState extends State<_VentaCard> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Row 1: code + total + anular + chevron  (exact web layout)
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           venta.codigo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -271,64 +273,16 @@ class _VentaCardState extends State<_VentaCard> {
                           ),
                         ),
                       ),
-                      _StatusBadge(label: status.$1, color: status.$2),
-                    ],
-                  ),
-                  const SizedBox(height: 9),
-                  Row(
-                    children: [
-                      if (venta.vendedoraUsername != null) ...[
-                        Flexible(
-                          child: Text(
-                            venta.vendedoraUsername!,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.colors.textTertiary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                      ],
-                      if (date != null)
-                        Text(
-                          DateFormat('dd/MM/yy, h:mm a').format(date),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: context.colors.textTertiary,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            FormatUtils.currency(venta.total),
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: context.colors.textPrimary,
-                            ),
-                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        FormatUtils.currency(venta.total),
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: context.colors.textPrimary,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Spacer(),
-                      if (widget.onConciliar != null)
-                        _ActionButton(
-                          label: widget.correction ? 'Corregir' : 'Clasificar',
-                          icon: Icons.account_balance_wallet_outlined,
-                          color: widget.correction
-                              ? context.colors.textSecondary
-                              : AppColors.warning,
-                          onTap: widget.onConciliar!,
-                        ),
                       if (widget.onAnular != null) ...[
                         const SizedBox(width: 6),
                         _SquareAction(
@@ -337,7 +291,7 @@ class _VentaCardState extends State<_VentaCard> {
                           onTap: widget.onAnular!,
                         ),
                       ],
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       _SquareAction(
                         icon: expanded
                             ? Icons.keyboard_arrow_up_rounded
@@ -348,6 +302,50 @@ class _VentaCardState extends State<_VentaCard> {
                           setState(() => expanded = !expanded);
                         },
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  // Row 2: username + date (muted)
+                  Row(
+                    children: [
+                      if (venta.vendedoraUsername != null) ...[
+                        Flexible(
+                          child: Text(
+                            venta.vendedoraUsername!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colors.textTertiary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                      ],
+                      if (date != null)
+                        Flexible(
+                          child: Text(
+                            DateFormat('dd/MM/yy, h:mm a').format(date),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.colors.textTertiary,
+                            ),
+                          ),
+                        ),
+                      // Conciliar/corregir action (inline, subtle)
+                      if (widget.onConciliar != null) ...[
+                        const Spacer(),
+                        _ActionButton(
+                          label: widget.correction ? 'Corregir' : 'Clasificar',
+                          icon: Icons.account_balance_wallet_outlined,
+                          color: widget.correction
+                              ? context.colors.textSecondary
+                              : AppColors.warning,
+                          onTap: widget.onConciliar!,
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -363,15 +361,6 @@ class _VentaCardState extends State<_VentaCard> {
     );
   }
 
-  (String, Color) _status(Venta venta) {
-    if (venta.isAnulada) return ('Anulada', AppColors.error);
-    return switch (venta.conciliacion?.estado) {
-      EstadoConciliacion.pendiente => ('Pendiente', AppColors.warning),
-      EstadoConciliacion.billetera => ('Billetera', AppColors.info),
-      EstadoConciliacion.efectivo => ('Efectivo', AppColors.success),
-      null => ('Activa', AppColors.success),
-    };
-  }
 }
 
 class _ExpandedSale extends StatelessWidget {
@@ -454,38 +443,6 @@ class _ExpandedSale extends StatelessWidget {
               ),
             ),
           ),
-      ],
-    ),
-  );
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusBadge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(100),
-      border: Border.all(color: color.withValues(alpha: 0.32)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.check_circle_outline_rounded, size: 11, color: color),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
       ],
     ),
   );

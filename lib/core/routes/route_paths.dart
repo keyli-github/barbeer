@@ -22,4 +22,7 @@ class RoutePaths {
   static const String asistencia = '/asistencia';
   static const String etiquetas = '/etiquetas';
   static const String categorias = '/categorias';
+  static const String cuentas = '/cuentas';
+  static const String reportes = '/reportes';
+  static const String respaldos = '/respaldos';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../routes/route_paths.dart';
+import 'route_access_policy.dart';
 
 enum AppDestinationSection {
   operations('OPERACIONES', Icons.bar_chart_rounded),
@@ -41,8 +42,14 @@ class AppDestination {
   bool isActive(String currentPath) =>
       currentPath == path || currentPath.startsWith('$path/');
 
-  bool canAccess(bool Function(String permission) hasPermission) =>
-      permissions.isEmpty || permissions.any(hasPermission);
+  bool canAccess(
+    bool Function(String permission) hasPermission, {
+    String role = '',
+  }) => RouteAccessPolicy.canAccess(
+    path,
+    role: role,
+    permissions: permissions.where(hasPermission),
+  );
 
   String get routeTitle => title.isEmpty ? label : title;
   String get desktopNavigationLabel => desktopLabel ?? label;

@@ -77,9 +77,13 @@ class PerfilScreen extends ConsumerWidget {
                                           color: context.colors.textTertiary,
                                         ),
                                         const SizedBox(width: 4),
-                                        Text(
-                                          user!.sedeName,
-                                          style: AppTextStyles.labelSmall,
+                                        Flexible(
+                                          child: Text(
+                                            user!.sedeName,
+                                            style: AppTextStyles.labelSmall,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                       ],
                                     ),

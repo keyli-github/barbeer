@@ -336,11 +336,18 @@ class _SedeTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(nombre, style: AppTextStyles.titleMedium),
+                      Text(
+                        nombre,
+                        style: AppTextStyles.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       if (codigoSede.isNotEmpty)
                         Text(
                           'Código: $codigoSede',
                           style: AppTextStyles.labelSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       if (direccion != null && direccion.isNotEmpty)
                         Text(
@@ -399,12 +406,12 @@ class _SedeTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                if (telefono != null) ...[
+                if (telefono != null)
                   _InfoChip(icon: Icons.phone_rounded, label: telefono),
-                  const SizedBox(width: 8),
-                ],
                 _InfoChip(
                   icon: Icons.people_rounded,
                   label: '$userCount usuarios',

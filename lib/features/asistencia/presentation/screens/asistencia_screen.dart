@@ -738,10 +738,12 @@ class _PlanillaView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(emp.username, style: AppTextStyles.titleMedium),
+                    Text(emp.username, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                     Text(
                       '${emp.rol}${emp.turno != null ? " · ${emp.turno}" : ""}',
                       style: AppTextStyles.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     if (emp.horaEntrada != null)
                       Text(
@@ -927,10 +929,14 @@ class _MarcajesView extends StatelessWidget {
                           color: context.colors.textPrimary,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         '${m['rol']} · ${m['detalle']}',
                         style: AppTextStyles.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -1447,8 +1453,10 @@ class _TodayArrivalsSectionState extends ConsumerState<_TodayArrivalsSection> {
                                   fontWeight: FontWeight.w600,
                                   color: context.colors.textPrimary,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              Text(emp.rol, style: AppTextStyles.labelSmall),
+                              Text(emp.rol, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                             ],
                           ),
                         ),
@@ -1989,6 +1997,8 @@ class _TurnosTab extends ConsumerWidget {
                         Text(
                           '${turno.horaInicioLabel} – ${turno.horaFinLabel}  ·  Margen: ${turno.margenTardanza} min',
                           style: AppTextStyles.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -2339,20 +2349,24 @@ class _TurnoFormSheetState extends State<_TurnoFormSheet> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppColors.warning.withOpacity(0.3)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.brightness_3,
                       size: 14,
                       color: AppColors.warning,
                     ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Este turno cruza medianoche',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.warning,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Este turno cruza medianoche',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],

@@ -648,10 +648,12 @@ class _OrdenTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text(compra.proveedor, style: AppTextStyles.bodySmall),
+                Text(compra.proveedor, style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                 Text(
                   '${compra.fecha} · ${compra.articulos} items',
                   style: AppTextStyles.labelSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -790,7 +792,7 @@ class _ProvTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(prov.nombre, style: AppTextStyles.titleMedium),
+                Text(prov.nombre, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
                 Text(
                   prov.activo ? 'Activo' : 'Inactivo',
                   style: AppTextStyles.labelSmall.copyWith(
@@ -801,13 +803,13 @@ class _ProvTile extends StatelessWidget {
                   ),
                 ),
                 if (prov.categoria != null)
-                  Text(prov.categoria!, style: AppTextStyles.labelSmall),
+                  Text(prov.categoria!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (prov.contacto != null)
-                  Text(prov.contacto!, style: AppTextStyles.labelSmall),
+                  Text(prov.contacto!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (prov.telefono != null)
-                  Text(prov.telefono!, style: AppTextStyles.labelSmall),
+                  Text(prov.telefono!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (prov.email != null)
-                  Text(prov.email!, style: AppTextStyles.labelSmall),
+                  Text(prov.email!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),

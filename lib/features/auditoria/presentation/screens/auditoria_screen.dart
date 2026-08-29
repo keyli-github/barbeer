@@ -528,7 +528,14 @@ class _LogTile extends StatelessWidget {
                             color: context.colors.textTertiary,
                           ),
                           const SizedBox(width: 4),
-                          Text(ip, style: AppTextStyles.labelSmall),
+                          Flexible(
+                            child: Text(
+                              ip,
+                              style: AppTextStyles.labelSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     if (sedeName != null)
@@ -540,7 +547,14 @@ class _LogTile extends StatelessWidget {
                             color: context.colors.textTertiary,
                           ),
                           const SizedBox(width: 4),
-                          Text(sedeName!, style: AppTextStyles.labelSmall),
+                          Flexible(
+                            child: Text(
+                              sedeName!,
+                              style: AppTextStyles.labelSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                   ],

@@ -637,10 +637,14 @@ class _MovTile extends StatelessWidget {
                 Text(
                   '${mov.codigo} · ${mov.referencia}',
                   style: AppTextStyles.labelSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '${mov.fecha} ${mov.hora} · ${mov.usuario}',
                   style: AppTextStyles.labelSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

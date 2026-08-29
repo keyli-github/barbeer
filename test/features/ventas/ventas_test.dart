@@ -346,7 +346,7 @@ void main() {
   });
 
   group('Modelos', () {
-    test('solo ENTRADA/AMBOS no sistema califican como billetera', () {
+    test('all active non-system wallet labels remain selectable', () {
       Etiqueta etiqueta(
         String tipo, {
         String nombre = 'Yape',
@@ -363,7 +363,7 @@ void main() {
 
       expect(isBilleteraEtiqueta(etiqueta('ENTRADA')), isTrue);
       expect(isBilleteraEtiqueta(etiqueta('AMBOS')), isTrue);
-      expect(isBilleteraEtiqueta(etiqueta('SALIDA')), isFalse);
+      expect(isBilleteraEtiqueta(etiqueta('SALIDA')), isTrue);
       expect(
         isBilleteraEtiqueta(etiqueta('ENTRADA', nombre: 'TOTAL DE VENTAS')),
         isFalse,
@@ -756,7 +756,7 @@ void main() {
   });
 
   group('Flujos de conciliación y anulación', () {
-    testWidgets('exige comprobante y lo mapea separado del código', (
+    testWidgets('submits analyzed receipt identity without legacy fields', (
       tester,
     ) async {
       final repo = _FakeVentasRepository();
@@ -787,10 +787,7 @@ void main() {
       await tester.tap(find.text('Billetera').first);
       await tester.pump();
       expect(find.byKey(const ValueKey('comprobanteField')), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('codigoOperacionField')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('codigoOperacionField')), findsNothing);
 
       // La billetera se selecciona explícitamente (no auto-selección).
       await tester.tap(find.text('Selecciona una billetera…').first);
@@ -808,10 +805,6 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('comprobanteField')));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey('codigoOperacionField')),
-        'op-456',
-      );
       await tester.ensureVisible(find.text('Confirmar clasificación'));
       await tester.pump();
       await tester.tap(find.text('Confirmar clasificación'));

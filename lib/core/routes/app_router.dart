@@ -23,14 +23,19 @@ import '../../features/compras/presentation/screens/compras_screen.dart';
 import '../../features/asistencia/presentation/screens/asistencia_screen.dart';
 import '../../features/etiquetas/presentation/screens/etiquetas_screen.dart';
 import '../../features/categorias/presentation/screens/categorias_screen.dart';
+import '../navigation/route_access_policy.dart';
 import '../theme/app_colors.dart';
 import '../widgets/barbeer_wordmark.dart';
 import 'route_paths.dart';
+import 'router_refresh_notifier.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = RouterRefreshNotifier();
+  ref.onDispose(refresh.dispose);
+  ref.listen<AuthState>(authProvider, (_, __) => refresh.refresh());
   // El GoRouter se crea UNA SOLA VEZ. El estado de auth se lee en el
   // callback de redirect (no al crear el provider) para evitar que el
   // router se reconstruya con cada cambio de estado, lo que provocaba
@@ -38,31 +43,33 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: RoutePaths.splash,
+    refreshListenable: refresh,
     redirect: (ctx, state) {
-      final auth = ref.read(authProvider); // lee el estado ACTUAL
+      final auth = ref.read(authProvider);
       final path = state.matchedLocation;
-      final status = auth.status;
-
-      // Durante la carga inicial y mientras se procesa el login,
-      // no forzar ninguna redirección para evitar parpadeos.
-      if (status == AuthStatus.initial || status == AuthStatus.loading) {
-        return null;
+      final gate = switch (auth.status) {
+        AuthStatus.initial => AuthGateState.unresolved,
+        AuthStatus.loading => AuthGateState.authenticating,
+        AuthStatus.unauthenticated => AuthGateState.unauthenticated,
+        AuthStatus.mustChangePassword => AuthGateState.forcedPasswordChange,
+        AuthStatus.authenticated => AuthGateState.authenticated,
+      };
+      if (gate != AuthGateState.authenticated &&
+          RouteAccessPolicy.isProtected(path)) {
+        refresh.remember(state.uri.toString());
       }
-      if (status == AuthStatus.mustChangePassword) {
-        return path == RoutePaths.changePassword
-            ? null
-            : RoutePaths.changePassword;
+      final redirect = routeGuardRedirect(
+        gate: gate,
+        currentPath: path,
+        pendingLocation: refresh.pendingLocation,
+        role: auth.user?.rol ?? '',
+        permissions: auth.permisos,
+      );
+      if (gate == AuthGateState.authenticated &&
+          !RouteAccessPolicy.isProtected(path)) {
+        refresh.clearPending();
       }
-      if (status == AuthStatus.unauthenticated) {
-        return path == RoutePaths.login ? null : RoutePaths.login;
-      }
-      if (status == AuthStatus.authenticated) {
-        if (path == RoutePaths.login || path == RoutePaths.splash) {
-          return RoutePaths.dashboard;
-        }
-        if (!auth.canAccess(path)) return RoutePaths.noAutorizado;
-      }
-      return null;
+      return redirect;
     },
     routes: [
       GoRoute(

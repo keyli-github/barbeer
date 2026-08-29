@@ -245,6 +245,8 @@ class PermisosScreen extends ConsumerWidget {
                                   fontWeight: FontWeight.w600,
                                   color: context.colors.textPrimary,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               if ((perm['descripcion'] as String? ?? '')
                                   .isNotEmpty) ...[
@@ -252,6 +254,8 @@ class PermisosScreen extends ConsumerWidget {
                                 Text(
                                   perm['descripcion'] as String? ?? '',
                                   style: AppTextStyles.labelSmall,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ],

@@ -571,6 +571,7 @@ class _Chip extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.sm),
     ),
     child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
           value,
@@ -579,8 +580,15 @@ class _Chip extends StatelessWidget {
             fontWeight: FontWeight.w700,
             color: color,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        Text(label, style: AppTextStyles.labelSmall),
+        Text(
+          label,
+          style: AppTextStyles.labelSmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ],
     ),
   );
@@ -644,6 +652,8 @@ class _InventarioTile extends StatelessWidget {
                       Text(
                         '${item.codigo} · ${item.categoria}',
                         style: AppTextStyles.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -697,6 +707,8 @@ class _InventarioTile extends StatelessWidget {
                       Text(
                         'Min ${item.min.toStringAsFixed(0)} · ${item.max > 0 ? 'Max ${item.max.toStringAsFixed(0)}' : 'Sin objetivo'} · ${item.ubicacion}',
                         style: AppTextStyles.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         'Costo: S/ ${item.costo.toStringAsFixed(2)}',
@@ -1137,6 +1149,8 @@ class _AdjustSheetState extends State<_AdjustSheet> {
                           style: AppTextStyles.bodySmall.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

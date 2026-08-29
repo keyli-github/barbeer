@@ -367,19 +367,23 @@ class _MovementCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${incoming ? '+' : '-'} ${_money(movement.monto)}',
-                  style: AppTextStyles.labelLarge.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${incoming ? '+' : '-'} ${_money(movement.monto)}',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                ),
-                const SizedBox(height: 5),
-                _TypeChip(type: movement.tipo),
-              ],
+                  const SizedBox(height: 5),
+                  _TypeChip(type: movement.tipo),
+                ],
+              ),
             ),
           ],
         ),

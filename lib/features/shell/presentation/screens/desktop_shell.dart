@@ -5,7 +5,6 @@ import '../../../../core/navigation/app_destinations.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format_utils.dart';
-import '../../../../core/widgets/barbeer_wordmark.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Texto sobre pildora naranja — replica `--primary-foreground` de la web.
@@ -50,9 +49,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   @override
   Widget build(BuildContext context) {
     final destination = appDestinationForPath(widget.currentPath);
-    final title = destination?.routeTitle ?? 'BarBeer';
+    final title = destination?.routeTitle ?? 'Yacare';
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final effectiveCollapsed = _collapsed || screenWidth < 800;
 
     return Scaffold(
       backgroundColor: context.colors.backgroundAlt,
@@ -62,10 +63,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
             key: const Key('desktop-sidebar'),
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            width: _collapsed ? 68 : 272,
+            width: effectiveCollapsed ? 68 : 272,
             color: context.colors.navBackground,
             child: _Sidebar(
-              collapsed: _collapsed,
+              collapsed: effectiveCollapsed,
               currentPath: widget.currentPath,
               destinations: widget.destinations,
               auth: widget.auth,
@@ -88,6 +89,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                       Expanded(
                         child: Text(
                           title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: context.colors.textPrimary,
                             fontSize: 16,
@@ -505,11 +508,11 @@ class _SidebarHeader extends StatelessWidget {
         : Icons.keyboard_double_arrow_left_rounded;
 
     return SizedBox(
-      height: collapsed ? 56 : 72,
+      height: collapsed ? 56 : 64,
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: collapsed ? 0 : 16,
-          vertical: collapsed ? 12 : 16,
+          vertical: collapsed ? 12 : 12,
         ),
         child: Row(
           mainAxisAlignment: collapsed
@@ -518,19 +521,24 @@ class _SidebarHeader extends StatelessWidget {
           children: [
             if (!collapsed) ...[
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    BarBeerWordmark(fontSize: 18),
-                    const SizedBox(height: 3),
-                    Text(
-                      'ERP SYSTEM',
-                      style: TextStyle(
-                        color: context.colors.textTertiary,
-                        fontSize: 9,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w600,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _SidebarLogo(logoUrl: logoUrl, size: 32),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        'Yacare',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Pacifico',
+                          fontSize: 20,
+                          color: AppColors.brand,
+                          height: 1.15,
+                        ),
                       ),
                     ),
                   ],
@@ -922,7 +930,7 @@ class _SidebarLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fallback = 'assets/images/barbeer_Log.png';
+    final fallback = 'assets/images/yacare.png';
     return logoUrl == null
         ? Image.asset(fallback, width: size, height: size, fit: BoxFit.contain)
         : Image.network(
