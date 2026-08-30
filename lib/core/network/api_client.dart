@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/api_constants.dart';
@@ -98,6 +99,22 @@ class ApiClient {
       ),
       path,
     );
+  }
+
+  Future<Uint8List> getBytes(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final h = await _headers(path);
+    final resp = await _execute(
+      () => _dio.get<Uint8List>(
+        path,
+        queryParameters: queryParameters,
+        options: _opts(h).copyWith(responseType: ResponseType.bytes),
+      ),
+      path,
+    );
+    return resp.data ?? Uint8List(0);
   }
 
   Future<Response<T>> post<T>(String path, {dynamic data}) async {

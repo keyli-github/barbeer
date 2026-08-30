@@ -13,6 +13,7 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../widgets/pin_management_sheet.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
@@ -290,6 +291,24 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                 prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
+            const SizedBox(height: 8),
+            if (auth.user?.isSuperAdmin ?? false)
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final users = state.users
+                        .map((u) => u as Map<String, dynamic>)
+                        .toList();
+                    showPinManagementSheet(context, users: users);
+                  },
+                  icon: const Icon(Icons.shield_outlined, size: 16),
+                  label: const Text('Claves PIN'),
+                  style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange,
+                      side: const BorderSide(color: Colors.orange)),
+                ),
+              ),
             const SizedBox(height: 8),
             AppCard(
               padding: const EdgeInsets.symmetric(

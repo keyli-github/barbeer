@@ -278,7 +278,7 @@ List<_Section> _buildSections(List<AppDestination> modules) {
       .where((m) => ps.contains(m.path) && paths.contains(m.path))
       .toList();
 
-  final op = from(['/ventas', '/caja', '/movimientos']);
+  final op = from(['/ventas', '/caja', '/movimientos', '/cuentas']);
   final inv = from([
     '/productos',
     '/categorias',

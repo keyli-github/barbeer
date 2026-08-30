@@ -190,6 +190,8 @@ class CajaNotifier extends StateNotifier<CajaState> {
     required String tipo,
     required double monto,
     required String concepto,
+    String? etiquetaId,
+    String? personalUsuarioId,
   }) async {
     final id = state.actual?.id;
     if (id == null) return;
@@ -199,6 +201,8 @@ class CajaNotifier extends StateNotifier<CajaState> {
         tipo: tipo,
         monto: monto,
         concepto: concepto,
+        etiquetaId: etiquetaId,
+        personalUsuarioId: personalUsuarioId,
       ),
     );
   }

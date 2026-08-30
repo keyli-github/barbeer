@@ -92,6 +92,14 @@ const appDestinations = <AppDestination>[
     permissions: ['caja:leer'],
   ),
   AppDestination(
+    path: RoutePaths.cuentas,
+    label: 'Cobros',
+    icon: Icons.account_balance_wallet_outlined,
+    activeIcon: Icons.account_balance_wallet_rounded,
+    section: AppDestinationSection.operations,
+    permissions: ['cuentas:leer'],
+  ),
+  AppDestination(
     path: RoutePaths.productos,
     label: 'Productos',
     icon: Icons.liquor_outlined,
@@ -197,6 +205,22 @@ const appDestinations = <AppDestination>[
     icon: Icons.shield_outlined,
     activeIcon: Icons.shield_rounded,
     section: AppDestinationSection.administration,
+  ),
+  AppDestination(
+    path: RoutePaths.reportes,
+    label: 'Reportes',
+    icon: Icons.bar_chart_outlined,
+    activeIcon: Icons.bar_chart_rounded,
+    section: AppDestinationSection.administration,
+    permissions: [],
+  ),
+  AppDestination(
+    path: RoutePaths.respaldos,
+    label: 'Respaldos',
+    icon: Icons.backup_outlined,
+    activeIcon: Icons.backup_rounded,
+    section: AppDestinationSection.administration,
+    permissions: ['respaldos:gestionar'],
   ),
   AppDestination(
     path: RoutePaths.perfil,

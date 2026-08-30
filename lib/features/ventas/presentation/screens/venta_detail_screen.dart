@@ -175,7 +175,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          FormatUtils.currency(_venta.total),
+                          _venta.hasAuthoritativeTotal
+                              ? FormatUtils.currency(_venta.total)
+                              : 'No disponible',
                           style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
@@ -233,15 +235,6 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
             ]),
 
             const SizedBox(height: 12),
-
-            if (_venta.recargoMonto != null) ...[
-              _Section('Recargo', [
-                _InfoRow('Monto', FormatUtils.currency(_venta.recargoMonto!)),
-                if (_venta.recargoMotivo != null)
-                  _InfoRow('Motivo', _venta.recargoMotivo!),
-              ]),
-              const SizedBox(height: 12),
-            ],
 
             // ── Conciliación / método de pago
             if (_venta.conciliacion != null) ...[
@@ -351,25 +344,6 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
               ),
               child: Column(
                 children: [
-                  if (_venta.recargoMonto != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Subtotal'),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Text(
-                              FormatUtils.currency(_venta.subtotalSinRecargo),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -384,7 +358,9 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                       const SizedBox(width: 12),
                       Flexible(
                         child: Text(
-                          FormatUtils.currency(_venta.total),
+                          _venta.hasAuthoritativeTotal
+                              ? FormatUtils.currency(_venta.total)
+                              : 'No disponible',
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,

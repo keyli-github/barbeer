@@ -23,6 +23,9 @@ import '../../features/compras/presentation/screens/compras_screen.dart';
 import '../../features/asistencia/presentation/screens/asistencia_screen.dart';
 import '../../features/etiquetas/presentation/screens/etiquetas_screen.dart';
 import '../../features/categorias/presentation/screens/categorias_screen.dart';
+import '../../features/cuentas/presentation/screens/cuentas_screen.dart';
+import '../../features/reportes/presentation/screens/reportes_screen.dart';
+import '../../features/respaldos/presentation/screens/respaldos_screen.dart';
 import '../navigation/route_access_policy.dart';
 import '../theme/app_colors.dart';
 import '../widgets/barbeer_wordmark.dart';
@@ -164,6 +167,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: RoutePaths.categorias,
             builder: (_, __) => const CategoriasScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.cuentas,
+            builder: (_, __) => const CuentasScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.reportes,
+            builder: (_, __) => const ReportesScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.respaldos,
+            builder: (_, __) => const RespaldosScreen(),
           ),
         ],
       ),

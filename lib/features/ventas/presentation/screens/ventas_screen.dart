@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../recargo/presentation/providers/recargo_control_provider.dart';
+import '../../../recargo/presentation/widgets/recargo_control_sheet.dart';
 import '../providers/ventas_provider.dart';
 import 'historial_ventas_view.dart';
 import 'nueva_venta_view.dart';
@@ -22,12 +24,19 @@ class VentasScreen extends ConsumerStatefulWidget {
 class _VentasScreenState extends ConsumerState<VentasScreen> {
   bool _showingNuevaVenta = false;
 
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(recargoControlProvider.notifier).load());
+  }
+
   void _openNewSale() => setState(() => _showingNuevaVenta = true);
   void _closeNewSale() => setState(() => _showingNuevaVenta = false);
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final recargo = ref.watch(recargoControlProvider);
     final canCreate = canCreateVenta(auth);
     final canRead = canReadAllVentas(auth) || canReadOwnVentas(auth);
 
@@ -42,6 +51,13 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
     if (canRead) {
       return HistorialVentasView(
         onCreate: canCreate ? _openNewSale : null,
+        onRecargoControl: recargo.puedeConfigurar || recargo.puedeCambiar
+            ? () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => const RecargoControlSheet(),
+              )
+            : null,
       );
     }
 

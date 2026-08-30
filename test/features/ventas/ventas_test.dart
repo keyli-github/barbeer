@@ -11,6 +11,7 @@ import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
 import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_screen.dart';
+import 'package:barbeer/features/ventas/presentation/screens/historial_ventas_view.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/anular_venta_dialog.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/carrito_venta_sheet.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
@@ -179,6 +180,94 @@ ComprobanteAnalisis _analysis({
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
+  group('Visible payment metadata', () {
+    final json = {
+      'id': 'v1',
+      'codigo': 'V-001',
+      'cajaSesionId': 'c1',
+      'sedeId': 's1',
+      'total': 40,
+      'estado': 'ACTIVA',
+      'registradaPor': {'username': 'admin'},
+      'vendedora': {'username': 'seller'},
+      'conciliaciones': [
+        {
+          'id': 'p1',
+          'estado': 'PENDIENTE',
+          'metodoPagoPendiente': 'BILLETERA',
+          'monto': 30,
+          'pagoRestoEfectivo': true,
+        },
+      ],
+      'cuentaId': 'account-1',
+      'cuenta': {'nombre': 'Cliente Uno'},
+      'cuentaMonto': 10,
+      'items': <Object>[],
+      'createdAt': '2026-08-29T10:00:00Z',
+    };
+
+    test('maps the authoritative registered, pending, cash and account fields', () {
+      final venta = Venta.fromJson(json);
+
+      expect(venta.registradaPorUsername, 'admin');
+      expect(venta.conciliaciones.single.metodoPagoPendiente, 'BILLETERA');
+      expect(venta.conciliaciones.single.pagoRestoEfectivo, isTrue);
+      expect(venta.cuentaNombre, 'Cliente Uno');
+      expect(venta.cuentaMonto, 10);
+    });
+
+    testWidgets('history exposes Pendiente and complete payment metadata', (
+      tester,
+    ) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: VentaHistoryCard(
+            venta: Venta.fromJson(json),
+            correction: false,
+            onConciliar: () {},
+          ),
+        ),
+      ));
+
+      expect(find.text('Pendiente'), findsWidgets);
+      expect(find.text('Clasificar'), findsNothing);
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Registrado por: admin'), findsOneWidget);
+      expect(find.textContaining('Pendiente · Transferencia'), findsOneWidget);
+      expect(find.textContaining('Resto en efectivo'), findsOneWidget);
+      expect(find.textContaining('Cuenta: Cliente Uno'), findsOneWidget);
+    });
+
+    testWidgets('history filters move with the sales list', (tester) async {
+      tester.view.physicalSize = const Size(320, 420);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repo = _FakeVentasRepository()
+        ..pages = {1: List.generate(12, (index) => _venta('$index'))}
+        ..total = 12;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [ventasRepositoryProvider.overrideWithValue(repo)],
+        child: const MaterialApp(
+          home: Scaffold(body: HistorialVentasView()),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final filter = find.byKey(const Key('ventas-filters'));
+      expect(repo.requestedEstados, isNotEmpty);
+      expect(find.text('V-0'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        filter,
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      expect(filter, findsNothing);
+    });
+  });
+
   group('Permisos de ventas', () {
     test('1. VENDEDORA puede crear ventas', () {
       final auth = _authWith(
@@ -658,7 +747,6 @@ void main() {
 
       expect(venta.recargoMonto, 5);
       expect(venta.recargoMotivo, 'Delivery');
-      expect(venta.subtotalSinRecargo, 30);
     });
   });
 

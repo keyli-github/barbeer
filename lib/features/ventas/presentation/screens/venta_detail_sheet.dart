@@ -203,7 +203,9 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                             fit: BoxFit.scaleDown,
                             alignment: Alignment.centerRight,
                             child: Text(
-                              FormatUtils.currency(v.total),
+                              v.hasAuthoritativeTotal
+                                  ? FormatUtils.currency(v.total)
+                                  : 'No disponible',
                               maxLines: 1,
                               textAlign: TextAlign.right,
                               style: const TextStyle(
@@ -240,23 +242,6 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                       ),
                     ],
                   ),
-
-                  if (v.recargoMonto != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    _SectionLabel('Recargo'),
-                    _InfoCard(
-                      children: [
-                        _InfoRow(
-                          'Monto',
-                          FormatUtils.currency(v.recargoMonto!),
-                        ),
-                        if (v.recargoMotivo != null) ...[
-                          const _Divider(),
-                          _InfoRow('Motivo', v.recargoMotivo!),
-                        ],
-                      ],
-                    ),
-                  ],
 
                   const SizedBox(height: AppSpacing.md),
 

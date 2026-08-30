@@ -89,11 +89,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 child: _DashboardErrors(errors: data.errors),
               ),
             // ── KPI cards grid ──
-            if (!data.loading)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _Kpis(data: data, auth: auth),
-              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: DashboardKpis(data: data, auth: auth),
+            ),
             const SizedBox(height: 14),
             // ── Recent Activity (conditional, audit:leer) ──
             if (data.audit.isNotEmpty && auth.hasPermission('audit:leer'))
@@ -316,10 +315,10 @@ class _MyAttendanceCard extends ConsumerWidget {
 
 // ─── KPI Cards Grid ───────────────────────────────────────────────────────────
 
-class _Kpis extends StatelessWidget {
+class DashboardKpis extends StatelessWidget {
   final DashboardData data;
   final AuthState auth;
-  const _Kpis({required this.data, required this.auth});
+  const DashboardKpis({super.key, required this.data, required this.auth});
 
   @override
   Widget build(BuildContext context) {
@@ -329,8 +328,32 @@ class _Kpis extends StatelessWidget {
     String detail(String key, String loaded) =>
         data.hasError(key) ? 'No disponible' : loaded;
 
+    final superadmin = auth.user?.isSuperAdmin == true;
+    if (superadmin) {
+      final summary = data.cajaActual?.resumen?.v2;
+      final needsSede = data.selectedSedeId == null;
+      final cashDetail = needsSede
+          ? 'Elige una sede en el encabezado'
+          : data.cajaActual == null
+          ? 'Sin turno abierto'
+          : 'Turno de caja actual';
+      String money(double? amount) => needsSede
+          ? 'Selecciona sede'
+          : FormatUtils.currency(amount ?? 0);
+      String number(num? amount) => needsSede ? 'Selecciona sede' : '${amount ?? 0}';
+      items.addAll([
+        _KD(icon: Icons.point_of_sale, label: 'Ventas totales', value: money(summary?.totalVentasNeto), detail: cashDetail, valueColor: AppColors.success, path: '/ventas'),
+        _KD(icon: Icons.inventory_2_outlined, label: 'Costo de productos vendidos', value: money(summary?.costoProductosVendidos), detail: cashDetail, valueColor: AppColors.warning, path: '/productos'),
+        _KD(icon: Icons.trending_up, label: 'Utilidad bruta', value: money(summary?.utilidadBruta), detail: 'Ventas menos costo de productos', valueColor: AppColors.success, path: '/ventas'),
+        _KD(icon: Icons.sell_outlined, label: 'Unidades vendidas', value: number(summary?.unidadesVendidas), detail: cashDetail, valueColor: context.colors.textPrimary, path: '/ventas'),
+        _KD(icon: Icons.trending_down, label: 'Otros gastos', value: money(summary?.otrosGastos), detail: 'Salidas manuales del cuadre de caja', valueColor: AppColors.error, path: '/movimientos'),
+        _KD(icon: Icons.account_balance, label: 'Utilidad neta', value: money(summary?.utilidadNeta), detail: 'Utilidad bruta menos otros gastos', valueColor: AppColors.success, path: '/caja'),
+        _KD(icon: Icons.percent, label: 'Margen neto', value: needsSede ? 'Selecciona sede' : '${(summary?.margenNeto ?? 0).toStringAsFixed(1)}%', detail: 'Utilidad neta sobre ventas totales', valueColor: AppColors.success, path: '/caja'),
+      ]);
+    }
+
     // 1. Caja
-    if (auth.hasPermission('caja:leer')) {
+    if (!superadmin && auth.hasPermission('caja:leer')) {
       final caja = data.cajaActual;
       final expectedCash = caja?.resumen?.efectivoEsperado;
       final allSedes =
@@ -363,7 +386,7 @@ class _Kpis extends StatelessWidget {
     }
 
     // 2. Productos
-    if (auth.hasPermission('productos:leer')) {
+    if (!superadmin && auth.hasPermission('productos:leer')) {
       items.add(
         _KD(
           icon: Icons.liquor_rounded,
@@ -377,7 +400,7 @@ class _Kpis extends StatelessWidget {
     }
 
     // 3. Compras
-    if (auth.hasPermission('compras:leer')) {
+    if (!superadmin && auth.hasPermission('compras:leer')) {
       items.add(
         _KD(
           icon: Icons.local_shipping_rounded,
@@ -391,7 +414,7 @@ class _Kpis extends StatelessWidget {
     }
 
     // 4. Asistencia
-    if (auth.hasPermission('asistencia:leer')) {
+    if (!superadmin && auth.hasPermission('asistencia:leer')) {
       items.add(
         _KD(
           icon: Icons.badge_rounded,
@@ -411,7 +434,7 @@ class _Kpis extends StatelessWidget {
     }
 
     // 5. Usuarios
-    if (auth.hasPermission('roles:leer')) {
+    if (!superadmin && auth.hasPermission('roles:leer')) {
       items.add(
         _KD(
           icon: Icons.people_rounded,
@@ -425,7 +448,7 @@ class _Kpis extends StatelessWidget {
     }
 
     // 6. Notificaciones (audit log count)
-    if (auth.hasPermission('audit:leer')) {
+    if (!superadmin && auth.hasPermission('audit:leer')) {
       items.add(
         _KD(
           icon: Icons.notifications_rounded,
@@ -450,7 +473,10 @@ class _Kpis extends StatelessWidget {
           runSpacing: gap,
           children: items
               .map(
-                (k) => SizedBox(width: cardWidth, child: _KpiCard(k: k)),
+                (k) => SizedBox(
+                  width: cardWidth,
+                  child: _KpiCard(k: k, loading: data.loading),
+                ),
               )
               .toList(),
         );
@@ -479,7 +505,8 @@ class _KD {
 
 class _KpiCard extends StatelessWidget {
   final _KD k;
-  const _KpiCard({required this.k});
+  final bool loading;
+  const _KpiCard({required this.k, required this.loading});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -516,18 +543,29 @@ class _KpiCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              Text(
-                k.value,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'monospace',
-                  color: k.valueColor,
-                  letterSpacing: -0.3,
+              if (loading)
+                Container(
+                  key: const Key('dashboard-kpi-value-skeleton'),
+                  width: 88,
+                  height: 19,
+                  decoration: BoxDecoration(
+                    color: context.colors.backgroundAlt,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                )
+              else
+                Text(
+                  k.value,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
+                    color: k.valueColor,
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
               const SizedBox(height: 2),
               Text(
                 k.detail,

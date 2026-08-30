@@ -55,5 +55,28 @@ void main() {
     test('seguridad is available to every authenticated user', () {
       expect(_authWith([]).canAccess('/seguridad'), isTrue);
     });
+
+    test('cuentas uses cuentas:leer permission', () {
+      expect(_authWith(['cuentas:leer']).canAccess('/cuentas'), isTrue);
+      expect(_authWith(['cuentas:crear']).canAccess('/cuentas'), isFalse);
+    });
+
+    test('reportes requires SUPERADMIN role', () {
+      final superadmin = AuthState(
+        status: AuthStatus.authenticated,
+        user: UserProfile(
+          id: 'sa', username: 'sa', rol: 'SUPERADMIN',
+          nivel: 99, createdAt: '2026-01-01', permisos: [],
+        ),
+      );
+      expect(superadmin.canAccess('/reportes'), isTrue);
+      expect(_authWith([]).canAccess('/reportes'), isFalse);
+    });
+
+    test('respaldos requires respaldos:gestionar', () {
+      expect(
+          _authWith(['respaldos:gestionar']).canAccess('/respaldos'), isTrue);
+      expect(_authWith([]).canAccess('/respaldos'), isFalse);
+    });
   });
 }

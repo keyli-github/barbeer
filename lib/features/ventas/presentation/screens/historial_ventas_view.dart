@@ -17,8 +17,9 @@ import 'conciliar_venta_screen.dart';
 
 class HistorialVentasView extends ConsumerStatefulWidget {
   final VoidCallback? onCreate;
+  final VoidCallback? onRecargoControl;
 
-  const HistorialVentasView({super.key, this.onCreate});
+  const HistorialVentasView({super.key, this.onCreate, this.onRecargoControl});
 
   @override
   ConsumerState<HistorialVentasView> createState() => _HistorialState();
@@ -57,16 +58,6 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
 
     return Column(
       children: [
-        _FiltersBar(
-          currentFilter: state.filterEstado,
-          total: state.total,
-          loading: state.loading,
-          onCreate: widget.onCreate,
-          onRefresh: _refresh,
-          onFilter: (estado) => ref
-              .read(ventasListProvider(_useMis).notifier)
-              .load(estado: estado),
-        ),
         Expanded(
           child: state.loading && state.ventas.isEmpty
               ? const Padding(
@@ -89,10 +80,24 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(15, 4, 15, 120),
                     itemCount:
-                        state.ventas.length +
+                        state.ventas.length + 1 +
                         (state.totalPaginas > state.pagina ? 1 : 0),
                     itemBuilder: (context, index) {
-                      if (index == state.ventas.length) {
+                      if (index == 0) {
+                        return _FiltersBar(
+                          currentFilter: state.filterEstado,
+                          total: state.total,
+                          loading: state.loading,
+                          onCreate: widget.onCreate,
+                          onRecargoControl: widget.onRecargoControl,
+                          onRefresh: _refresh,
+                          onFilter: (estado) => ref
+                              .read(ventasListProvider(_useMis).notifier)
+                              .load(estado: estado),
+                        );
+                      }
+                      final saleIndex = index - 1;
+                      if (saleIndex == state.ventas.length) {
                         return _LoadMoreButton(
                           loading: state.loading,
                           onTap: state.loading
@@ -102,12 +107,12 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                                     .loadMore(),
                         );
                       }
-                      final venta = state.ventas[index];
+                      final venta = state.ventas[saleIndex];
                       final classified =
                           venta.conciliacion != null && !venta.isPendiente;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: _VentaCard(
+                          child: VentaHistoryCard(
                           venta: venta,
                           onConciliar: canConciliar(auth) && venta.isPendiente
                               ? () => _openConciliar(venta)
@@ -134,6 +139,7 @@ class _FiltersBar extends StatelessWidget {
   final int total;
   final bool loading;
   final VoidCallback? onCreate;
+  final VoidCallback? onRecargoControl;
   final Future<void> Function() onRefresh;
   final ValueChanged<String?> onFilter;
 
@@ -144,10 +150,12 @@ class _FiltersBar extends StatelessWidget {
     required this.onRefresh,
     required this.onFilter,
     this.onCreate,
+    this.onRecargoControl,
   });
 
   @override
   Widget build(BuildContext context) => Container(
+    key: const Key('ventas-filters'),
     color: context.colors.background,
     padding: const EdgeInsets.fromLTRB(15, 10, 15, 12),
     child: Column(
@@ -186,6 +194,14 @@ class _FiltersBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
+            if (onRecargoControl != null) ...[
+              IconButton(
+                key: const Key('recargo-control-open'),
+                onPressed: onRecargoControl,
+                icon: const Icon(Icons.visibility_outlined),
+              ),
+              const SizedBox(width: 4),
+            ],
             Flexible(
               child: Text(
                 '$total venta${total == 1 ? '' : 's'}',
@@ -217,13 +233,14 @@ class _FiltersBar extends StatelessWidget {
   );
 }
 
-class _VentaCard extends StatefulWidget {
+class VentaHistoryCard extends StatefulWidget {
   final Venta venta;
   final VoidCallback? onConciliar;
   final VoidCallback? onAnular;
   final bool correction;
 
-  const _VentaCard({
+  const VentaHistoryCard({
+    super.key,
     required this.venta,
     required this.correction,
     this.onConciliar,
@@ -231,10 +248,10 @@ class _VentaCard extends StatefulWidget {
   });
 
   @override
-  State<_VentaCard> createState() => _VentaCardState();
+  State<VentaHistoryCard> createState() => _VentaCardState();
 }
 
-class _VentaCardState extends State<_VentaCard> {
+class _VentaCardState extends State<VentaHistoryCard> {
   bool expanded = false;
 
   @override
@@ -275,7 +292,9 @@ class _VentaCardState extends State<_VentaCard> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        FormatUtils.currency(venta.total),
+                        venta.hasAuthoritativeTotal
+                            ? FormatUtils.currency(venta.total)
+                            : 'No disponible',
                         maxLines: 1,
                         style: TextStyle(
                           fontSize: 14,
@@ -338,7 +357,7 @@ class _VentaCardState extends State<_VentaCard> {
                       if (widget.onConciliar != null) ...[
                         const Spacer(),
                         _ActionButton(
-                          label: widget.correction ? 'Corregir' : 'Clasificar',
+                          label: widget.correction ? 'Corregir' : 'Pendiente',
                           icon: Icons.account_balance_wallet_outlined,
                           color: widget.correction
                               ? context.colors.textSecondary
@@ -421,6 +440,29 @@ class _ExpandedSale extends StatelessWidget {
               ],
             ),
           ),
+        if (venta.registradaPorUsername != null)
+          _PaymentLine('Registrado por: ${venta.registradaPorUsername}'),
+        for (final payment in venta.conciliaciones.isNotEmpty
+            ? venta.conciliaciones
+            : [if (venta.conciliacion != null) venta.conciliacion!]) ...[
+          _PaymentLine(
+            payment.estado == EstadoConciliacion.pendiente
+                ? payment.metodoPagoPendiente == 'BILLETERA'
+                    ? 'Pendiente · Transferencia'
+                    : 'Pendiente · Efectivo'
+                : estadoConciliacionLabel(payment.estado),
+          ),
+          if (payment.monto != null)
+            _PaymentLine('Monto: ${FormatUtils.currency(payment.monto!)}'),
+          if (payment.comprobante != null)
+            _PaymentLine('Comprobante: ${payment.comprobante}'),
+          if (payment.pagoRestoEfectivo)
+            const _PaymentLine('Resto en efectivo'),
+        ],
+        if (venta.cuentaNombre != null && venta.cuentaMonto != null)
+          _PaymentLine(
+            'Cuenta: ${venta.cuentaNombre} · ${FormatUtils.currency(venta.cuentaMonto!)}',
+          ),
         if (venta.conciliacion?.etiquetaNombre != null)
           Align(
             alignment: Alignment.centerLeft,
@@ -444,6 +486,20 @@ class _ExpandedSale extends StatelessWidget {
             ),
           ),
       ],
+    ),
+  );
+}
+
+class _PaymentLine extends StatelessWidget {
+  final String text;
+  const _PaymentLine(this.text);
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: Padding(
+      padding: const EdgeInsets.only(top: 7),
+      child: Text(text, style: TextStyle(fontSize: 11, color: context.colors.textSecondary)),
     ),
   );
 }

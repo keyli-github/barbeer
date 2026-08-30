@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/navigation/app_nav.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -12,6 +14,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../ventas/data/models/venta_models.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
 import '../widgets/caja_arqueo_sheets.dart';
@@ -921,6 +924,70 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
   final _conceptController = TextEditingController();
   bool _loading = false;
 
+  // Label + staff state
+  List<Etiqueta> _etiquetas = [];
+  String? _etiquetaId;
+  List<Map<String, dynamic>> _personal = [];
+  String? _personalId;
+  bool _loadingEtiquetas = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEtiquetas();
+  }
+
+  Future<void> _loadEtiquetas() async {
+    final sedeId = ref.read(cajaProvider).sedeId;
+    if (sedeId == null) return;
+    setState(() => _loadingEtiquetas = true);
+    try {
+      final response = await ApiClient.instance.get(
+        ApiConstants.etiquetas,
+        queryParameters: {'pagina': 1, 'limite': 100, 'sedeId': sedeId, 'soloActivas': true},
+      );
+      final data = Map<String, dynamic>.from(response.data as Map);
+      final all = (data['data'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => Etiqueta.fromJson(Map<String, dynamic>.from(e)))
+          .where((e) => e.activo)
+          .toList();
+      if (mounted) setState(() => _etiquetas = all);
+    } catch (_) {
+      // etiquetas are optional — proceed without them
+    } finally {
+      if (mounted) setState(() => _loadingEtiquetas = false);
+    }
+  }
+
+  Future<void> _loadPersonal(String sedeId) async {
+    try {
+      final response = await ApiClient.instance.get(
+        ApiConstants.users,
+        queryParameters: {'pagina': 1, 'limite': 100, 'sedeId': sedeId},
+      );
+      final data = Map<String, dynamic>.from(response.data as Map);
+      final list = (data['data'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((e) => e['activo'] == true && (e['rol'] as Map?)?['nombre'] != 'SUPERADMIN')
+          .toList();
+      if (mounted) setState(() => _personal = list);
+    } catch (_) {
+      if (mounted) setState(() => _personal = []);
+    }
+  }
+
+  Etiqueta? get _selectedEtiqueta =>
+      _etiquetaId == null ? null : _etiquetas.where((e) => e.id == _etiquetaId).firstOrNull;
+
+  bool get _requierePersonal =>
+      widget.tipo == 'SALIDA' && (_selectedEtiqueta?.tipo == 'SALIDA' || _selectedEtiqueta?.tipo == 'AMBOS');
+
+  List<Etiqueta> get _filteredEtiquetas => _etiquetas
+      .where((e) => e.tipo == 'AMBOS' || e.tipo == widget.tipo)
+      .toList();
+
   @override
   void dispose() {
     _amountController.dispose();
@@ -931,6 +998,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
   @override
   Widget build(BuildContext context) {
     final entrada = widget.tipo == 'ENTRADA';
+    final etiquetas = _filteredEtiquetas;
     return Scaffold(
       backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
@@ -942,6 +1010,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppTextField(
                 label: 'Monto (S/)',
@@ -974,6 +1043,78 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
                     ? 'Ingresa un concepto'
                     : null,
               ),
+              if (_loadingEtiquetas) ...[
+                const SizedBox(height: 14),
+                const LinearProgressIndicator(),
+              ] else if (etiquetas.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('etiqueta-$_etiquetaId'),
+                  value: _etiquetaId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Etiqueta (opcional)',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Sin etiqueta'),
+                    ),
+                    ...etiquetas.map(
+                      (e) => DropdownMenuItem<String>(
+                        value: e.id,
+                        child: Text(e.nombre, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) async {
+                    setState(() {
+                      _etiquetaId = value;
+                      _personalId = null;
+                      _personal = [];
+                    });
+                    if (value != null && _requierePersonal) {
+                      final sedeId = ref.read(cajaProvider).sedeId;
+                      if (sedeId != null) await _loadPersonal(sedeId);
+                    }
+                  },
+                ),
+              ],
+              if (_requierePersonal) ...[
+                const SizedBox(height: 14),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('personal-$_personalId'),
+                  value: _personalId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Personal',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  validator: (v) =>
+                      _requierePersonal && (v == null || v.isEmpty)
+                          ? 'Selecciona el personal responsable'
+                          : null,
+                  items: _personal
+                      .map(
+                        (p) => DropdownMenuItem<String>(
+                          value: p['id'] as String? ?? '',
+                          child: Text(
+                            p['username'] as String? ?? '',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _personalId = v),
+                ),
+              ],
               const SizedBox(height: 20),
               AppButton(
                 label: entrada ? 'Registrar entrada' : 'Registrar salida',
@@ -1004,6 +1145,8 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
             tipo: widget.tipo,
             monto: double.parse(_amountController.text),
             concepto: _conceptController.text.trim(),
+            etiquetaId: _etiquetaId,
+            personalUsuarioId: _requierePersonal ? _personalId : null,
           );
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {

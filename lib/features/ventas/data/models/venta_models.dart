@@ -228,6 +228,8 @@ class ConciliacionVenta {
   final String? comprobante;
   final String? codigoOperacion;
   final String? clasificadaAt;
+  final String? metodoPagoPendiente;
+  final bool pagoRestoEfectivo;
 
   const ConciliacionVenta({
     required this.id,
@@ -238,6 +240,8 @@ class ConciliacionVenta {
     this.comprobante,
     this.codigoOperacion,
     this.clasificadaAt,
+    this.metodoPagoPendiente,
+    this.pagoRestoEfectivo = false,
   });
 
   factory ConciliacionVenta.fromJson(Map<String, dynamic> j) =>
@@ -250,6 +254,8 @@ class ConciliacionVenta {
         comprobante: j['comprobante'] as String?,
         codigoOperacion: j['codigoOperacion'] as String?,
         clasificadaAt: j['clasificadaAt'] as String?,
+        metodoPagoPendiente: j['metodoPagoPendiente'] as String?,
+        pagoRestoEfectivo: j['pagoRestoEfectivo'] as bool? ?? false,
       );
 }
 
@@ -299,13 +305,19 @@ class Venta {
   final String cajaSesionId;
   final String sedeId;
   final String? vendedoraUsername;
+  final String? registradaPorUsername;
   final double total;
+  final bool hasAuthoritativeTotal;
   final EstadoVenta estado;
   final String? motivoAnulacion;
   final String? anuladaAt;
   final double? recargoMonto;
   final String? recargoMotivo;
+  final String? cuentaId;
+  final String? cuentaNombre;
+  final double? cuentaMonto;
   final ConciliacionVenta? conciliacion;
+  final List<ConciliacionVenta> conciliaciones;
   final List<VentaItem> items;
   final String createdAt;
 
@@ -315,13 +327,19 @@ class Venta {
     required this.cajaSesionId,
     required this.sedeId,
     this.vendedoraUsername,
+    this.registradaPorUsername,
     required this.total,
+    this.hasAuthoritativeTotal = true,
     required this.estado,
     this.motivoAnulacion,
     this.anuladaAt,
     this.recargoMonto,
     this.recargoMotivo,
+    this.cuentaId,
+    this.cuentaNombre,
+    this.cuentaMonto,
     this.conciliacion,
+    this.conciliaciones = const [],
     required this.items,
     required this.createdAt,
   });
@@ -332,17 +350,26 @@ class Venta {
     cajaSesionId: j['cajaSesionId'] as String? ?? '',
     sedeId: j['sedeId'] as String? ?? '',
     vendedoraUsername: (j['vendedora'] as Map?)?['username'] as String?,
+    registradaPorUsername: (j['registradaPor'] as Map?)?['username'] as String?,
     total: (j['total'] as num?)?.toDouble() ?? 0,
+    hasAuthoritativeTotal: j['total'] is num,
     estado: parseEstadoVenta(j['estado'] as String?),
     motivoAnulacion: j['motivoAnulacion'] as String?,
     anuladaAt: j['anuladaAt'] as String?,
     recargoMonto: (j['recargoMonto'] as num?)?.toDouble(),
     recargoMotivo: j['recargoMotivo'] as String?,
+    cuentaId: j['cuentaId'] as String?,
+    cuentaNombre: (j['cuenta'] as Map?)?['nombre'] as String?,
+    cuentaMonto: (j['cuentaMonto'] as num?)?.toDouble(),
     conciliacion: j['conciliacion'] is Map
         ? ConciliacionVenta.fromJson(
             Map<String, dynamic>.from(j['conciliacion'] as Map),
           )
         : null,
+    conciliaciones: (j['conciliaciones'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => ConciliacionVenta.fromJson(Map<String, dynamic>.from(item)))
+        .toList(),
     items: (j['items'] as List? ?? const [])
         .map(
           (item) => VentaItem.fromJson(Map<String, dynamic>.from(item as Map)),
@@ -353,7 +380,6 @@ class Venta {
 
   bool get isAnulada => estado == EstadoVenta.anulada;
   bool get isPendiente => conciliacion?.estado == EstadoConciliacion.pendiente;
-  double get subtotalSinRecargo => total - (recargoMonto ?? 0);
 }
 
 class VendedorVenta {
@@ -390,6 +416,8 @@ class CreateVentaPayload {
     String? comprobanteAnalisisId,
     double? recargoMonto,
     String? recargoMotivo,
+    String? cuentaId,
+    double? cuentaMonto,
   }) : json = Map.unmodifiable({
          'idempotencyKey': idempotencyKey,
          'items': List.unmodifiable(
@@ -404,6 +432,8 @@ class CreateVentaPayload {
          if (comprobanteAnalisisId == null) 'codigoOperacion': ?codigoOperacion,
          'recargoMonto': ?recargoMonto,
          'recargoMotivo': ?recargoMotivo,
+         'cuentaId': ?cuentaId,
+         'cuentaMonto': ?cuentaMonto,
        });
 
   String get idempotencyKey => json['idempotencyKey'] as String;

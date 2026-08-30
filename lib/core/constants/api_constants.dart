@@ -45,6 +45,10 @@ class ApiConstants {
   static String user(String id) => '/usuarios/$id';
   static String resetUserPassword(String id) =>
       '/usuarios/$id/resetear-password';
+  static String userPermissions(String id) => '/usuarios/$id/permisos';
+  static String superadminPin(String id) => '/usuarios/$id/superadmin-pin';
+  static const String validatePin = '/usuarios/validate-pin';
+  static String productStock(String id) => '/productos/$id/stock';
 
   // ── Roles ────────────────────────────────────────────────────────────────
   static const String roles = '/roles';
@@ -117,10 +121,32 @@ class ApiConstants {
   static String anularVenta(String id) => '/ventas/$id/anular';
   static String conciliarVenta(String id) => '/ventas/$id/conciliacion';
 
+  static const String recargoEstado = '/recargo-control/estado';
+  static const String recargoConfiguracion = '/recargo-control/configuracion';
+  static const String recargoCambiar = '/recargo-control/cambiar';
+
+  static const String accounts = '/cuentas';
+  static const String accountSelector = '/cuentas/selector';
+  static String account(String id) => '/cuentas/$id';
+  static String accountPayments(String id) => '/cuentas/$id/pagos';
+
   // ── Etiquetas (billeteras digitales) ─────────────────────────────────────
   static const String etiquetas = '/etiquetas';
   static String etiqueta(String id) => '/etiquetas/$id';
   static String etiquetaEstado(String id) => '/etiquetas/$id/estado';
+
+  // ── Reports ──────────────────────────────────────────────────────────────
+  static String reportExport(String tipo) => '/reportes/$tipo/exportar';
+  static String reportCajaExport(String cajaId) =>
+      '/reportes/cajas/$cajaId/ventas/exportar';
+  static const String reportEmailConfig = '/reportes/email/configuration';
+  static const String reportEmailTest = '/reportes/email/test';
+
+  // ── Backups ───────────────────────────────────────────────────────────────
+  static const String backupSchedule = '/backups/schedule';
+  static const String backupRuns = '/backups/runs';
+  static String backupArtifact(String runId, String format) =>
+      '/backups/runs/$runId/artifacts/$format';
 
   // ── Uploads ──────────────────────────────────────────────────────────────
   static const String uploads = '/uploads';

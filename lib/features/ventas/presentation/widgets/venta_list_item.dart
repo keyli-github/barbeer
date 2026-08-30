@@ -113,7 +113,7 @@ class VentaListItem extends StatelessWidget {
                     children: [
                       if (showConciliarButton && venta.isPendiente)
                         _ActionChip(
-                          label: 'Clasificar',
+                          label: 'Pendiente',
                           icon: Icons.account_balance_wallet_rounded,
                           color: AppColors.warning,
                           onTap: onConciliar,

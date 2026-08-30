@@ -175,10 +175,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     BoxConstraints constraints,
     BrandingState branding,
   ) {
-    final isNarrow = constraints.maxWidth < 340;
-    final isShort = pageHeight < 560;
-    final heroHeight = (pageHeight * 0.42)
-        .clamp(isShort ? 180.0 : 286.0, isShort ? 250.0 : 360.0)
+    final isNarrow = constraints.maxWidth < 360;
+    final isShort = pageHeight < 600;
+    // Keep hero visible but never dominate a short screen.
+    // Minimum is 160 so the logo (positioned -30px above the card) always has
+    // a visible background instead of overlapping the status bar.
+    final heroHeight = (pageHeight * 0.38)
+        .clamp(isShort ? 160.0 : 220.0, isShort ? 220.0 : 320.0)
         .toDouble();
 
     return Center(

@@ -15,6 +15,7 @@ import '../../../../core/widgets/ds_product_image.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../productos/data/productos_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../recargo/presentation/providers/recargo_control_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../../data/ventas_repository.dart';
 import '../providers/ventas_provider.dart';
@@ -582,6 +583,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   }
 
   Future<void> _editRecargo(VoidCallback refresh) async {
+    if (ref.read(recargoControlProvider).oculto) return;
     var amountText = _recargoMonto?.toStringAsFixed(2) ?? '';
     var reasonText = _recargoMotivo ?? '';
     String? error;
@@ -653,6 +655,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Widget _buildSaleDetails({required VoidCallback refresh}) {
     final auth = ref.read(authProvider);
+    final recargoOculto = ref.read(recargoControlProvider).oculto;
     final selectedEtiqueta = _etiquetas
         .where((item) => item.id == _etiquetaId)
         .firstOrNull;
@@ -884,81 +887,12 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
               ),
             ],
           ],
-          // Subtotal row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Subtotal',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: context.colors.textSecondary,
-                ),
-              ),
-              Text(
-                _fmt(_carrito.fold(0.0, (s, i) => s + i.subtotal)),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: context.colors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          // Recargo section
-          Row(
-            children: [
-              Expanded(
-                child: _recargoMonto == null
-                    ? GestureDetector(
-                        key: const Key('add-surcharge'),
-                        onTap: _frozen ? null : () => _editRecargo(refresh),
-                        child: Text(
-                          '+ Agregar recargo',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _frozen
-                                ? context.colors.textTertiary
-                                : AppColors.brand,
-                          ),
-                        ),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Recargo: ${_fmt(_recargoMonto!)}',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          if (_recargoMotivo != null)
-                            Text(
-                              _recargoMotivo!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: context.colors.textTertiary,
-                              ),
-                            ),
-                        ],
-                      ),
-              ),
-              if (_recargoMonto != null)
-                IconButton(
-                  key: const Key('remove-surcharge'),
-                  onPressed: _frozen
-                      ? null
-                      : () {
-                          update(() {
-                            _recargoMonto = null;
-                            _recargoMotivo = null;
-                          });
-                          _invalidateAnalysisIfAmountChanged();
-                        },
-                  icon: const Icon(Icons.close_rounded, size: 17),
-                  visualDensity: VisualDensity.compact,
-                ),
-            ],
-          ),
+          if (!recargoOculto)
+            TextButton(
+              key: const Key('add-surcharge'),
+              onPressed: _frozen ? null : () => _editRecargo(refresh),
+              child: Text(_recargoMonto == null ? 'Ajustar total' : 'Editar ajuste'),
+            ),
         ],
       ),
     );
@@ -1128,6 +1062,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Future<void> _submit() async {
     if (_submitting || _carrito.isEmpty) return;
+    if (_blockHiddenRecargo(_retryPayload?.json['recargoMonto'] as num? ?? _recargoMonto)) return;
     if (_retryPayload != null) {
       await _executePayload(_retryPayload!);
       return;
@@ -1261,6 +1196,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   /// Guarda la venta como PENDIENTE sin clasificar método de pago.
   Future<void> _submitPending() async {
     if (_submitting || _carrito.isEmpty) return;
+    if (_blockHiddenRecargo(_recargoMonto)) return;
     final auth = ref.read(authProvider);
     final sedeId = auth.user?.isSuperAdmin == true
         ? ref.read(globalSedeIdProvider)
@@ -1339,6 +1275,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     return 'No se pudo registrar la venta. Intenta de nuevo.';
   }
 
+  bool _blockHiddenRecargo(num? amount) {
+    if (!shouldBlockPositiveRecargo(
+      oculto: ref.read(recargoControlProvider).oculto,
+      monto: amount,
+    )) return false;
+    setState(() => _submitError = 'Los ajustes de total no están disponibles');
+    return true;
+  }
+
   void _showCarrito() {
     showModalBottomSheet(
       context: context,
@@ -1395,6 +1340,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final recargoOculto = ref.watch(recargoControlProvider).oculto;
+    if (recargoOculto && _recargoMonto != null && !_frozen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final draft = resolveRecargoDraft(
+          oculto: true, monto: _recargoMonto, motivo: _recargoMotivo);
+        setState(() { _recargoMonto = draft.monto; _recargoMotivo = draft.motivo; });
+      });
+    }
     final selectedSedeId = ref.watch(globalSedeIdProvider);
     final effectiveSedeId = auth.user?.isSuperAdmin == true
         ? selectedSedeId

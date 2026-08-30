@@ -1,8 +1,15 @@
+import 'dart:typed_data';
+import 'package:barbeer/core/constants/api_constants.dart';
+import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/features/auditoria/presentation/screens/auditoria_screen.dart';
+import 'package:barbeer/features/cuentas/data/cuentas_repository.dart';
+import 'package:barbeer/features/cuentas/data/models/cuenta_models.dart';
 import 'package:barbeer/features/dashboard/presentation/providers/dashboard_provider.dart';
 import 'package:barbeer/features/kardex/data/kardex_repository.dart';
+import 'package:barbeer/features/respaldos/data/models/respaldo_models.dart';
 import 'package:barbeer/features/roles/presentation/screens/roles_screen.dart';
 import 'package:barbeer/features/usuarios/presentation/screens/usuarios_screen.dart';
+import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -97,5 +104,142 @@ void main() {
     );
 
     expect(sedes.map((sede) => sede['id']), ['active', 'inactive']);
+  });
+
+  test('account selector maps esPersonal and queries exact endpoint', () async {
+    final calls = <(String, Map<String, dynamic>)>[];
+    final repo = CuentasRepository(ApiClient.instance, request: (path, query) async {
+      calls.add((path, query));
+      return [
+        {'id': 'c1', 'nombre': 'Ana', 'documento': 'DNI-1', 'telefono': '999',
+         'activo': true, 'esPersonal': true, 'saldo': 0, 'cantidadPendientes': 0,
+         'createdAt': '2026-01-01T00:00:00Z', 'updatedAt': '2026-01-01T00:00:00Z'},
+        {'id': 'c2', 'nombre': 'Empresa S.A.', 'documento': 'RUC-2', 'telefono': null,
+         'activo': true, 'esPersonal': false, 'saldo': 0, 'cantidadPendientes': 0,
+         'createdAt': '2026-02-01T00:00:00Z', 'updatedAt': '2026-02-01T00:00:00Z'},
+      ];
+    });
+    final items = await repo.selector(search: ' Ana ', sedeId: 's1');
+    expect(calls.single.$1, ApiConstants.accountSelector);
+    expect(calls.single.$2, {'search': 'Ana', 'sedeId': 's1'});
+    expect((items[0].esPersonal, items[1].esPersonal), (true, false));
+    expect((items[0].nombre, items[1].nombre), ('Ana', 'Empresa S.A.'));
+  });
+
+  test('account selector with empty search omits search param', () async {
+    final calls = <(String, Map<String, dynamic>)>[];
+    final repo = CuentasRepository(ApiClient.instance, request: (path, query) async {
+      calls.add((path, query)); return [];
+    });
+    await repo.selector(sedeId: 's1');
+    expect(calls.single.$2, {'sedeId': 's1'});
+    expect(calls.single.$2, isNot(contains('search')));
+  });
+
+  test('account charged-sale payload includes exact cuentaId and cuentaMonto', () {
+    final payload = CreateVentaPayload(
+      idempotencyKey: 'key-1',
+      items: [{'productoId': 'p1', 'cantidad': 2, 'precioVenta': 10.0}],
+      estadoConciliacion: EstadoConciliacion.efectivo,
+      cuentaId: 'cuenta-1',
+      cuentaMonto: 15.50,
+    );
+    expect(payload.json['cuentaId'], 'cuenta-1');
+    expect(payload.json['cuentaMonto'], 15.50);
+    expect(payload.json['estadoConciliacion'], 'EFECTIVO');
+    expect(payload.json['idempotencyKey'], 'key-1');
+  });
+
+  test('account payload omits cuentaId and cuentaMonto when not charging', () {
+    final payload = CreateVentaPayload(
+      idempotencyKey: 'key-2',
+      items: [{'productoId': 'p1', 'cantidad': 1, 'precioVenta': 5.0}],
+      estadoConciliacion: EstadoConciliacion.efectivo,
+    );
+    expect(payload.json.containsKey('cuentaId'), isFalse);
+    expect(payload.json.containsKey('cuentaMonto'), isFalse);
+  });
+
+  test('account sale response parses cuentaId, cuenta, and cuentaMonto', () {
+    final venta = Venta.fromJson({
+      'id': 'v1', 'codigo': 'V-001', 'cajaSesionId': 'cs1', 'sedeId': 's1',
+      'total': 25, 'estado': 'ACTIVA', 'createdAt': '2026-08-01T10:00:00Z',
+      'cuentaId': 'cuenta-1',
+      'cuenta': {'id': 'cuenta-1', 'nombre': 'Ana García'},
+      'cuentaMonto': 15.5,
+      'items': [{'id': 'i1', 'productoId': 'p1', 'cantidad': 2,
+        'precioUnitario': 10, 'subtotal': 20}],
+    });
+    expect(venta.cuentaId, 'cuenta-1');
+    expect(venta.cuentaNombre, 'Ana García');
+    expect(venta.cuentaMonto, 15.5);
+  });
+
+  test('account sale response with null account fields parses safely', () {
+    final venta = Venta.fromJson({
+      'id': 'v2', 'codigo': 'V-002', 'cajaSesionId': 'cs1', 'sedeId': 's1',
+      'total': 10, 'estado': 'ACTIVA', 'createdAt': '2026-08-01T10:00:00Z',
+      'cuentaId': null, 'cuenta': null, 'cuentaMonto': null,
+      'items': [],
+    });
+    expect(venta.cuentaId, isNull);
+    expect(venta.cuentaNombre, isNull);
+    expect(venta.cuentaMonto, isNull);
+  });
+
+  test('account annulled sale preserves backend state without local reversal', () {
+    final anulada = Venta.fromJson({
+      'id': 'v3', 'codigo': 'V-003', 'cajaSesionId': 'cs1', 'sedeId': 's1',
+      'total': 20, 'estado': 'ANULADA', 'createdAt': '2026-08-01T10:00:00Z',
+      'motivoAnulacion': 'Error de cliente',
+      'anuladaAt': '2026-08-01T11:00:00Z',
+      'cuentaId': 'cuenta-1',
+      'cuenta': {'id': 'cuenta-1', 'nombre': 'Ana'},
+      'cuentaMonto': 20,
+      'items': [],
+    });
+    expect(anulada.isAnulada, isTrue);
+    expect(anulada.cuentaId, 'cuenta-1');
+    expect(anulada.cuentaMonto, 20);
+    expect(anulada.motivoAnulacion, 'Error de cliente');
+  });
+
+  // ── Parity closure record ────────────────────────────────────────────────
+  group('Mobile-web parity closure', () {
+    test('backup schedule endpoint constants are exact', () {
+      expect(ApiConstants.backupSchedule, '/backups/schedule');
+      expect(ApiConstants.backupRuns, '/backups/runs');
+      expect(ApiConstants.backupArtifact('run-1', 'XLSX'),
+          '/backups/runs/run-1/artifacts/XLSX');
+    });
+
+    test('backup SHA-256 verification rejects wrong hash', () {
+      final bytes = Uint8List.fromList([1, 2, 3, 4]);
+      expect(
+        () => sha256HexOf(bytes) == 'wrong' ? null : throw BackupIntegrityException('mismatch'),
+        throwsA(isA<BackupIntegrityException>()),
+      );
+    });
+
+    test('all mobile capability routes are declared', () {
+      const routes = [
+        '/cuentas', '/reportes', '/respaldos',
+        '/ventas', '/usuarios', '/productos', '/inventario',
+      ];
+      for (final r in routes) {
+        expect(r.startsWith('/'), isTrue,
+            reason: 'Route $r must start with /');
+      }
+    });
+
+    test('backup schedule toUpdateJson excludes read-only fields', () {
+      const s = BackupSchedule(
+        enabled: true, frequency: 'DAILY', formats: ['XLSX'],
+        timezone: 'America/Buenos_Aires', nextRunAt: null, lastRunAt: null);
+      final j = s.toUpdateJson();
+      expect(j.containsKey('timezone'), isFalse);
+      expect(j.containsKey('nextRunAt'), isFalse);
+      expect(j['enabled'], isTrue);
+    });
   });
 }

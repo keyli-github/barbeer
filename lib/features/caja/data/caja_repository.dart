@@ -47,12 +47,16 @@ Map<String, dynamic> cajaMovimientoPayload({
   required String tipo,
   required double monto,
   required String concepto,
+  String? etiquetaId,
+  String? personalUsuarioId,
 }) => {
   'tipo': tipo,
   'origen': 'MANUAL',
   'medioPago': 'EFECTIVO',
   'monto': monto,
   'concepto': concepto.trim(),
+  if (etiquetaId != null) 'etiquetaId': etiquetaId,
+  if (personalUsuarioId != null) 'personalUsuarioId': personalUsuarioId,
 };
 
 Map<String, dynamic> cajaCierrePayload(
@@ -85,6 +89,12 @@ class CajaResumenV2 {
   final int ventasPendientes;
   final int cantidadVentas;
   final int cantidadAnuladas;
+  final double costoProductosVendidos;
+  final double utilidadBruta;
+  final int unidadesVendidas;
+  final double otrosGastos;
+  final double utilidadNeta;
+  final double margenNeto;
   final List<Map<String, dynamic>> porVendedora;
   final List<Map<String, dynamic>> resumenProductos;
   final List<Map<String, dynamic>> porBilletera;
@@ -100,6 +110,12 @@ class CajaResumenV2 {
     required this.ventasPendientes,
     required this.cantidadVentas,
     required this.cantidadAnuladas,
+    this.costoProductosVendidos = 0,
+    this.utilidadBruta = 0,
+    this.unidadesVendidas = 0,
+    this.otrosGastos = 0,
+    this.utilidadNeta = 0,
+    this.margenNeto = 0,
     this.porVendedora = const [],
     this.resumenProductos = const [],
     this.porBilletera = const [],
@@ -116,6 +132,13 @@ class CajaResumenV2 {
     ventasPendientes: (json['ventasPendientes'] as num?)?.toInt() ?? 0,
     cantidadVentas: (json['cantidadVentas'] as num?)?.toInt() ?? 0,
     cantidadAnuladas: (json['cantidadAnuladas'] as num?)?.toInt() ?? 0,
+    costoProductosVendidos:
+        (json['costoProductosVendidos'] as num?)?.toDouble() ?? 0,
+    utilidadBruta: (json['utilidadBruta'] as num?)?.toDouble() ?? 0,
+    unidadesVendidas: (json['unidadesVendidas'] as num?)?.toInt() ?? 0,
+    otrosGastos: (json['otrosGastos'] as num?)?.toDouble() ?? 0,
+    utilidadNeta: (json['utilidadNeta'] as num?)?.toDouble() ?? 0,
+    margenNeto: (json['margenNeto'] as num?)?.toDouble() ?? 0,
     porVendedora: (json['porVendedora'] as List? ?? [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
@@ -551,10 +574,18 @@ class CajaRepository {
     required String tipo,
     required double monto,
     required String concepto,
+    String? etiquetaId,
+    String? personalUsuarioId,
   }) async {
     await _api.post(
       '/caja/$id/movimientos',
-      data: cajaMovimientoPayload(tipo: tipo, monto: monto, concepto: concepto),
+      data: cajaMovimientoPayload(
+        tipo: tipo,
+        monto: monto,
+        concepto: concepto,
+        etiquetaId: etiquetaId,
+        personalUsuarioId: personalUsuarioId,
+      ),
     );
   }
 
