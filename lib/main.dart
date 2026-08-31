@@ -47,7 +47,7 @@ class BarBeerApp extends ConsumerWidget {
     Future.microtask(() => ref.read(brandingProvider.notifier).load());
 
     return MaterialApp.router(
-      title: 'BarBeer',
+      title: 'Yacare',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

@@ -716,6 +716,8 @@ class _HeroPanel extends StatelessWidget {
                 title: 'Caja y reportes',
                 desc: 'Cierres, reportes y conciliaciones.',
               ),
+              // Espacio para que el logo circular no tape la última card
+              SizedBox(height: 48),
             ],
           ),
         ),

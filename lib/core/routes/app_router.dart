@@ -208,25 +208,12 @@ class _SplashState extends ConsumerState<_SplashScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Logo real — más grande
           Image.asset(
-            'assets/images/barbeer_Log.png',
-            width: 132,
-            height: 88,
+            'assets/images/yacare.png',
+            width: 96,
+            height: 96,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: context.colors.brandSurface,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.local_bar_rounded,
-                color: AppColors.brand,
-                size: 48,
-              ),
-            ),
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 20),
           const BarBeerWordmark(fontSize: 32),

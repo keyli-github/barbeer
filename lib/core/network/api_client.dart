@@ -59,14 +59,14 @@ class ApiClient {
     if (kIsWeb) return null;
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => const {
-        'x-device-name': 'BarBeer Android',
+        'x-device-name': 'Yacare Android',
         'x-device-type': 'android',
-        'user-agent': 'BarBeer/1.0 (Android)',
+        'user-agent': 'Yacare/1.0 (Android)',
       },
       TargetPlatform.windows => const {
-        'x-device-name': 'BarBeer Windows',
+        'x-device-name': 'Yacare Windows',
         'x-device-type': 'windows',
-        'user-agent': 'BarBeer/1.0 (Windows)',
+        'user-agent': 'Yacare/1.0 (Windows)',
       },
       _ => null,
     };

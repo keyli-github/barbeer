@@ -1788,7 +1788,7 @@ class _ScannerErrorView extends StatelessWidget {
         : 'No se pudo iniciar la cámara';
 
     final description = permissionDenied
-        ? 'Para escanear el QR de asistencia, BarBeer necesita acceso a la cámara. Puedes habilitarlo desde los ajustes del dispositivo.'
+        ? 'Para escanear el QR de asistencia, Yacare necesita acceso a la cámara. Puedes habilitarlo desde los ajustes del dispositivo.'
         : unsupported
         ? 'Este dispositivo no tiene una cámara compatible con el escáner de QR.'
         : 'Ocurrió un error al iniciar la cámara. Revisa que ninguna otra app la esté usando e inténtalo de nuevo.';
