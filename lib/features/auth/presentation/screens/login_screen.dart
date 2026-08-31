@@ -168,7 +168,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
 
   // ════════════════════════════════════════════════════════════════════════════
-  // MOBILE LAYOUT (< 1024px) — Stacked: hero top, panel bottom
+  // MOBILE LAYOUT (< 1024px) — Compact: fits any screen without scrolling.
+  // Uses SizedBox(height: pageHeight) so the Column fills exactly the viewport
+  // when the keyboard is closed (no scroll) but the SingleChildScrollView
+  // activates automatically when the keyboard pushes the content up.
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildMobile(
     double pageHeight,
@@ -176,12 +179,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     BrandingState branding,
   ) {
     final isNarrow = constraints.maxWidth < 360;
-    final isShort = pageHeight < 600;
-    // Keep hero visible but never dominate a short screen.
-    // Minimum is 160 so the logo (positioned -30px above the card) always has
-    // a visible background instead of overlapping the status bar.
-    final heroHeight = (pageHeight * 0.38)
-        .clamp(isShort ? 160.0 : 220.0, isShort ? 220.0 : 320.0)
+    // Show feature cards in the hero only when there is enough vertical room.
+    final showCards = pageHeight >= 640;
+    // Hero height: just enough for its content; never dominates the screen.
+    final heroH = (pageHeight * 0.37)
+        .clamp(showCards ? 240.0 : 140.0, showCards ? 280.0 : 190.0)
         .toDouble();
 
     return Center(
@@ -190,70 +192,86 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: pageHeight),
+          // SizedBox = full page height → no scroll when keyboard is closed;
+          // keyboard opening shrinks the viewport so scroll kicks in naturally.
+          child: SizedBox(
+            height: pageHeight,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               children: [
-                _HeroPanel(
-                  height: heroHeight,
-                  coverUrl: branding.coverUrl,
+                // ── Hero: fixed height, clips to its bounds ──────────────────
+                SizedBox(
+                  height: heroH,
+                  width: double.infinity,
+                  child: _HeroPanel(
+                    height: heroH,
+                    coverUrl: branding.coverUrl,
+                    showCards: showCards,
+                  ),
                 ),
-                FadeTransition(
-                  opacity: _fade,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.06),
-                      end: Offset.zero,
-                    ).animate(_fade),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.topCenter,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0B0A08),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.10),
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x80000000),
-                                blurRadius: 40,
-                                offset: Offset(0, 20),
-                              ),
-                            ],
-                          ),
-                          child: SafeArea(
-                            top: false,
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                isNarrow ? 20.0 : 24.0,
-                                isShort ? 34.0 : 44.0,
-                                isNarrow ? 20.0 : 24.0,
-                                isShort ? 16.0 : 20.0,
-                              ),
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 400),
-                                  child: _buildForm(
-                                    desktop: false,
-                                    narrow: isNarrow,
+                // ── Login card: Expanded fills all remaining space ────────────
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: FadeTransition(
+                      opacity: _fade,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.06),
+                          end: Offset.zero,
+                        ).animate(_fade),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.topCenter,
+                          children: [
+                            // Card fills the entire Expanded space
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0B0A08),
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.10),
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x80000000),
+                                      blurRadius: 40,
+                                      offset: Offset(0, 20),
+                                    ),
+                                  ],
+                                ),
+                                child: SafeArea(
+                                  top: false,
+                                  child: Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      isNarrow ? 20.0 : 24.0,
+                                      42.0, // clears the 64px logo at top: -30
+                                      isNarrow ? 20.0 : 24.0,
+                                      12.0,
+                                    ),
+                                    child: Center(
+                                      child: ConstrainedBox(
+                                        constraints:
+                                            const BoxConstraints(maxWidth: 400),
+                                        child: _buildForm(
+                                          desktop: false,
+                                          narrow: isNarrow,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
+                            // Floating logo at the hero/card boundary
+                            Positioned(
+                              top: -30,
+                              child: _Logo(url: branding.logoUrl, size: 62),
+                            ),
+                          ],
                         ),
-                        Positioned(
-                          top: -30,
-                          child: _Logo(url: branding.logoUrl, size: 64),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -291,7 +309,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: desktop ? 28 : 18),
+            SizedBox(height: desktop ? 28 : 10),
 
             // Error
             if (_error != null) ...[
@@ -359,12 +377,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
             ),
-            SizedBox(height: desktop ? 18 : 14),
+            SizedBox(height: desktop ? 18 : 10),
 
             // Button
             SizedBox(
               width: double.infinity,
-              height: desktop ? 52 : 48,
+              height: desktop ? 52 : 46,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -419,7 +437,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
             ),
-            SizedBox(height: desktop ? 24 : 14),
+            SizedBox(height: desktop ? 24 : 8),
 
             // Footer divider
             Row(
@@ -534,18 +552,21 @@ class _HeroPanel extends StatelessWidget {
   final double height;
   final bool desktop;
   final String? coverUrl;
+  final bool showCards;
 
   const _HeroPanel({
     required this.height,
     this.desktop = false,
     this.coverUrl,
+    this.showCards = true,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
         width: double.infinity,
-        constraints: BoxConstraints(minHeight: height),
+        height: height,
         child: Stack(
+          clipBehavior: Clip.hardEdge,
           children: [
             // Background image
             Positioned.fill(
@@ -682,42 +703,44 @@ class _HeroPanel extends StatelessWidget {
   Widget _mobileContent() => SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 32, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: const [
-              Center(child: BarBeerWordmark(fontSize: 28)),
-              SizedBox(height: 8),
-              Text(
-                'Accede de forma segura a la plataforma\nde administración de Yacare.',
+            children: [
+              const Center(child: BarBeerWordmark(fontSize: 26)),
+              const SizedBox(height: 5),
+              const Text(
+                'Accede de forma segura a la plataforma de administración de Yacare.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12.0,
                   color: Color(0xE6FFFFFF),
                   height: 1.3,
                 ),
               ),
-              SizedBox(height: 10),
-              _FeatureCard(
-                icon: Icons.bar_chart_rounded,
-                title: 'Ventas',
-                desc: 'Consulta y analiza el rendimiento.',
-              ),
-              SizedBox(height: 6),
-              _FeatureCard(
-                icon: Icons.inventory_2_outlined,
-                title: 'Inventario',
-                desc: 'Controla stock y movimientos.',
-              ),
-              SizedBox(height: 6),
-              _FeatureCard(
-                icon: Icons.receipt_long_outlined,
-                title: 'Caja y reportes',
-                desc: 'Cierres, reportes y conciliaciones.',
-              ),
-              // Espacio para que el logo circular no tape la última card
-              SizedBox(height: 48),
+              if (showCards) ...[
+                const SizedBox(height: 8),
+                const _FeatureCard(
+                  icon: Icons.bar_chart_rounded,
+                  title: 'Ventas',
+                  desc: 'Consulta y analiza el rendimiento.',
+                ),
+                const SizedBox(height: 4),
+                const _FeatureCard(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Inventario',
+                  desc: 'Controla stock y movimientos.',
+                ),
+                const SizedBox(height: 4),
+                const _FeatureCard(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Caja y reportes',
+                  desc: 'Cierres, reportes y conciliaciones.',
+                ),
+              ],
+              // Buffer so the floating logo (-30px) doesn't overlap hero content
+              const SizedBox(height: 34),
             ],
           ),
         ),
