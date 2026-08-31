@@ -3,6 +3,9 @@ import 'package:barbeer/core/errors/app_exception.dart';
 import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/features/usuarios/data/models/usuario_permission_models.dart';
 import 'package:barbeer/features/usuarios/data/usuario_admin_repository.dart';
+import 'package:barbeer/features/usuarios/presentation/widgets/permission_editor_sheet.dart';
+import 'package:barbeer/features/usuarios/presentation/widgets/pin_stock_adjust_sheet.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Map<String, dynamic> _resp({List<String> added = const [], List<String> revoked = const []}) {
@@ -326,6 +329,177 @@ void main() {
         'POST /usuarios/validate-pin',
         'POST /usuarios/validate-pin',
       ]);
+    });
+  });
+
+  // ── Permission Editor Widget ───────────────────────────────────────────────
+
+  Widget _editorApp(UsuarioAdminRepository repo) => MaterialApp(
+    home: Scaffold(body: PermissionEditorSheet(
+      userId: 'u-1', username: 'maria', repo: repo)),
+  );
+
+  group('permission editor widget', () {
+    testWidgets('loads permissions grouped by module with inherited/granted/revoked', (tester) async {
+      var current = _resp(added: ['p-cuentas-leer'], revoked: ['p-ventas-crear']);
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        getRequest: (_) async => current,
+        putRequest: (_, b) async { current = _resp(
+          added: (b['permisoIds'] as List).cast<String>(),
+          revoked: (b['permisoIdsRevocados'] as List?)?.cast<String>() ?? [],
+        ); return current; });
+      await tester.pumpWidget(_editorApp(repo));
+      // Loading state
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      await tester.pumpAndSettle();
+      // Module headers present
+      expect(find.text('ventas'), findsOneWidget);
+      expect(find.text('cuentas'), findsOneWidget);
+      expect(find.text('inventario'), findsOneWidget);
+      // Permission names rendered
+      expect(find.text('ventas:leer'), findsOneWidget);
+      expect(find.text('cuentas:leer'), findsOneWidget);
+      // Role summary
+      expect(find.textContaining('VENDEDORA'), findsOneWidget);
+    });
+
+    testWidgets('toggle calls replacePermissions and updates state', (tester) async {
+      Map<String, dynamic>? lastPutBody;
+      var current = _resp();
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        getRequest: (_) async => current,
+        putRequest: (_, b) async { lastPutBody = b; current = _resp(
+          added: (b['permisoIds'] as List).cast<String>(),
+          revoked: (b['permisoIdsRevocados'] as List?)?.cast<String>() ?? [],
+        ); return current; });
+      await tester.pumpWidget(_editorApp(repo));
+      await tester.pumpAndSettle();
+      // Find and tap the toggle for cuentas:leer (currently inactive, not inherited)
+      final cuentasToggle = find.byKey(const Key('perm-toggle-p-cuentas-leer'));
+      expect(cuentasToggle, findsOneWidget);
+      await tester.tap(cuentasToggle);
+      await tester.pumpAndSettle();
+      // Verify PUT was called with cuentas:leer as granted
+      expect(lastPutBody, isNotNull);
+      expect((lastPutBody!['permisoIds'] as List), contains('p-cuentas-leer'));
+    });
+
+    testWidgets('module bulk toggle enables all permissions in a module', (tester) async {
+      Map<String, dynamic>? lastPutBody;
+      var current = _resp();
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        getRequest: (_) async => current,
+        putRequest: (_, b) async { lastPutBody = b; current = _resp(
+          added: (b['permisoIds'] as List).cast<String>(),
+          revoked: (b['permisoIdsRevocados'] as List?)?.cast<String>() ?? [],
+        ); return current; });
+      await tester.pumpWidget(_editorApp(repo));
+      await tester.pumpAndSettle();
+      // Tap the module-level toggle for cuentas (currently off)
+      final moduloToggle = find.byKey(const Key('module-toggle-cuentas'));
+      expect(moduloToggle, findsOneWidget);
+      await tester.tap(moduloToggle);
+      await tester.pumpAndSettle();
+      expect(lastPutBody, isNotNull);
+      expect((lastPutBody!['permisoIds'] as List), contains('p-cuentas-leer'));
+    });
+
+    testWidgets('shows 403 error from non-superadmin', (tester) async {
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        getRequest: (_) async { throw const AppException(
+          message: 'Solo el SUPERADMIN puede ver permisos.', statusCode: 403); });
+      await tester.pumpWidget(_editorApp(repo));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('403'), findsOneWidget);
+    });
+
+    testWidgets('shows 404 when target user not found', (tester) async {
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        getRequest: (_) async { throw const AppException(
+          message: 'El usuario no existe.', statusCode: 404); });
+      await tester.pumpWidget(_editorApp(repo));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('usuario no existe'), findsOneWidget);
+    });
+  });
+
+  // ── PIN Stock Adjust Widget ────────────────────────────────────────────────
+
+  Widget _pinStockApp(UsuarioAdminRepository repo, {VoidCallback? onSaved}) =>
+    MaterialApp(home: Scaffold(body: PinStockAdjustSheet(
+      productId: 'prod-1', productName: 'Shampoo', currentStock: 10,
+      sedeId: 's-1', isSuperAdmin: false, repo: repo,
+      onSaved: onSaved ?? () {},
+    )));
+
+  group('PIN stock widget', () {
+    testWidgets('valid PIN then successful stock adjustment shows result', (tester) async {
+      var savedCalled = false;
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        postRequest: (path, body) async {
+          if (path == ApiConstants.validatePin) {
+            return {'success': true, 'username': 'admin1'};
+          }
+          return {'productoId': 'prod-1', 'sedeId': 's-1',
+            'stock': 20, 'tipo': 'ENTRADA', 'cantidad': 10};
+        });
+      await tester.pumpWidget(_pinStockApp(repo, onSaved: () => savedCalled = true));
+      // Select ENTRADA
+      await tester.tap(find.text('Entrada'));
+      await tester.pump();
+      // Enter quantity
+      await tester.enterText(find.byKey(const Key('stock-cantidad')), '10');
+      // Enter reference
+      await tester.enterText(find.byKey(const Key('stock-referencia')), 'Restock');
+      // Enter PIN
+      await tester.enterText(find.byKey(const Key('stock-pin')), '1234');
+      // Confirm
+      await tester.tap(find.text('Confirmar ajuste'));
+      await tester.pumpAndSettle();
+      // Success: onSaved was called
+      expect(savedCalled, isTrue);
+    });
+
+    testWidgets('wrong PIN shows error and keeps form editable', (tester) async {
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        postRequest: (path, body) async {
+          if (path == ApiConstants.validatePin) {
+            return {'success': false};
+          }
+          throw StateError('should not reach stock endpoint');
+        });
+      await tester.pumpWidget(_pinStockApp(repo));
+      await tester.tap(find.text('Entrada'));
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('stock-cantidad')), '5');
+      await tester.enterText(find.byKey(const Key('stock-referencia')), 'Test');
+      await tester.enterText(find.byKey(const Key('stock-pin')), '0000');
+      await tester.tap(find.text('Confirmar ajuste'));
+      await tester.pumpAndSettle();
+      // Error displayed, form still visible
+      expect(find.textContaining('PIN'), findsWidgets);
+      expect(find.byKey(const Key('stock-pin')), findsOneWidget);
+    });
+
+    testWidgets('429 throttle shows lockout message', (tester) async {
+      final repo = UsuarioAdminRepository(ApiClient.instance,
+        postRequest: (path, body) async {
+          if (path == ApiConstants.validatePin) {
+            throw const AppException(
+              message: 'Demasiados intentos fallidos. Intenta nuevamente en 15 minutos.',
+              statusCode: 429);
+          }
+          throw StateError('should not reach stock endpoint');
+        });
+      await tester.pumpWidget(_pinStockApp(repo));
+      await tester.tap(find.text('Entrada'));
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('stock-cantidad')), '5');
+      await tester.enterText(find.byKey(const Key('stock-referencia')), 'Test');
+      await tester.enterText(find.byKey(const Key('stock-pin')), '0000');
+      await tester.tap(find.text('Confirmar ajuste'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Demasiados intentos'), findsOneWidget);
     });
   });
 }

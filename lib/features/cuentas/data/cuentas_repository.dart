@@ -22,6 +22,14 @@ class CuentasRepository {
     final data = await _get(ApiConstants.accounts, query) as List;
     return data.map((value) => Cuenta.fromJson(Json.from(value as Map))).toList();
   }
+  Future<Cuenta> create({required String nombre, String? documento, String? telefono}) async {
+    final body = <String, dynamic>{'nombre': nombre.trim(),
+      if (documento?.trim().isNotEmpty ?? false) 'documento': documento!.trim(),
+      if (telefono?.trim().isNotEmpty ?? false) 'telefono': telefono!.trim()};
+    final data = post != null ? await post!(ApiConstants.accounts, body)
+      : (await _api.post(ApiConstants.accounts, data: body)).data;
+    return Cuenta.fromJson(Json.from(data as Map));
+  }
   Future<CuentaDetalle> detail(String id, {required String sedeId}) async =>
     CuentaDetalle.fromJson(Json.from(await _get(ApiConstants.account(id), {'sedeId': sedeId}) as Map));
   Future<CuentaDetalle> collect(String id, {required double monto, required String medioPago,

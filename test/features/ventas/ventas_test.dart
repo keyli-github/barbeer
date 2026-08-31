@@ -7,11 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/core/network/upload_client.dart';
+import 'package:barbeer/core/errors/app_exception.dart';
 import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
 import 'package:barbeer/features/ventas/presentation/screens/conciliar_venta_screen.dart';
 import 'package:barbeer/features/ventas/presentation/screens/historial_ventas_view.dart';
+import 'package:barbeer/features/ventas/presentation/screens/venta_detail_screen.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/anular_venta_dialog.dart';
 import 'package:barbeer/features/ventas/presentation/widgets/carrito_venta_sheet.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
@@ -60,6 +62,7 @@ class _FakeVentasRepository extends VentasRepository {
   int total = 0;
   int totalPaginas = 1;
   final requestedEstados = <String?>[];
+  final annulResults = <Object>[];
   final conciliaciones =
       <
         ({
@@ -141,6 +144,19 @@ class _FakeVentasRepository extends VentasRepository {
     ));
     return _venta(id);
   }
+
+  @override
+  Future<Venta> anularVenta(String id, {required String motivo}) async {
+    final result = annulResults.removeAt(0);
+    if (result is AppException) throw result;
+    return result as Venta;
+  }
+}
+
+class _TestAuthNotifier extends AuthNotifier {
+  _TestAuthNotifier(super.repository, AuthState value) {
+    state = value;
+  }
 }
 
 ComprobanteAnalisis _analysis({
@@ -206,28 +222,33 @@ void main() {
       'createdAt': '2026-08-29T10:00:00Z',
     };
 
-    test('maps the authoritative registered, pending, cash and account fields', () {
-      final venta = Venta.fromJson(json);
+    test(
+      'maps the authoritative registered, pending, cash and account fields',
+      () {
+        final venta = Venta.fromJson(json);
 
-      expect(venta.registradaPorUsername, 'admin');
-      expect(venta.conciliaciones.single.metodoPagoPendiente, 'BILLETERA');
-      expect(venta.conciliaciones.single.pagoRestoEfectivo, isTrue);
-      expect(venta.cuentaNombre, 'Cliente Uno');
-      expect(venta.cuentaMonto, 10);
-    });
+        expect(venta.registradaPorUsername, 'admin');
+        expect(venta.conciliaciones.single.metodoPagoPendiente, 'BILLETERA');
+        expect(venta.conciliaciones.single.pagoRestoEfectivo, isTrue);
+        expect(venta.cuentaNombre, 'Cliente Uno');
+        expect(venta.cuentaMonto, 10);
+      },
+    );
 
     testWidgets('history exposes Pendiente and complete payment metadata', (
       tester,
     ) async {
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: VentaHistoryCard(
-            venta: Venta.fromJson(json),
-            correction: false,
-            onConciliar: () {},
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: VentaHistoryCard(
+              venta: Venta.fromJson(json),
+              correction: false,
+              onConciliar: () {},
+            ),
           ),
         ),
-      ));
+      );
 
       expect(find.text('Pendiente'), findsWidgets);
       expect(find.text('Clasificar'), findsNothing);
@@ -239,6 +260,100 @@ void main() {
       expect(find.textContaining('Cuenta: Cliente Uno'), findsOneWidget);
     });
 
+    testWidgets(
+      'charged detail preserves account state across rejected and successful annulment',
+      (tester) async {
+        final active = Venta.fromJson({
+          ...json,
+          'estado': 'ACTIVA',
+          'conciliacion': (json['conciliaciones'] as List).single,
+        });
+        final annulled = Venta.fromJson({
+          ...json,
+          'estado': 'ANULADA',
+          'motivoAnulacion': 'Error de registro',
+          'conciliacion': (json['conciliaciones'] as List).single,
+        });
+        final repo = _FakeVentasRepository()
+          ..annulResults.addAll([
+            const AppException(
+              message: 'No autorizado para anular',
+              statusCode: 403,
+              code: 'VENTA_FORBIDDEN',
+            ),
+            const AppException(
+              message: 'La venta ya fue anulada',
+              statusCode: 409,
+              code: 'VENTA_YA_ANULADA',
+            ),
+            const AppException(
+              message: 'Esta venta pertenece a una sesión cerrada',
+              statusCode: 422,
+              code: 'VENTA_EN_CAJA_CERRADA',
+              details: ['El stock NO ha sido modificado'],
+            ),
+            annulled,
+          ]);
+        var changed = 0;
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              ventasRepositoryProvider.overrideWithValue(repo),
+              authProvider.overrideWith(
+                (ref) => _TestAuthNotifier(
+                  ref.read(authRepositoryProvider),
+                  _authWith(
+                    _makeUser(rol: 'ADMIN', permisos: const ['ventas:anular']),
+                  ),
+                ),
+              ),
+            ],
+            child: MaterialApp(
+              home: VentaDetailScreen(
+                venta: active,
+                onChanged: () => changed++,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Cuenta del cliente'), findsOneWidget);
+        expect(find.textContaining('Rosa'), findsNothing);
+        expect(find.textContaining('Cliente Uno'), findsOneWidget);
+
+        for (final code in [
+          'VENTA_FORBIDDEN',
+          'VENTA_YA_ANULADA',
+          'VENTA_EN_CAJA_CERRADA',
+        ]) {
+          await tester.tap(find.byIcon(Icons.more_vert_rounded));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('motivoAnulacionField')),
+            'Error de registro',
+          );
+          await tester.tap(find.text('Anular'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining(code), findsOneWidget);
+          expect(find.text('PENDIENTE'), findsOneWidget);
+          expect(find.textContaining('Cliente Uno'), findsOneWidget);
+        }
+
+        await tester.tap(find.byIcon(Icons.more_vert_rounded));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('motivoAnulacionField')),
+          'Error de registro',
+        );
+        await tester.tap(find.text('Anular'));
+        await tester.pumpAndSettle();
+        expect(find.text('ANULADA'), findsOneWidget);
+        expect(find.textContaining('Cliente Uno'), findsOneWidget);
+        expect(find.textContaining('Error de registro'), findsOneWidget);
+        expect(changed, 1);
+      },
+    );
+
     testWidgets('history filters move with the sales list', (tester) async {
       tester.view.physicalSize = const Size(320, 420);
       tester.view.devicePixelRatio = 1;
@@ -246,12 +361,12 @@ void main() {
       final repo = _FakeVentasRepository()
         ..pages = {1: List.generate(12, (index) => _venta('$index'))}
         ..total = 12;
-      await tester.pumpWidget(ProviderScope(
-        overrides: [ventasRepositoryProvider.overrideWithValue(repo)],
-        child: const MaterialApp(
-          home: Scaffold(body: HistorialVentasView()),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [ventasRepositoryProvider.overrideWithValue(repo)],
+          child: const MaterialApp(home: Scaffold(body: HistorialVentasView())),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       final filter = find.byKey(const Key('ventas-filters'));
@@ -414,23 +529,36 @@ void main() {
   });
 
   group('Idempotencia', () {
-    test('14. Genera UUIDs diferentes para ventas diferentes', () {
-      final k1 = _uuid.v4();
-      final k2 = _uuid.v4();
+    test('14. VentasRepository generates unique idempotencyKeys per call', () {
+      final repo = VentasRepository(ApiClient.instance);
+      final k1 = repo.generateIdempotencyKey();
+      final k2 = repo.generateIdempotencyKey();
       expect(k1, isNot(equals(k2)));
-      expect(k1.length, 36);
+      expect(k1.length, 36); // UUID v4 has 36 characters
     });
 
-    test('15. El reintento conserva la misma clave', () {
-      final key = _uuid.v4();
-      final retryKey = key;
-      expect(retryKey, key);
+    test('15. CreateVentaPayload preserves idempotencyKey for exact retry', () {
+      const fixedKey = 'abc12345-0000-4abc-8abc-abcdef012345';
+      final payload = CreateVentaPayload(
+        idempotencyKey: fixedKey,
+        items: [{'productoId': 'p1', 'cantidad': 1}],
+        estadoConciliacion: EstadoConciliacion.efectivo,
+      );
+      expect(payload.idempotencyKey, fixedKey,
+          reason: 'idempotencyKey in the payload must match the one used at creation');
     });
 
-    test('16. Éxito genera nueva clave', () {
-      final keyBefore = _uuid.v4();
-      final keyAfter = _uuid.v4();
-      expect(keyAfter, isNot(equals(keyBefore)));
+    test('16. VentasRepository idempotencyKey follows UUID v4 format', () {
+      final repo = VentasRepository(ApiClient.instance);
+      final key = repo.generateIdempotencyKey();
+      final keyAfter = repo.generateIdempotencyKey();
+      expect(keyAfter, isNot(equals(key)),
+          reason: 'successive keys must differ (simulating post-success rotation)');
+      // UUID v4: 8-4-4-4-12 hex chars with version digit 4
+      final uuidV4Pattern = RegExp(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+      );
+      expect(uuidV4Pattern.hasMatch(key), isTrue);
     });
   });
 
@@ -616,45 +744,48 @@ void main() {
       expect(analysis.advertencias, ['Verificar hora']);
     });
 
-    test('monto menor al total es pago parcial válido (como web y backend)', () {
-      final analysis = ComprobanteAnalisis.fromJson({
-        'id': 'analysis-partial',
-        'estado': 'APTO',
-        'posibleDuplicado': false,
-        'coincidencias': [],
-        'entidad': 'Yape',
-        'etiquetaSugerida': {'id': 'et-1', 'nombre': 'Yape'},
-        'monto': 10.0,
-        'codigoOperacion': 'OP-P',
-        'codigoSeguridad': 'SEC-P',
-        'fechaOperacion': '2026-08-13',
-        'horaOperacion': '12:30:00',
-        'imagenUrl': '/receipts/partial.jpg',
-        'thumbnailUrl': '/receipts/partial-thumb.jpg',
-        'confianza': {
-          'documento': .9,
-          'entidad': .9,
-          'monto': .9,
-          'operacion': .9,
-          'fecha': .9,
-        },
-        'advertencias': [],
-        'expiraAt': '2099-08-13T12:45:00.000Z',
-      });
+    test(
+      'monto menor al total es pago parcial válido (como web y backend)',
+      () {
+        final analysis = ComprobanteAnalisis.fromJson({
+          'id': 'analysis-partial',
+          'estado': 'APTO',
+          'posibleDuplicado': false,
+          'coincidencias': [],
+          'entidad': 'Yape',
+          'etiquetaSugerida': {'id': 'et-1', 'nombre': 'Yape'},
+          'monto': 10.0,
+          'codigoOperacion': 'OP-P',
+          'codigoSeguridad': 'SEC-P',
+          'fechaOperacion': '2026-08-13',
+          'horaOperacion': '12:30:00',
+          'imagenUrl': '/receipts/partial.jpg',
+          'thumbnailUrl': '/receipts/partial-thumb.jpg',
+          'confianza': {
+            'documento': .9,
+            'entidad': .9,
+            'monto': .9,
+            'operacion': .9,
+            'fecha': .9,
+          },
+          'advertencias': [],
+          'expiraAt': '2099-08-13T12:45:00.000Z',
+        });
 
-      expect(analysis.montoEsMenor(25.0), isTrue);
-      expect(analysis.montoExcede(25.0), isFalse);
-      expect(
-        comprobanteAnalysisError(
-          analysis: analysis,
-          total: 25,
-          required: true,
-          selectedEtiquetaId: 'et-1',
-        ),
-        isNull,
-        reason: 'Un monto menor es válido: el cliente completa con otro pago',
-      );
-    });
+        expect(analysis.montoEsMenor(25.0), isTrue);
+        expect(analysis.montoExcede(25.0), isFalse);
+        expect(
+          comprobanteAnalysisError(
+            analysis: analysis,
+            total: 25,
+            required: true,
+            selectedEtiquetaId: 'et-1',
+          ),
+          isNull,
+          reason: 'Un monto menor es válido: el cliente completa con otro pago',
+        );
+      },
+    );
 
     test('monto mayor al total bloquea la venta', () {
       final analysis = ComprobanteAnalisis.fromJson({
@@ -751,20 +882,17 @@ void main() {
   });
 
   group('Doble confirmación', () {
-    test('20. No se ejecuta submit si ya está en progreso', () {
-      var count = 0;
-      void doSubmit(bool submitting) {
-        if (submitting) return; // Guard: si ya está enviando, no ejecutar
-        count++;
-      }
-
-      // Simular que ya hay un envío en curso
-      doSubmit(true);
-      expect(count, 0, reason: 'No debe ejecutarse con submitting=true');
-
-      // Simular que no hay envío en curso
-      doSubmit(false);
-      expect(count, 1, reason: 'Debe ejecutarse con submitting=false');
+    test('20. saleMutationError formats AppException with message and code', () {
+      // Tests production saleMutationError — the guard against leaking raw errors
+      // to the submit UI after a rejected double-confirmation.
+      const e = AppException(
+        message: 'Venta ya procesada',
+        statusCode: 409,
+        code: 'DUPLICATE_SALE',
+      );
+      final msg = saleMutationError(e);
+      expect(msg, contains('Venta ya procesada'));
+      expect(msg, contains('DUPLICATE_SALE'));
     });
   });
 
@@ -801,27 +929,24 @@ void main() {
       },
     );
 
-    test(
-      'PENDIENTE filtra conciliación local sin enviarlo al backend',
-      () async {
-        final repo = _FakeVentasRepository()
-          ..pages = {
-            1: [_venta('1', pendiente: true), _venta('2')],
-            2: [_venta('3', pendiente: true), _venta('1', pendiente: true)],
-          }
-          ..total = 4
-          ..totalPaginas = 2;
-        final notifier = VentasListNotifier(repo, useMisVentas: false);
+    test('PENDIENTE filtra conciliación local sin enviarlo al backend', () async {
+      final repo = _FakeVentasRepository()
+        ..pages = {
+          1: [_venta('1', pendiente: true), _venta('2')],
+          2: [_venta('3', pendiente: true), _venta('1', pendiente: true)],
+        }
+        ..total = 4
+        ..totalPaginas = 2;
+      final notifier = VentasListNotifier(repo, useMisVentas: false);
 
-        await notifier.load(estado: 'PENDIENTE');
+      await notifier.load(estado: 'PENDIENTE');
 
-        // La carga inicial del constructor + las páginas de PENDIENTE no envían estado.
-        expect(repo.requestedEstados, [null, null, null]);
-        expect(notifier.state.filterEstado, 'PENDIENTE');
-        expect(notifier.state.ventas.map((venta) => venta.id), ['1', '3']);
-        expect(notifier.state.total, 2);
-      },
-    );
+      // La carga inicial del constructor + las páginas de PENDIENTE no envían estado.
+      expect(repo.requestedEstados, [null, null, null]);
+      expect(notifier.state.filterEstado, 'PENDIENTE');
+      expect(notifier.state.ventas.map((venta) => venta.id), ['1', '3']);
+      expect(notifier.state.total, 2);
+    });
 
     test(
       'un filtro de estado válido sí se envía y reinicia la página',

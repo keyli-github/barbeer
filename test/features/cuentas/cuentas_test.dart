@@ -197,4 +197,45 @@ void main() {
       {'monto', 'medioPago', 'idempotencyKey', 'sedeId'}));
     expect(payloads[0]['idempotencyKey'], isNot(payloads[1]['idempotencyKey']));
   });
+  testWidgets('production account form preserves backend errors then creates exact account', (tester) async {
+    final bodies = <Map<String, dynamic>>[];
+    final created = Completer<Object?>();
+    var attempt = 0, listCalls = 0;
+    final repo = CuentasRepository(ApiClient.instance,
+      request: (_, _) async { listCalls++; return []; }, post: (path, body) async {
+        expect(path, '/cuentas'); bodies.add(body);
+        if (++attempt == 1) {
+          throw const AppException(message: 'Ya existe una cuenta con el nombre indicado', statusCode: 409);
+        }
+        if (attempt == 2) {
+          throw const AppException(message: 'El documento no debe exceder 20 caracteres', statusCode: 400);
+        }
+        return created.future;
+      });
+    final notifier = CuentasNotifier(repo, authorized: true, canCreate: true, sedeId: 's1');
+    await notifier.load();
+    await tester.pumpWidget(ProviderScope(overrides: [cuentasProvider.overrideWith((_) => notifier)],
+      child: const MaterialApp(home: CuentasScreen())));
+    await tester.tap(find.byKey(const Key('account-create-open'))); await tester.pumpAndSettle();
+    expect(find.text('Crear Nueva Cuenta'), findsOneWidget);
+    expect(find.text('Nombre de Usuario *'), findsOneWidget);
+    expect(find.text('Documento (opcional)'), findsOneWidget);
+    expect(find.text('Teléfono (opcional)'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('account-name')), '  Ana Pérez  ');
+    await tester.enterText(find.byKey(const Key('account-document')), ' 74881234 ');
+    await tester.enterText(find.byKey(const Key('account-phone')), ' 999888777 ');
+    await tester.tap(find.byKey(const Key('account-create-submit'))); await tester.pump();
+    expect(find.text('Ya existe una cuenta con el nombre indicado'), findsOneWidget);
+    expect(tester.widget<TextField>(find.byKey(const Key('account-name'))).controller!.text, '  Ana Pérez  ');
+    await tester.tap(find.byKey(const Key('account-create-submit'))); await tester.pump();
+    expect(find.text('El documento no debe exceder 20 caracteres'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('account-create-submit'))); await tester.pump();
+    expect(find.text('Creando...'), findsOneWidget);
+    created.complete({...account('created', 'Ana Pérez', 0),
+      'documento': '74881234', 'telefono': '999888777'});
+    await tester.pumpAndSettle();
+    expect(bodies, everyElement({'nombre': 'Ana Pérez', 'documento': '74881234', 'telefono': '999888777'}));
+    expect(find.text('Cuenta creada.'), findsOneWidget);
+    expect(listCalls, 2);
+  });
 }

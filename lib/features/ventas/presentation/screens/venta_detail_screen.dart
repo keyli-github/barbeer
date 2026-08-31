@@ -44,18 +44,22 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
       _errorAnular = null;
     });
     try {
-      await ref
+      final result = await ref
           .read(ventasRepositoryProvider)
           .anularVenta(_venta.id, motivo: motivo);
       if (mounted) {
+        invalidateSaleSideEffects(ref);
+        setState(() {
+          _venta = result;
+          _anulando = false;
+        });
         widget.onChanged?.call();
         AppFeedback.success(context, 'Venta anulada');
-        Navigator.pop(context);
       }
     } catch (e) {
       setState(() {
         _anulando = false;
-        _errorAnular = e.toString();
+        _errorAnular = saleMutationError(e);
       });
     }
   }
@@ -249,6 +253,24 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                   _InfoRow('Código op.', _venta.conciliacion!.codigoOperacion!),
                 if (_venta.conciliacion!.comprobante != null)
                   _InfoRow('Comprobante', _venta.conciliacion!.comprobante!),
+              ]),
+              const SizedBox(height: 12),
+            ],
+
+            if (_venta.cuentaNombre != null && _venta.cuentaMonto != null) ...[
+              _Section('Cuenta del cliente', [
+                _InfoRow('Cliente', _venta.cuentaNombre!),
+                _InfoRow(
+                  'Cargado a cuenta',
+                  FormatUtils.currency(_venta.cuentaMonto!),
+                ),
+              ]),
+              const SizedBox(height: 12),
+            ],
+
+            if (_venta.motivoAnulacion != null) ...[
+              _Section('Anulación', [
+                _InfoRow('Motivo', _venta.motivoAnulacion!),
               ]),
               const SizedBox(height: 12),
             ],

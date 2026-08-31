@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/files/file_artifact_service.dart' show mimeTypeForFilename;
 import '../../../core/network/api_client.dart';
+import '../../../core/network/http_header_utils.dart';
 import 'models/respaldo_models.dart';
 
 typedef Json = Map<String, dynamic>;
@@ -50,15 +52,24 @@ class RespaldosRepository {
     return BackupRunsPage.fromJson(data as Json);
   }
 
-  Future<Uint8List> downloadArtifact(
+  Future<BackupDownloadResult> downloadArtifact(
     String runId,
     String format, {
     String? expectedSha256,
   }) async {
     final path = ApiConstants.backupArtifact(runId, format);
-    final bytes = bytesRequest != null
-        ? await bytesRequest!(path)
-        : await _api!.getBytes(path);
+    Uint8List bytes;
+    String? serverFilename;
+    String? serverContentType;
+    if (bytesRequest != null) {
+      bytes = await bytesRequest!(path);
+    } else {
+      final response = await _api!.getBytesResponse(path);
+      bytes = response.bytes;
+      serverFilename =
+          parseContentDispositionFilename(response.contentDisposition);
+      serverContentType = response.contentType;
+    }
     if (expectedSha256 != null) {
       final actual = sha256HexOf(bytes);
       if (actual != expectedSha256) {
@@ -66,6 +77,12 @@ class RespaldosRepository {
             'SHA-256 mismatch: expected $expectedSha256 got $actual');
       }
     }
-    return bytes;
+    final ext = format.toLowerCase();
+    final shortId = runId.length >= 8 ? runId.substring(0, 8) : runId;
+    return BackupDownloadResult(
+      bytes: bytes,
+      filename: serverFilename ?? 'respaldo-$shortId.$ext',
+      contentType: serverContentType ?? mimeTypeForFilename('file.$ext'),
+    );
   }
 }

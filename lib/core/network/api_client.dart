@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../constants/api_constants.dart';
 import '../errors/app_exception.dart';
 import '../storage/secure_storage.dart';
+import 'http_header_utils.dart';
 
 class ApiClient {
   ApiClient._();
@@ -115,6 +116,27 @@ class ApiClient {
       path,
     );
     return resp.data ?? Uint8List(0);
+  }
+
+  /// Like [getBytes] but preserves Content-Disposition and Content-Type.
+  Future<HttpBytesResponse> getBytesResponse(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final h = await _headers(path);
+    final resp = await _execute(
+      () => _dio.get<Uint8List>(
+        path,
+        queryParameters: queryParameters,
+        options: _opts(h).copyWith(responseType: ResponseType.bytes),
+      ),
+      path,
+    );
+    return HttpBytesResponse(
+      bytes: resp.data ?? Uint8List(0),
+      contentDisposition: resp.headers.value('content-disposition'),
+      contentType: resp.headers.value('content-type'),
+    );
   }
 
   Future<Response<T>> post<T>(String path, {dynamic data}) async {

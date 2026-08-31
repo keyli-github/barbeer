@@ -1,5 +1,7 @@
 import '../../../core/constants/api_constants.dart';
+import '../../../core/files/file_artifact_service.dart' show mimeTypeForFilename;
 import '../../../core/network/api_client.dart';
+import '../../../core/network/http_header_utils.dart';
 import 'models/reporte_models.dart';
 typedef Json = Map<String, dynamic>;
 typedef ReportBytesRequest = Future<ReporteExportado> Function(String path, Json query);
@@ -20,15 +22,29 @@ class ReportesRepository {
       if (sedeId?.isNotEmpty ?? false) 'sedeId': sedeId};
     final path = ApiConstants.reportExport(tipo);
     if (bytesRequest != null) return bytesRequest!(path, query);
-    return ReporteExportado(bytes: await _api.getBytes(path, queryParameters: query),
-        contentType: 'application/octet-stream', filename: 'reporte.$formato');
+    final response = await _api.getBytesResponse(path, queryParameters: query);
+    final fallbackName = 'reporte.$formato';
+    final serverFilename =
+        parseContentDispositionFilename(response.contentDisposition);
+    return ReporteExportado(
+        bytes: response.bytes,
+        contentType:
+            response.contentType ?? mimeTypeForFilename(serverFilename ?? fallbackName),
+        filename: serverFilename ?? fallbackName);
   }
   Future<ReporteExportado> exportCajaReport(String cajaId, {required String formato}) async {
     final query = <String, dynamic>{'formato': formato};
     final path = ApiConstants.reportCajaExport(cajaId);
     if (bytesRequest != null) return bytesRequest!(path, query);
-    return ReporteExportado(bytes: await _api.getBytes(path, queryParameters: query),
-        contentType: 'application/octet-stream', filename: 'caja.$formato');
+    final response = await _api.getBytesResponse(path, queryParameters: query);
+    final fallbackName = 'caja.$formato';
+    final serverFilename =
+        parseContentDispositionFilename(response.contentDisposition);
+    return ReporteExportado(
+        bytes: response.bytes,
+        contentType:
+            response.contentType ?? mimeTypeForFilename(serverFilename ?? fallbackName),
+        filename: serverFilename ?? fallbackName);
   }
   Future<ReporteEmailConfig> getEmailConfig() async {
     final data = getRequest != null ? await getRequest!(ApiConstants.reportEmailConfig)

@@ -24,7 +24,8 @@ class _State {
   final bool runsLoading;
   final bool saveLoading;
   final String? downloadingFormat;
-  final String? error;
+  final String? scheduleError;
+  final String? runsError;
   const _State({
     this.schedule,
     this.runs,
@@ -32,7 +33,8 @@ class _State {
     this.runsLoading = false,
     this.saveLoading = false,
     this.downloadingFormat,
-    this.error,
+    this.scheduleError,
+    this.runsError,
   });
   _State copyWith({
     BackupSchedule? schedule,
@@ -41,7 +43,8 @@ class _State {
     bool? runsLoading,
     bool? saveLoading,
     Object? downloadingFormat = _sentinel,
-    Object? error = _sentinel,
+    Object? scheduleError = _sentinel,
+    Object? runsError = _sentinel,
   }) =>
       _State(
         schedule: schedule ?? this.schedule,
@@ -52,7 +55,12 @@ class _State {
         downloadingFormat: downloadingFormat == _sentinel
             ? this.downloadingFormat
             : downloadingFormat as String?,
-        error: error == _sentinel ? this.error : error as String?,
+        scheduleError: scheduleError == _sentinel
+            ? this.scheduleError
+            : scheduleError as String?,
+        runsError: runsError == _sentinel
+            ? this.runsError
+            : runsError as String?,
       );
 }
 
@@ -63,28 +71,30 @@ class _Notifier extends StateNotifier<_State> {
   _Notifier(this._repo) : super(const _State());
 
   Future<void> loadAll() async {
-    state = state.copyWith(scheduleLoading: true, runsLoading: true);
+    state = state.copyWith(
+        scheduleLoading: true, runsLoading: true,
+        scheduleError: null, runsError: null);
     try {
       final s = await _repo.getSchedule();
       state = state.copyWith(schedule: s, scheduleLoading: false);
     } catch (e) {
-      state = state.copyWith(scheduleLoading: false, error: e.toString());
+      state = state.copyWith(scheduleLoading: false, scheduleError: e.toString());
     }
     try {
       final r = await _repo.listRuns(limit: 25);
       state = state.copyWith(runs: r, runsLoading: false);
     } catch (e) {
-      state = state.copyWith(runsLoading: false, error: e.toString());
+      state = state.copyWith(runsLoading: false, runsError: e.toString());
     }
   }
 
   Future<void> refreshRuns() async {
-    state = state.copyWith(runsLoading: true);
+    state = state.copyWith(runsLoading: true, runsError: null);
     try {
       final r = await _repo.listRuns(limit: 25);
       state = state.copyWith(runs: r, runsLoading: false);
     } catch (e) {
-      state = state.copyWith(runsLoading: false, error: e.toString());
+      state = state.copyWith(runsLoading: false, runsError: e.toString());
     }
   }
 
@@ -100,14 +110,14 @@ class _Notifier extends StateNotifier<_State> {
     }
   }
 
-  Future<Uint8List?> downloadArtifact(
+  Future<BackupDownloadResult?> downloadArtifact(
       String runId, String format, String? sha256) async {
     state = state.copyWith(downloadingFormat: format);
     try {
-      final bytes = await _repo.downloadArtifact(runId, format,
+      final result = await _repo.downloadArtifact(runId, format,
           expectedSha256: sha256);
       state = state.copyWith(downloadingFormat: null);
-      return bytes;
+      return result;
     } catch (e) {
       state = state.copyWith(downloadingFormat: null);
       rethrow;
@@ -168,9 +178,9 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
 
   Future<void> _download(
       BuildContext ctx, BackupRun run, BackupArtifact artifact) async {
-    Uint8List? bytes;
+    BackupDownloadResult? result;
     try {
-      bytes = await ref
+      result = await ref
           .read(_notifierProvider.notifier)
           .downloadArtifact(run.id, artifact.format, artifact.sha256);
     } catch (e) {
@@ -179,18 +189,12 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
           content: Text('Error: $e'), backgroundColor: Colors.red));
       return;
     }
-    if (bytes == null || !ctx.mounted) return;
-    final ext = artifact.format.toLowerCase();
-    final filename =
-        'respaldo-${run.id.substring(0, 8)}.$ext';
-    final ct = ext == 'xlsx'
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : ext == 'json'
-            ? 'application/json'
-            : 'text/plain';
+    if (result == null || !ctx.mounted) return;
     final fa = FileArtifact(
-        bytes: bytes, filename: filename, contentType: ct,
-        expectedLength: bytes.length);
+        bytes: result.bytes,
+        filename: result.filename,
+        contentType: result.contentType,
+        expectedLength: result.bytes.length);
     FileArtifactService svc;
     if (Platform.isAndroid) {
       svc = AndroidFileArtifactService();
@@ -201,14 +205,14 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
           const SnackBar(content: Text('Descarga no disponible en esta plataforma.')));
       return;
     }
-    final result = await svc.save(fa);
+    final saveResult = await svc.save(fa);
     if (!ctx.mounted) return;
-    if (result is FileArtifactSaved) {
+    if (saveResult is FileArtifactSaved) {
       ScaffoldMessenger.of(ctx).showSnackBar(
           const SnackBar(content: Text('Descarga completada.'), backgroundColor: Colors.green));
-    } else if (result is! FileArtifactCancelled) {
+    } else if (saveResult is! FileArtifactCancelled) {
       ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $result'), backgroundColor: Colors.red));
+          SnackBar(content: Text('Error al guardar: $saveResult'), backgroundColor: Colors.red));
     }
   }
 
@@ -244,6 +248,7 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
                       enabled: _enabled,
                       frequency: _frequency,
                       formats: _formats,
+                      error: state.scheduleError,
                       onEnabledChanged: (v) =>
                           setState(() => _enabled = v),
                       onFrequencyChanged: (v) =>
@@ -253,12 +258,15 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
                               ? _formats.remove(f)
                               : _formats.add(f)),
                       onSave: _saveSchedule,
+                      onRetry: () =>
+                          ref.read(_notifierProvider.notifier).loadAll(),
                     ),
                     const SizedBox(height: 16),
                     _HistoryCard(
                       runs: state.runs,
                       loading: state.runsLoading,
                       downloadingFormat: state.downloadingFormat,
+                      error: state.runsError,
                       onRefresh: () =>
                           ref.read(_notifierProvider.notifier).refreshRuns(),
                       onDownload: (run, artifact) =>
@@ -295,10 +303,12 @@ class _ScheduleCard extends StatelessWidget {
   final bool enabled;
   final String frequency;
   final Set<String> formats;
+  final String? error;
   final ValueChanged<bool> onEnabledChanged;
   final ValueChanged<String> onFrequencyChanged;
   final ValueChanged<String> onFormatToggled;
   final VoidCallback onSave;
+  final VoidCallback? onRetry;
   const _ScheduleCard({
     required this.schedule,
     required this.loading,
@@ -306,19 +316,39 @@ class _ScheduleCard extends StatelessWidget {
     required this.enabled,
     required this.frequency,
     required this.formats,
+    this.error,
     required this.onEnabledChanged,
     required this.onFrequencyChanged,
     required this.onFormatToggled,
     required this.onSave,
+    this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
+    if (loading && schedule == null) {
       return const Card(
           child: Padding(
               padding: EdgeInsets.all(32),
               child: Center(child: CircularProgressIndicator())));
+    }
+    if (error != null && schedule == null) {
+      return Card(
+          elevation: 2,
+          child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                const SizedBox(height: 8),
+                Text(error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reintentar'),
+                    onPressed: onRetry),
+              ])));
     }
     return Card(
       elevation: 2,
@@ -412,12 +442,14 @@ class _HistoryCard extends StatelessWidget {
   final BackupRunsPage? runs;
   final bool loading;
   final String? downloadingFormat;
+  final String? error;
   final VoidCallback onRefresh;
   final void Function(BackupRun, BackupArtifact) onDownload;
   const _HistoryCard({
     required this.runs,
     required this.loading,
     required this.downloadingFormat,
+    this.error,
     required this.onRefresh,
     required this.onDownload,
   });
@@ -451,6 +483,20 @@ class _HistoryCard extends StatelessWidget {
                   child: Padding(
                       padding: EdgeInsets.all(32),
                       child: CircularProgressIndicator()))
+            else if (error != null && (runs == null || runs!.data.isEmpty))
+              Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Error: $error',
+                        style:
+                            const TextStyle(color: Colors.red, fontSize: 13),
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reintentar'),
+                        onPressed: onRefresh),
+                  ]))
             else if (runs == null || runs!.data.isEmpty)
               const Padding(
                   padding: EdgeInsets.all(16),

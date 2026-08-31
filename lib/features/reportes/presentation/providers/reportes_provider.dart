@@ -79,6 +79,20 @@ class ReportesNotifier extends StateNotifier<ReportesState> {
       state = state.copyWith(exportBusy: false, exportState: OperationRecoverableError(_ex(e)));
     }
   }
+  Future<void> exportCajaReport(String cajaId, {required String formato}) async {
+    if (!authorized) {
+      state = state.copyWith(exportState: OperationRecoverableError(
+          const AppException(message: 'No autorizado.', statusCode: 403)));
+      return;
+    }
+    state = state.copyWith(exportBusy: true);
+    try {
+      state = state.copyWith(exportBusy: false, exportState: OperationContent(
+          await _repository.exportCajaReport(cajaId, formato: formato)));
+    } catch (e) {
+      state = state.copyWith(exportBusy: false, exportState: OperationRecoverableError(_ex(e)));
+    }
+  }
   AppException _ex(Object e) => e is AppException ? e : AppException(message: '$e');
 }
 final reportesRepositoryProvider = Provider((_) => ReportesRepository(ApiClient.instance));

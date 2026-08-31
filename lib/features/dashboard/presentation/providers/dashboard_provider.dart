@@ -10,6 +10,9 @@ import '../../../inventario/data/models/inventario.dart';
 import '../../../kardex/data/kardex_repository.dart';
 import '../../../productos/data/productos_repository.dart';
 
+/// Matches the web dashboard's audit fetch limit.
+const dashboardAuditLimit = 8;
+
 class DashboardSede {
   final String id, nombre, codigoSede;
   final String? direccion;
@@ -453,7 +456,7 @@ class DashboardNotifier extends StateNotifier<DashboardData> {
       add('audit', () async {
         final response = await _api.get(
           ApiConstants.audit,
-          queryParameters: const {'pagina': 1, 'limite': 6},
+          queryParameters: const {'pagina': 1, 'limite': dashboardAuditLimit},
         );
         audit = ((response.data as Map)['data'] as List? ?? const [])
             .whereType<Map>()

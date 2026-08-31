@@ -13,7 +13,9 @@ import '../../../../core/widgets/app_bottom_sheet.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
+import '../widgets/permission_editor_sheet.dart';
 import '../widgets/pin_management_sheet.dart';
+import '../../data/usuario_admin_repository.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
@@ -525,6 +527,9 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
             .read(usuariosProvider.notifier)
             .reactivateUser(user['id'] as String),
         onResetPassword: (uid) => _resetPassword(context, ref, uid),
+        onEditPermissions: auth.user?.isSuperAdmin == true
+          ? (userId, username) => _showPermissions(context, userId, username)
+          : null,
       ),
     );
   }
@@ -616,6 +621,20 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
         AppFeedback.error(context, 'Error: $e');
       }
     }
+  }
+
+  void _showPermissions(BuildContext context, String userId, String username) {
+    AppNav.push(
+      context,
+      Scaffold(
+        appBar: AppBar(title: Text('Permisos: $username')),
+        body: PermissionEditorSheet(
+          userId: userId,
+          username: username,
+          repo: UsuarioAdminRepository(ApiClient.instance),
+        ),
+      ),
+    );
   }
 }
 
@@ -1086,6 +1105,7 @@ class _UserDetailScreen extends StatelessWidget {
   final bool canEdit, canDeactivate, canReset;
   final VoidCallback onEdit, onDeactivate, onReactivate;
   final void Function(String) onResetPassword;
+  final void Function(String userId, String username)? onEditPermissions;
 
   const _UserDetailScreen({
     required this.user,
@@ -1099,6 +1119,7 @@ class _UserDetailScreen extends StatelessWidget {
     required this.onDeactivate,
     required this.onReactivate,
     required this.onResetPassword,
+    this.onEditPermissions,
   });
 
   @override
@@ -1227,6 +1248,29 @@ class _UserDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
+            // Permission editor (SUPERADMIN only)
+            if (isSuperAdmin && onEditPermissions != null) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () => onEditPermissions!(
+                    user['id'] as String? ?? '',
+                    user['username'] as String? ?? '',
+                  ),
+                  icon: const Icon(Icons.shield_outlined, size: 18),
+                  label: const Text('Permisos'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.deepPurple,
+                    side: const BorderSide(color: Colors.deepPurple),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             // Acciones
             if (canReset && !protected)
               SizedBox(

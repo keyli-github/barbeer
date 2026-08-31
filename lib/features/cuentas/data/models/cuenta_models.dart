@@ -1,6 +1,6 @@
 typedef Json = Map<String, dynamic>;
 Json _json(Object? value) => Map<String, dynamic>.from(value as Map);
-double _number(Object? value) => (value as num).toDouble();
+double _number(Object? value) => value is num ? value.toDouble() : double.parse(value as String);
 class Cuenta {
   final String id, nombre, createdAt, updatedAt;
   final String? documento, telefono;

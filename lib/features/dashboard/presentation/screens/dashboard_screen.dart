@@ -98,7 +98,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             if (data.audit.isNotEmpty && auth.hasPermission('audit:leer'))
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _Activity(audit: data.audit),
+                child: DashboardRecentActivity(audit: data.audit),
               ),
           ],
         ),
@@ -635,9 +635,9 @@ class _DashboardErrors extends StatelessWidget {
 
 // ─── Recent Activity — 8 items ────────────────────────────────────────────────
 
-class _Activity extends StatelessWidget {
+class DashboardRecentActivity extends StatelessWidget {
   final List<Map<String, dynamic>> audit;
-  const _Activity({required this.audit});
+  const DashboardRecentActivity({super.key, required this.audit});
 
   @override
   Widget build(BuildContext context) => _DashboardSurface(
@@ -656,7 +656,7 @@ class _Activity extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (audit.length > 8)
+                if (audit.isNotEmpty)
                   GestureDetector(
                     onTap: () => GoRouter.of(context).go('/auditoria'),
                     child: const Text(

@@ -14,6 +14,9 @@ import '../../../../core/widgets/ds_inputs.dart';
 import '../../../../core/widgets/ds_product_image.dart';
 import '../../../../core/widgets/ds_states.dart';
 import '../../../productos/data/productos_repository.dart';
+import '../../../cuentas/data/models/cuenta_models.dart';
+import '../../../cuentas/presentation/providers/cuentas_provider.dart';
+import '../../../cuentas/presentation/widgets/cuenta_selector.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../recargo/presentation/providers/recargo_control_provider.dart';
 import '../../data/models/venta_models.dart';
@@ -49,6 +52,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   String? _vendedoraId;
   double? _recargoMonto;
   String? _recargoMotivo;
+  Cuenta? _cuenta;
+  double? _cuentaMonto;
+  Venta? _completedSale;
+  String? _refreshWarning;
   Uint8List? _voucherBytes;
   String? _voucherFilename;
   ComprobanteAnalisis? _comprobanteAnalisis;
@@ -691,7 +698,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
               decoration: const InputDecoration(
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 10),
+                  horizontal: 12,
+                  vertical: 10,
+                ),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -723,73 +732,74 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             children: EstadoConciliacion.values
                 .where((p) => p != EstadoConciliacion.pendiente)
                 .map((payment) {
-              final selected = _payment == payment;
-              final isEfectivo = payment == EstadoConciliacion.efectivo;
-              final activeColor = isEfectivo
-                  ? const Color(0xFF10B981) // green
-                  : const Color(0xFF3B82F6); // blue
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: GestureDetector(
-                    key: ValueKey('payment-${payment.name}'),
-                    onTap: _frozen
-                        ? null
-                        : () => update(() {
-                              if (_payment != payment) {
-                                _payment = payment;
-                                _clearVoucherAnalysis();
-                              }
-                            }),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? activeColor.withValues(alpha: 0.15)
-                            : context.colors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: selected
-                              ? activeColor
-                              : context.colors.border,
-                          width: selected ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isEfectivo
-                                ? Icons.payments_outlined
-                                : Icons.account_balance_wallet_outlined,
-                            size: 16,
+                  final selected = _payment == payment;
+                  final isEfectivo = payment == EstadoConciliacion.efectivo;
+                  final activeColor = isEfectivo
+                      ? const Color(0xFF10B981) // green
+                      : const Color(0xFF3B82F6); // blue
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: GestureDetector(
+                        key: ValueKey('payment-${payment.name}'),
+                        onTap: _frozen
+                            ? null
+                            : () => update(() {
+                                if (_payment != payment) {
+                                  _payment = payment;
+                                  _clearVoucherAnalysis();
+                                }
+                              }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          height: 44,
+                          decoration: BoxDecoration(
                             color: selected
-                                ? activeColor
-                                : context.colors.textSecondary,
+                                ? activeColor.withValues(alpha: 0.15)
+                                : context.colors.surfaceAlt,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: selected
+                                  ? activeColor
+                                  : context.colors.border,
+                              width: selected ? 1.5 : 1,
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              estadoConciliacionLabel(payment),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isEfectivo
+                                    ? Icons.payments_outlined
+                                    : Icons.account_balance_wallet_outlined,
+                                size: 16,
                                 color: selected
                                     ? activeColor
                                     : context.colors.textSecondary,
                               ),
-                            ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  estadoConciliacionLabel(payment),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected
+                                        ? activeColor
+                                        : context.colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            }).toList(),
+                  );
+                })
+                .toList(),
           ),
           if (_payment == EstadoConciliacion.billetera) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -811,8 +821,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                   hint: const Text('Selecciona una billetera…'),
                   items: _etiquetas
                       .map(
-                        (e) =>
-                            DropdownMenuItem(value: e.id, child: Text(e.nombre)),
+                        (e) => DropdownMenuItem(
+                          value: e.id,
+                          child: Text(e.nombre),
+                        ),
                       )
                       .toList(),
                   onChanged: _frozen
@@ -887,11 +899,79 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
               ),
             ],
           ],
+          if ((_payment == EstadoConciliacion.efectivo ||
+                  (_payment == EstadoConciliacion.billetera &&
+                      (_comprobanteAnalisis?.monto ?? _total) < _total)) &&
+              (auth.user?.hasPermission('cuentas:crear') == true ||
+                  auth.user?.hasPermission('ventas:crear') == true)) ...[
+            const SizedBox(height: AppSpacing.xs),
+            if (_cuenta != null && _cuentaMonto != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Cargado a cuenta (${_cuenta!.nombre})'),
+                  ),
+                  Text(_fmt(_cuentaMonto!)),
+                  IconButton(
+                    tooltip: 'Quitar',
+                    icon: const Icon(Icons.close),
+                    onPressed: _frozen
+                        ? null
+                        : () => update(() {
+                            _cuenta = null;
+                            _cuentaMonto = null;
+                          }),
+                  ),
+                ],
+              ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key('account-charge-open'),
+                icon: const Icon(Icons.person_add_alt_1),
+                label: Text(
+                  _cuenta == null
+                      ? 'Cargar diferencia a cuenta'
+                      : 'Editar pago',
+                ),
+                onPressed: _frozen || _total <= 0
+                    ? null
+                    : () async {
+                        final sedeId = auth.user?.isSuperAdmin == true
+                            ? ref.read(globalSedeIdProvider)
+                            : auth.user?.sedeId;
+                        if (sedeId == null) return;
+                        final result = await showCuentaChargeDialog(
+                          context,
+                          repository: ref.read(cuentasRepositoryProvider),
+                          sedeId: sedeId,
+                          total: _total,
+                          canCreate:
+                              auth.user?.hasPermission('cuentas:crear') ??
+                              false,
+                          paidAmount: _payment == EstadoConciliacion.billetera
+                              ? _comprobanteAnalisis?.monto
+                              : null,
+                          paidLabel: _payment == EstadoConciliacion.billetera
+                              ? 'Monto en comprobante (S/)'
+                              : 'Monto dejado en efectivo (S/)',
+                        );
+                        if (result != null && mounted)
+                          update(() {
+                            _cuenta = result.cuenta;
+                            _cuentaMonto = result.monto;
+                          });
+                      },
+              ),
+            ),
+          ],
           if (!recargoOculto)
             TextButton(
               key: const Key('add-surcharge'),
               onPressed: _frozen ? null : () => _editRecargo(refresh),
-              child: Text(_recargoMonto == null ? 'Ajustar total' : 'Editar ajuste'),
+              child: Text(
+                _recargoMonto == null ? 'Ajustar total' : 'Editar ajuste',
+              ),
             ),
         ],
       ),
@@ -1062,7 +1142,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Future<void> _submit() async {
     if (_submitting || _carrito.isEmpty) return;
-    if (_blockHiddenRecargo(_retryPayload?.json['recargoMonto'] as num? ?? _recargoMonto)) return;
+    if (_blockHiddenRecargo(
+      _retryPayload?.json['recargoMonto'] as num? ?? _recargoMonto,
+    ))
+      return;
     if (_retryPayload != null) {
       await _executePayload(_retryPayload!);
       return;
@@ -1130,6 +1213,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             : null,
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
+        cuentaId: _cuenta?.id,
+        cuentaMonto: _cuentaMonto,
       );
       await _executePayload(payload);
     } catch (e) {
@@ -1148,19 +1233,29 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     });
     try {
       final repo = ref.read(ventasRepositoryProvider);
-      await repo.crearVenta(payload: payload);
+      final sale = await repo.crearVenta(payload: payload);
+      invalidateSaleSideEffects(ref);
+      ref.invalidate(ventasListProvider(false));
+      ref.invalidate(ventasListProvider(true));
+      await _loadProducts();
       if (!mounted) return;
       // Feedback de éxito centrado
       AppFeedback.success(context, 'Venta registrada');
       _voucherRequestToken++;
       setState(() {
         _carrito.clear();
+        _completedSale = sale;
+        _refreshWarning = _errorProducts == null
+            ? null
+            : 'La venta se registró, pero no se pudo actualizar el stock.';
         _idempotencyKey = repo.generateIdempotencyKey();
         _submitting = false;
         _retryPayload = null;
         _frozen = false;
         _recargoMonto = null;
         _recargoMotivo = null;
+        _cuenta = null;
+        _cuentaMonto = null;
         _payment = EstadoConciliacion.efectivo;
         _voucherBytes = null;
         _voucherFilename = null;
@@ -1228,6 +1323,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         estadoConciliacion: EstadoConciliacion.pendiente,
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
+        cuentaId: _cuenta?.id,
+        cuentaMonto: _cuentaMonto,
       );
       await _executePayload(payload);
     } catch (e) {
@@ -1257,6 +1354,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   }
 
   String _friendlySubmitError(Object e) {
+    if (e is AppException && e.message.isNotEmpty) return saleMutationError(e);
     final s = e.toString();
     if (s.contains('STOCK_INSUFICIENTE')) {
       return 'Stock insuficiente para algún producto';
@@ -1279,7 +1377,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     if (!shouldBlockPositiveRecargo(
       oculto: ref.read(recargoControlProvider).oculto,
       monto: amount,
-    )) return false;
+    ))
+      return false;
     setState(() => _submitError = 'Los ajustes de total no están disponibles');
     return true;
   }
@@ -1345,8 +1444,14 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final draft = resolveRecargoDraft(
-          oculto: true, monto: _recargoMonto, motivo: _recargoMotivo);
-        setState(() { _recargoMonto = draft.monto; _recargoMotivo = draft.motivo; });
+          oculto: true,
+          monto: _recargoMonto,
+          motivo: _recargoMotivo,
+        );
+        setState(() {
+          _recargoMonto = draft.monto;
+          _recargoMotivo = draft.motivo;
+        });
       });
     }
     final selectedSedeId = ref.watch(globalSedeIdProvider);
@@ -1421,6 +1526,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          if (_completedSale != null)
+            _SaleResult(sale: _completedSale!, warning: _refreshWarning),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -1476,6 +1583,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     return Column(
       key: const Key('mobile-sales-layout'),
       children: [
+        if (_completedSale != null)
+          _SaleResult(sale: _completedSale!, warning: _refreshWarning),
         // ── Buscador ───────────────────────────────────────────────────
         Container(
           color: context.colors.background,
@@ -1527,7 +1636,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       );
     }
 
-      if (desktop) {
+    if (desktop) {
       return LayoutBuilder(
         builder: (context, constraints) {
           final columns = (constraints.maxWidth / 200).floor().clamp(2, 5);
@@ -1573,6 +1682,49 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       onAdd: () => _selectProduct(product),
       onIncrease: () => _changeQuantity(product.id, 1),
       onDecrease: () => _changeQuantity(product.id, -1),
+    );
+  }
+}
+
+class _SaleResult extends StatelessWidget {
+  final Venta sale;
+  final String? warning;
+  const _SaleResult({required this.sale, this.warning});
+
+  @override
+  Widget build(BuildContext context) {
+    final payment = sale.conciliacion;
+    final receipt = sale.comprobantesAnalisis.firstOrNull;
+    return Container(
+      key: const Key('sale-success-result'),
+      width: double.infinity,
+      margin: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: context.colors.successLight,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Venta ${sale.codigo} registrada',
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          if (payment != null)
+            Text(
+              '${estadoConciliacionLabel(payment.estado)}${payment.etiquetaNombre == null ? '' : ' · ${payment.etiquetaNombre}'}',
+            ),
+          if (receipt != null || payment?.codigoOperacion != null)
+            Text(
+              'Comprobante: ${receipt?.codigoOperacion ?? payment!.codigoOperacion ?? receipt!.id}',
+            ),
+          if (sale.cuentaNombre != null && sale.cuentaMonto != null)
+            Text('Cuenta: ${sale.cuentaNombre} · ${_fmt(sale.cuentaMonto!)}'),
+          if (warning != null)
+            Text(warning!, style: const TextStyle(color: AppColors.warning)),
+        ],
+      ),
     );
   }
 }
@@ -1685,7 +1837,9 @@ class _ProductoCard extends StatelessWidget {
                                 if (stock != null)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 5, vertical: 2),
+                                      horizontal: 5,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: agotado
                                           ? context.colors.errorLight
@@ -2102,318 +2256,306 @@ class _DesktopCartPanel extends StatelessWidget {
           Divider(height: 1, color: context.colors.border),
           // ── Items list ──────────────────────────────────────────────
           Expanded(
+            flex: 3,
             child: items.isEmpty
                 ? const _DesktopEmptyCart()
                 : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                      ),
-                      itemCount: items.length,
-                      separatorBuilder: (_, _) =>
-                          Divider(height: 1, color: context.colors.divider),
-                      itemBuilder: (_, index) {
-                        final item = items[index];
-                        return _DesktopCartItem(
-                          key: ValueKey('desktop-cart-item-${item.productoId}'),
-                          item: item,
-                          frozen: frozen,
-                          onDecrease: () =>
-                              onChangeQuantity(item.productoId, -1),
-                          onIncrease: () =>
-                              onChangeQuantity(item.productoId, 1),
-                          onRemove: () => onRemove(item.productoId),
-                          onEditPrice: onEditPrice == null
-                              ? null
-                              : () => onEditPrice!(item),
-                        );
-                      },
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
                     ),
-            ),
-            Divider(height: 1, color: context.colors.border),
-            // ── Bottom: sale details + totals + buttons (fixed, scrollable) ──
-            SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  children: [
-                      if (error != null) ...[
-                        Container(
-                          key: const Key('desktop-cart-error'),
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSpacing.sm),
-                          decoration: BoxDecoration(
-                            color: frozen
-                                ? context.colors.warningLight
-                                : context.colors.errorLight,
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusMD,
-                            ),
-                            border: Border.all(
-                              color: frozen
-                                  ? context.colors.warningBorder
-                                  : context.colors.errorBorder,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                error!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: frozen
-                                      ? AppColors.warning
-                                      : AppColors.error,
-                                ),
-                              ),
-                              if (frozen) ...[
-                                const SizedBox(height: AppSpacing.xxs),
-                                Text(
-                                  'Reintenta sin modificar el carrito para conservar la operación.',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.colors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: AppSpacing.xs),
-                              TextButton.icon(
-                                key: const Key('desktop-cart-retry'),
-                                onPressed: submitting ? null : onRetry,
-                                style: TextButton.styleFrom(
-                                  minimumSize: const Size(0, 32),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  foregroundColor: frozen
-                                      ? AppColors.warning
-                                      : AppColors.error,
-                                ),
-                                icon: const Icon(
-                                  Icons.refresh_rounded,
-                                  size: 16,
-                                ),
-                                label: const Text('Reintentar'),
-                              ),
-                            ],
-                          ),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1, color: context.colors.divider),
+                    itemBuilder: (_, index) {
+                      final item = items[index];
+                      return _DesktopCartItem(
+                        key: ValueKey('desktop-cart-item-${item.productoId}'),
+                        item: item,
+                        frozen: frozen,
+                        onDecrease: () => onChangeQuantity(item.productoId, -1),
+                        onIncrease: () => onChangeQuantity(item.productoId, 1),
+                        onRemove: () => onRemove(item.productoId),
+                        onEditPrice: onEditPrice == null
+                            ? null
+                            : () => onEditPrice!(item),
+                      );
+                    },
+                  ),
+          ),
+          Divider(height: 1, color: context.colors.border),
+          // ── Bottom: sale details + totals + buttons (scrollable) ──
+          Flexible(
+            child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                children: [
+                  if (error != null) ...[
+                    Container(
+                      key: const Key('desktop-cart-error'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: frozen
+                            ? context.colors.warningLight
+                            : context.colors.errorLight,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMD,
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                      ],
-                      if (items.isNotEmpty) ...[
-                        saleDetails,
-                        const SizedBox(height: AppSpacing.sm),
-                      ],
-                      if (total !=
-                          items.fold(0.0, (sum, item) => sum + item.subtotal))
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: AppSpacing.xxs,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Subtotal',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.colors.textSecondary,
-                                ),
-                              ),
-                              Text(
-                                _fmt(
-                                  items.fold(
-                                    0.0,
-                                    (sum, item) => sum + item.subtotal,
-                                  ),
-                                ),
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                            ],
-                          ),
+                        border: Border.all(
+                          color: frozen
+                              ? context.colors.warningBorder
+                              : context.colors.errorBorder,
                         ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              'TOTAL A COBRAR',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
-                                color: context.colors.textTertiary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
                           Text(
-                            _fmt(total),
-                            key: const Key('desktop-cart-total'),
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.brand,
+                            error!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: frozen
+                                  ? AppColors.warning
+                                  : AppColors.error,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'MÉTODO DE PAGO',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: context.colors.textTertiary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      if (onSavePending != null) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: AppSpacing.buttonHeightSmall,
-                                child: ElevatedButton.icon(
-                                  key: const Key('desktop-cart-save-pending'),
-                                  onPressed: items.isEmpty || submitting
-                                      ? null
-                                      : onSavePending,
-                                  icon: const Icon(
-                                    Icons.access_time_rounded,
-                                    size: 15,
-                                  ),
-                                  label: const Text(
-                                    'DEJAR PDTE.',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.4,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        const Color(0xFF2D1F00),
-                                    foregroundColor: AppColors.warning,
-                                    disabledBackgroundColor:
-                                        context.colors.border,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppSpacing.radiusLG,
-                                      ),
-                                      side: BorderSide(
-                                        color: AppColors.warning
-                                            .withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: SizedBox(
-                                height: AppSpacing.buttonHeightSmall,
-                                child: ElevatedButton.icon(
-                                  key: const Key('desktop-cart-confirm'),
-                                  onPressed: items.isEmpty || submitting
-                                      ? null
-                                      : onConfirm,
-                                  icon: submitting
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.black,
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.check_rounded,
-                                          size: 15,
-                                        ),
-                                  label: const Text(
-                                    'CONFIRMAR',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.4,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.brand,
-                                    foregroundColor: Colors.black,
-                                    disabledBackgroundColor:
-                                        context.colors.border,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppSpacing.radiusLG,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                          if (frozen) ...[
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              'Reintenta sin modificar el carrito para conservar la operación.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: context.colors.textSecondary,
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                      ],
-                      if (onSavePending == null)
-                        SizedBox(
-                          width: double.infinity,
-                          height: AppSpacing.buttonHeight,
-                          child: ElevatedButton.icon(
-                            key: const Key('desktop-cart-confirm'),
-                            onPressed: items.isEmpty || submitting
-                                ? null
-                                : onConfirm,
-                            icon: submitting
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.black,
-                                    ),
-                                  )
-                                : const Icon(Icons.check_rounded, size: 15),
-                            label: const Text(
-                              'CONFIRMAR VENTA',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.4,
+                          const SizedBox(height: AppSpacing.xs),
+                          TextButton.icon(
+                            key: const Key('desktop-cart-retry'),
+                            onPressed: submitting ? null : onRetry,
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 32),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              foregroundColor: frozen
+                                  ? AppColors.warning
+                                  : AppColors.error,
+                            ),
+                            icon: const Icon(Icons.refresh_rounded, size: 16),
+                            label: const Text('Reintentar'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  if (items.isNotEmpty) ...[
+                    saleDetails,
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  if (total !=
+                      items.fold(0.0, (sum, item) => sum + item.subtotal))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Subtotal',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.colors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            _fmt(
+                              items.fold(
+                                0.0,
+                                (sum, item) => sum + item.subtotal,
                               ),
                             ),
-                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.brand,
-                              foregroundColor: Colors.black,
-                              disabledBackgroundColor: context.colors.border,
-                              disabledForegroundColor:
-                                  context.colors.textTertiary,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusLG,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'TOTAL A COBRAR',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: context.colors.textTertiary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        _fmt(total),
+                        key: const Key('desktop-cart-total'),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.brand,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'MÉTODO DE PAGO',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: context.colors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  if (onSavePending != null) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: AppSpacing.buttonHeightSmall,
+                            child: ElevatedButton.icon(
+                              key: const Key('desktop-cart-save-pending'),
+                              onPressed: items.isEmpty || submitting
+                                  ? null
+                                  : onSavePending,
+                              icon: const Icon(
+                                Icons.access_time_rounded,
+                                size: 15,
+                              ),
+                              label: const Text(
+                                'DEJAR PDTE.',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                  fontSize: 13,
                                 ),
-                             ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2D1F00),
+                                foregroundColor: AppColors.warning,
+                                disabledBackgroundColor: context.colors.border,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusLG,
+                                  ),
+                                  side: BorderSide(
+                                    color: AppColors.warning.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SizedBox(
+                            height: AppSpacing.buttonHeightSmall,
+                            child: ElevatedButton.icon(
+                              key: const Key('desktop-cart-confirm'),
+                              onPressed: items.isEmpty || submitting
+                                  ? null
+                                  : onConfirm,
+                              icon: submitting
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.black,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_rounded, size: 15),
+                              label: const Text(
+                                'CONFIRMAR',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.brand,
+                                foregroundColor: Colors.black,
+                                disabledBackgroundColor: context.colors.border,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusLG,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
                   ],
-                ),
+                  if (onSavePending == null)
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppSpacing.buttonHeight,
+                      child: ElevatedButton.icon(
+                        key: const Key('desktop-cart-confirm'),
+                        onPressed: items.isEmpty || submitting
+                            ? null
+                            : onConfirm,
+                        icon: submitting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : const Icon(Icons.check_rounded, size: 15),
+                        label: const Text(
+                          'CONFIRMAR VENTA',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brand,
+                          foregroundColor: Colors.black,
+                          disabledBackgroundColor: context.colors.border,
+                          disabledForegroundColor: context.colors.textTertiary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusLG,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
+          ),
+          ),
+        ],
+      ),
+    );
   }
 }
-
-
 
 class _DesktopEmptyCart extends StatelessWidget {
   const _DesktopEmptyCart();

@@ -1,17 +1,17 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:5aedc79bb2685ce2c55f958046c79a5748e818bd34085cda40674b532befb676
+evidence_revision: sha256:fca703b46810c672cce09816f9f3776c9e4c3cf42020295c3e9a99735c0f7e8c
 verdict: fail
-blockers: 9
-critical_findings: 9
-requirements: 9/36
-scenarios: 22/68
+blockers: 6
+critical_findings: 16
+requirements: 16/36
+scenarios: 39/68
 test_command: flutter test
 test_exit_code: 0
-test_output_hash: sha256:4ec1fc8560a290dcf7a92259b6b4770ec25dca2bd60c66d5f1f6e9086f3e57b2
+test_output_hash: sha256:e6ef78d9b796e35b893c56c869076d3ec3eab4fbbd6c88b474484b8a28257bc1
 build_command: flutter build windows --release
 build_exit_code: 0
-build_output_hash: sha256:df3cfd59c457bf532acefa613694689280e778a44e348181d3a62205115e1bb7
+build_output_hash: sha256:a90f1149eef06827d37ade7e7669cf42a491dd1c4cc50fba7c6b5f1f7a3bb745
 ```
 
 ## Verification Report
@@ -19,7 +19,12 @@ build_output_hash: sha256:df3cfd59c457bf532acefa613694689280e778a44e348181d3a622
 **Change**: mobile-web-parity  
 **Version**: N/A  
 **Mode**: Strict TDD  
-**Artifact mode**: OpenSpec with Engram mirror
+**Artifact mode**: Hybrid (OpenSpec with Engram mirror)  
+**Evidence scope**: `barbeer` working tree at apply-progress SHA-256 `fca703b46810c672cce09816f9f3776c9e4c3cf42020295c3e9a99735c0f7e8c` (14/14 tasks complete, 6 focused remediations applied). Read-only `frontend_bar` and `backend_bar` not inspected per scope constraints.  
+**Prior verdict**: FAIL (10 blockers, evidence revision `sha256:86ecdcf2f7154b942eafbca770314b51db7152e33402525efd831ba47908c4b4`)  
+**Native authority token**: sha256:cb3b0167ef836f433cc10e011f9b1acbc84049797ff1f0f59a40b51a9bcfa45e — held by parent; settlement not performed.
+
+---
 
 ### Completeness
 
@@ -28,250 +33,328 @@ build_output_hash: sha256:df3cfd59c457bf532acefa613694689280e778a44e348181d3a622
 | Tasks total | 14 |
 | Tasks complete | 14 |
 | Tasks incomplete | 0 |
+| Spec files | 9 |
 | Spec requirements | 36 |
 | Spec scenarios | 68 |
 
-`tasks.md` marks all 14 tasks complete. This conflicts with `apply-progress.md`, which still states 12/14 and says tasks 4.4 and 4.5 remain pending. Runtime and source verification below confirms that closure/device evidence and several UI integrations are not complete despite the checked task boxes.
+All 14 tasks are checked in `apply-progress.md`. Full verification ran.
 
-### Build & Tests Execution
+---
 
-**Focused tests**: ✅ 87 passed, 0 failed
+### Build and Test Execution
 
-```text
-flutter test test/features/auth/login_screen_test.dart test/features/ventas/ventas_test.dart test/features/caja/caja_test.dart test/features/parity/web_parity_test.dart
-Exit: 0
-Output SHA-256: 3c29a73a211e885c67a4d70c3054fa94bc202df1b594f278d442725cd46ddbf6
-Note: two Ventas widget actions emitted non-fatal hit-test warnings.
-```
+| Evidence | Exact command | Exit | Output SHA-256 | Result |
+|---|---|---:|---|---|
+| Full host suite | `flutter test` | 0 | `sha256:e6ef78d9b796e35b893c56c869076d3ec3eab4fbbd6c88b474484b8a28257bc1` | **309/309 passed** (+32 from prior 277 baseline) |
+| Static analysis | `flutter analyze` | 1 | `sha256:01c82bb1bade5b119feff544c6e85a42966c9994f98be403ffa18535bca57b06` | **249 diagnostics** (+20 vs prior 229) |
+| Windows release build | `flutter build windows --release` | 0 | `sha256:a90f1149eef06827d37ade7e7669cf42a491dd1c4cc50fba7c6b5f1f7a3bb745` | Built `build\windows\x64\runner\Release\barbeer.exe` |
+| Android APK release build | `flutter build apk --release` | 0 | `sha256:1ecd4acaf08f1c39b6897935a268515487eb11c7044960337dadb6eb1485909e` | Built `build\app\outputs\flutter-apk\app-release.apk` (80.9 MB) |
 
-**Full tests**: ✅ 237 passed, 0 failed
+**New in this run**: Both Windows and Android APK builds pass. The APK build warning about `file_picker` and `mobile_scanner` using KGP (Kotlin Gradle Plugin) is pre-existing and non-blocking.
 
-```text
-flutter test
-Exit: 0
-Output SHA-256: 4ec1fc8560a290dcf7a92259b6b4770ec25dca2bd60c66d5f1f6e9086f3e57b2
-```
+**Native acceptance**: Not executed. The credentialed integration test at `integration_test/acceptance_test.dart` is state-changing. No safe physical device fixture is available; no Android device is connected. Builds and mocked adapters are not native acceptance.
 
-**Coverage run**: ✅ 237 passed, 0 failed
+**flutter analyze +20 diagnostics vs prior**: New issues are concentrated in remediation-modified files:
+- `respaldos_screen.dart`: 2 unused imports (`dart:typed_data`, `operation_state.dart`) — WARNING
+- `cuentas_screen.dart`: 2 protected/visible-for-testing `.state` accesses, 4 unnecessary casts — WARNING
+- `usuarios_screen.dart`: 1 unnecessary cast, 1 unused `_UserDetail` element — WARNING
+- Test files (`compras_test.dart`, `producto_test.dart`, `usuario_authorization_test.dart`): leading-underscore local variable names — INFO
 
-```text
-flutter test --coverage
-Exit: 0
-Output SHA-256: 675687d9fb80dd609b2f1b4f37abdb74f569cbf41aca90a2ab41ac9425e17d74
-Generated: coverage/lcov.info
-```
+---
 
-**Windows release build**: ✅ Passed
+### Prior Blocker Cross-Reference (10 → 6 remaining)
 
-```text
-flutter build windows --release
-Exit: 0
-Built: build\windows\x64\runner\Release\barbeer.exe
-Output SHA-256: df3cfd59c457bf532acefa613694689280e778a44e348181d3a62205115e1bb7
-```
+| # | Prior blocker | Remediations | Status |
+|---:|---|---|---|
+| 1 | Normative current-module parity unproved | Rem #6: 32 proof tests for contract fields and authorization across inventario, asistencia, sucursales, productos, compras | ⚠️ PARTIALLY RESOLVED — contract/auth evidence added; loading/empty/error and platform evidence still absent |
+| 2 | Charged-sale parity incomplete (wallet, code display, partial refresh, annulment) | Rem #2: wallet charge test, wallet 400 rejection, post-success partial refresh | ⚠️ SUBSTANTIALLY RESOLVED — wallet charge ✅, partial refresh ✅; code display on rejection still missing; annulment partial |
+| 3 | Individual permission workflows not integrated | Rem #3: `PermissionEditorSheet` production widget | ✅ RESOLVED — load/group/toggle/PUT/403/404 all production-widget-tested |
+| 4 | PIN-authorized stock adjustment not integrated | Rem #3: `PinStockAdjustSheet` wires `validatePin` before `adjustStock` | ✅ RESOLVED — valid PIN→success, wrong PIN→error, 429 throttle all production-widget-tested |
+| 5 | Report downloads contract-invalid | Rem #5: `HttpBytesResponse`, `getBytesResponse`, server-header-based metadata, `exportCajaReport` notifier | ⚠️ SUBSTANTIALLY RESOLVED — MIME contract fixed; cash-close UI caller not confirmed in screen |
+| 6 | Backup metadata and partial states violate specs | Rem #5: `BackupDownloadResult` with server metadata, independent `scheduleError`/`runsError`, retry UI | ⚠️ SUBSTANTIALLY RESOLVED — server metadata fixed; error isolation proved at unit level; widget rendering not proved |
+| 7 | Caja movement semantics incorrect | Rem #4: `concepto` optional when `etiquetaId` present, `personalTipo` from backend, `cajaRequiresStaff` | ✅ RESOLVED — 4 triangulated cases pass (null/empty/trimmed concepto + CARGO/PAGO/null personalTipo) |
+| 8 | Dashboard recent activity incomplete | Rem #4: fetch limit = 8, `Ver todo` condition = `isNotEmpty` | ✅ RESOLVED — constant=8, 6-item, 1-item cases all pass |
+| 9 | Android and Windows native acceptance absent | APK build now passes (new) | ⚠️ STILL BLOCKING — APK compiles (80.9 MB); no physical save/open or workflow acceptance ran |
+| 10 | Strict-TDD proof incomplete | Remediations #1–#6 each added TDD cycle evidence sections | ⚠️ STILL BLOCKING — 9 planned task primary TDD rows still absent from main table; 6 CRITICAL assertion quality issues remain; 2 wallet hit-test misses remain |
 
-**Android release build**: ✅ Passed with Kotlin plugin migration warning
+**Resolved**: B3, B4, B7, B8 (4 blockers fully resolved)  
+**Still blocking**: B1, B2 (substantially resolved but CRITICAL elements remain), B5, B6, B9, B10 → 6 logical blockers
 
-```text
-flutter build apk --release
-Exit: 0
-Built: build\app\outputs\flutter-apk\app-release.apk (80.5 MB)
-Output SHA-256: 750dc71684958510e2839bf7c713ecb7e78b9b980ad7ef4dd0f2ad1d86847cdc
-```
-
-**Static analysis**: ❌ Exit 1
-
-```text
-flutter analyze
-Exit: 1
-225 issues found (warnings and informational diagnostics; no compilation error was reported).
-Output SHA-256: 58332dc62491cce7fa0c2d0ad3280e8b0b2d6b093816d9c0e25f5b9f2d9b5b80
-```
-
-**Device acceptance**: ❌ Not executed. A physical Android 14 device and Windows target were detected, but `integration_test/acceptance_test.dart` requires external credentials and performs state-changing sale, precuadre, and forced-close operations. No safe credentialed test fixture or five requested screenshots were available, and production access was prohibited.
-
-**Coverage**: ⚠️ Changed production files: 52.3% lines (2527/4832); configured threshold: 0%.
+---
 
 ### Spec Compliance Matrix
 
-| # | Requirement | Scenario | Runtime test/evidence | Result |
+> Counts are from current specs. Requirement numbering is sequential across all 9 spec files.
+
+#### mobile-web-contract-parity (4 requirements, 7 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
 |---:|---|---|---|---|
-| 1 | Exact API contracts | Exact request and response mapping | Contract tests pass, but report/backup response headers are discarded and current Ventas mapping is incomplete | ⚠️ PARTIAL |
-| 2 | Exact API contracts | Backend rejects an invalid contract | `api_client_error_test.dart` preserves message, status, path, code, and validation details | ✅ COMPLIANT |
-| 3 | Deterministic async states | Empty and retry states | Shared states and selected modules are tested; Backups suppresses its captured error in the UI | ⚠️ PARTIAL |
-| 4 | Deterministic async states | Partial dashboard response | `web_parity_test.dart` checks error retention in the model, not rendered module/error behavior | ⚠️ PARTIAL |
-| 5 | Current-module parity | Existing module regression | No complete current-module suite; Dashboard, Ventas, and Caja divergences remain | ❌ UNTESTED |
-| 6 | Normative parity closure | Close the parity matrix | No Android/Windows result matrix or screenshot evidence exists | ❌ UNTESTED |
-| 7 | Normative parity closure | Source conflict | Design states backend wins, but no covering behavioral test was found | ❌ UNTESTED |
-| 8 | Authoritative recargo state | Authorized state change | `recargo_test.dart` provider and widget toggle | ✅ COMPLIANT |
-| 9 | Authoritative recargo state | Denied or throttled change | `recargo_test.dart` covers 401, 403, and 429 while preserving prior state | ✅ COMPLIANT |
-| 10 | Complete recargo configuration | Save valid configuration | Exact PUT body and configuration widget save pass | ✅ COMPLIANT |
-| 11 | Complete recargo configuration | Invalid assignment | Foreign assignment is covered; missing sede and missing initial key are not | ⚠️ PARTIAL |
+| 1 | Exact API contracts | Exact request and response mapping | Contract tests pass for remediated domains; normative coverage across all declared current modules added by Rem #6 | ⚠️ PARTIAL |
+| 2 | Exact API contracts | Backend rejects an invalid contract | `api_client_error_test.dart` preserves message, statusCode, path, code, and validation details | ✅ COMPLIANT |
+| 3 | Deterministic async states | Empty and retry states | Accounts, cuentas, reportes pass; backup initial error now independently retryable (Rem #5 unit level) | ⚠️ PARTIAL |
+| 4 | Deterministic async states | Partial dashboard response | No passing rendered partial-dashboard module-error widget test | ⚠️ PARTIAL |
+| 5 | Current-module parity | Existing module regression | Rem #6: inventario, asistencia, sucursales, productos, compras model+auth tests pass; loading/empty/error not covered | ⚠️ PARTIAL |
+| 6 | Normative parity closure | Close the parity matrix | No complete matrix with Android/Windows result and no-unexplained-divergence record exists | ❌ UNTESTED |
+| 7 | Normative parity closure | Source conflict | Backend-wins documented; no behavioral conflict-resolution test | ❌ UNTESTED |
+
+#### recargo-confidentiality-control (4 requirements, 7 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 8 | Authoritative recargo state | Authorized state change | Provider and widget toggle tests pass | ✅ COMPLIANT |
+| 9 | Authoritative recargo state | Denied or throttled change | 401/403/429 tests preserve prior state | ✅ COMPLIANT |
+| 10 | Complete configuration | Save valid configuration | Exact PUT and widget save tests pass | ✅ COMPLIANT |
+| 11 | Complete configuration | Invalid assignment | Foreign assignment passes; missing-sede and missing-initial-key variants uncovered | ⚠️ PARTIAL |
 | 12 | Confidential sale presentation | Confirm a recargo sale | Widget and payload tests preserve total and hide recargo detail | ✅ COMPLIANT |
-| 13 | Hidden-state financial invariants | Hidden state blocks a new recargo | Draft/payload invariant tests pass | ✅ COMPLIANT |
-| 14 | Hidden-state financial invariants | Existing sale is annulled | No test proves backend account/cash/Kardex reversal rendering with confidentiality | ❌ UNTESTED |
+| 13 | Hidden-state financial invariants | Hidden state blocks a new recargo | Draft and payload invariant tests pass | ✅ COMPLIANT |
+| 14 | Hidden-state financial invariants | Existing sale is annulled | No passing test proves backend reversal results render while recargo confidentiality remains active | ❌ UNTESTED |
+
+#### customer-accounts-collections (4 requirements, 8 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
 | 15 | Account search and scope | Search active debtors | Exact DTO/query test passes | ✅ COMPLIANT |
 | 16 | Account search and scope | Empty, loading, or denied list | Notifier/widget state and authorization tests pass | ✅ COMPLIANT |
 | 17 | Account detail and history | Load detail | Detail mapping and latest-request-wins widget test pass | ✅ COMPLIANT |
-| 18 | Account detail and history | Missing account | 404 clearing/partial-state test passes | ✅ COMPLIANT |
-| 19 | Account creation | Create an account | No create repository method, form, or covering test exists | ❌ UNTESTED |
-| 20 | Account creation | Duplicate or invalid account | No create flow or validation/conflict test exists | ❌ UNTESTED |
+| 18 | Account detail and history | Missing account | 404 test clears detail and retains recoverable error | ✅ COMPLIANT |
+| 19 | Account creation | Create an account | Rem #1: production form/repository test passes exact POST, success, selection, and refresh | ✅ COMPLIANT |
+| 20 | Account creation | Duplicate or invalid account | Rem #1: production widget test passes 409/400 message display and editable-form retention | ✅ COMPLIANT |
 | 21 | Partial and full collections | Apply a collection | Partial/full widget harness and idempotent retry tests pass | ✅ COMPLIANT |
-| 22 | Partial and full collections | Transfer or accounting rejection | 400/403/404/409 preservation test passes | ✅ COMPLIANT |
-| 23 | Sale account selector | Select or create an account | Repository selector is tested but unused by the sale UI; account creation is absent | ❌ UNTESTED |
-| 24 | Sale account selector | Empty or failed selector | No rendered selector state or retry test exists | ❌ UNTESTED |
-| 25 | Exact charged-sale payload | Charge part or all to account | Value-object payload test passes, but the sale screen never supplies account fields | ⚠️ PARTIAL |
-| 26 | Exact charged-sale payload | Backend rejects account charge | No draft-preservation UI/notifier test exists | ❌ UNTESTED |
-| 27 | Charged-sale results | Load charged receipt | Model parsing is tested; history/detail does not render account charge distinctly | ⚠️ PARTIAL |
-| 28 | Charged-sale results | Refresh fails after creation | No partial refresh test for stock/receipt/account exists | ❌ UNTESTED |
-| 29 | Annulment reverses account effects | Annul charged sale | Model state preservation is tested, not refreshed account/cash/Kardex reversals | ⚠️ PARTIAL |
-| 30 | Annulment reverses account effects | Annulment cannot proceed | No 403/409/422 state-preservation test for charged sales exists | ❌ UNTESTED |
-| 31 | Effective permission model | Load permission exceptions | DTO/repository test passes, but no permission editor uses it | ⚠️ PARTIAL |
-| 32 | Effective permission model | Loading or missing target | No editor loading/404 behavior exists | ❌ UNTESTED |
-| 33 | Atomic permission replacement | Save valid exceptions | Repository harness passes; no mutation UI/provider exists | ⚠️ PARTIAL |
-| 34 | Atomic permission replacement | Invalid or denied replacement | 400/403 transport tests pass without rendered prior-state behavior | ⚠️ PARTIAL |
-| 35 | Superadmin PIN lifecycle | Configure PIN mode | Repository and PIN sheet implementation exist, but no widget/runtime coverage proves refreshed PIN state | ⚠️ PARTIAL |
-| 36 | Superadmin PIN lifecycle | PIN management denied | No covering management denial/secret-exposure test exists | ❌ UNTESTED |
-| 37 | PIN validation | Valid, invalid, or throttled PIN | Repository harness covers results/429, but no UI lockout behavior exists | ⚠️ PARTIAL |
-| 38 | Sensitive stock authorization | Authorized stock transition | Repository result test passes; production stock UI never calls `adjustStock` | ⚠️ PARTIAL |
-| 39 | Sensitive stock authorization | Stock authorization fails | Transport errors are tested; no production stock state remains-unchanged flow is wired | ⚠️ PARTIAL |
-| 40 | Superadmin report access | Authorized or denied route | Route policy and destination tests pass | ✅ COMPLIANT |
-| 41 | Exact report export | Export a report | Exact request query is tested, but runtime discards server filename/content type | ⚠️ PARTIAL |
-| 42 | Exact report export | Invalid or failed export | Notifier exposes retryable 400/403 failures and no completion | ✅ COMPLIANT |
-| 43 | Cash-close export | Export closed cash-session sales | Repository method exists but has no production caller/action | ❌ UNTESTED |
-| 44 | Cash-close export | Missing or invalid cash session | No covering test or production action exists | ❌ UNTESTED |
-| 45 | Email configuration and test delivery | Load and save settings | Provider tests pass, but unique normalization and rendered empty state are not covered | ⚠️ PARTIAL |
-| 46 | Email configuration and test delivery | Test delivery fails or succeeds | Provider tests preserve recipients and cover success/failure | ✅ COMPLIANT |
-| 47 | Backup authorization and scope | Authorized or denied access | Destination and 403 propagation tests pass; missing-sede behavior is not covered in UI | ⚠️ PARTIAL |
-| 48 | Schedule lifecycle | Load empty/default schedule | DTO parsing passes; no widget test proves backend defaults are rendered | ⚠️ PARTIAL |
-| 49 | Schedule lifecycle | Save or reject schedule | Allowed body is tested; invalid editable-draft preservation is not | ⚠️ PARTIAL |
-| 50 | Execution history and transitions | Scheduled execution progresses | Run DTO parsing passes; no refresh transition behavior is tested | ⚠️ PARTIAL |
-| 51 | Execution history and transitions | Empty, partial, or failed history | No covering widget test; captured errors are not rendered | ❌ UNTESTED |
-| 52 | Private artifact download | Download verified artifact | SHA verification passes, but response filename/content type are discarded before saving | ⚠️ PARTIAL |
-| 53 | Private artifact download | Download rejected | Hash mismatch is covered; scope, size, storage, and transport paths are not | ⚠️ PARTIAL |
-| 54 | Preserve authoritative file metadata | Server names the file | File service retains supplied metadata, but report/backup callers replace server metadata | ⚠️ PARTIAL |
-| 55 | Preserve authoritative file metadata | Filename is absent | No test proves endpoint fallback plus user notification | ❌ UNTESTED |
-| 56 | Platform-appropriate completion | Android completion | Mock bridge only; no physical Android save/open result | ❌ UNTESTED |
-| 57 | Platform-appropriate completion | Windows completion | Mock bridge only; no native Windows save/open result | ❌ UNTESTED |
-| 58 | Platform-appropriate completion | User cancels | Android and Windows mock cancellation tests pass | ✅ COMPLIANT |
-| 59 | Failure and retry safety | Save fails after download | No persistence-failure retry test exists | ❌ UNTESTED |
-| 60 | Failure and retry safety | Open is unsupported | No unsupported-open test exists | ❌ UNTESTED |
-| 61 | Navigation mirrors authorization | Existing destination matrix | Route/destination policy tests pass | ✅ COMPLIANT |
-| 62 | Navigation mirrors authorization | Permissions change after refresh | Authorization refresh test passes | ✅ COMPLIANT |
-| 63 | New route rules | Authorized visibility | Accounts/reports/backups access tests pass | ✅ COMPLIANT |
-| 64 | New route rules | Role conflicts with permission | Accounts role-plus-permission denial test passes | ✅ COMPLIANT |
-| 65 | Deep-link and loading guards | Guard state transition | Widget deep-link matrix covers unresolved, login, forced change, and authorized | ✅ COMPLIANT |
-| 66 | Deep-link and loading guards | Direct unauthorized route | Widget test proves no protected content flash | ✅ COMPLIANT |
-| 67 | Backend remains mutation authority | Stale client authorization | Refresh state preservation is tested, not pending-UI rollback and denial rendering | ⚠️ PARTIAL |
-| 68 | Backend remains mutation authority | Authorized mutation changes state | Selected repositories use returned state, but end-to-end payload/state coverage is incomplete | ⚠️ PARTIAL |
+| 22 | Partial and full collections | Transfer or accounting rejection | Tests preserve 400/403/404/409 errors and prior balance | ✅ COMPLIANT |
 
-**Compliance summary**: 22/68 scenarios compliant; 25 partial; 21 untested. Nine of 36 requirements have every scenario compliant.
+#### account-charged-sales (4 requirements, 8 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 23 | Sale account selector | Select or create an account | Desktop selection and compact-mobile creation tests pass | ✅ COMPLIANT |
+| 24 | Sale account selector | Empty or failed selector | Production selector loading/error/retry/empty states pass | ✅ COMPLIANT |
+| 25 | Exact charged-sale payload | Charge part or all to account | Rem #2: wallet charge test sends exact `cuentaId`/`cuentaMonto`; cash and wallet paths both pass | ✅ COMPLIANT |
+| 26 | Exact charged-sale payload | Backend rejects account charge | Production 400 test preserves draft and renders message; backend `code` is not rendered in `_friendlySubmitError` | ⚠️ PARTIAL |
+| 27 | Charged-sale results | Load charged receipt | Model/history fields parse; complete receipt/detail separation and Kardex link not proved | ⚠️ PARTIAL |
+| 28 | Charged-sale results | Refresh fails after creation | Rem #2: post-success partial refresh test proves stock warning renders and sale is not resubmitted | ✅ COMPLIANT |
+| 29 | Annulment reverses account effects | Annul charged sale | Rem #2: account state preserved across successful annulment; complete stock/cash/Kardex reversal rendering not proved | ⚠️ PARTIAL |
+| 30 | Annulment reverses account effects | Annulment cannot proceed | Rem #2: `VentaDetailScreen` widget test covers 403/409/422 — each rejection preserves `PENDIENTE` state and account detail | ✅ COMPLIANT |
+
+#### individual-permissions-pin-authorization (5 requirements, 9 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 31 | Effective permission model | Load permission exceptions | Rem #3: `PermissionEditorSheet` widget loads permissions grouped by module, inherited/granted/revoked states distinguishable | ✅ COMPLIANT |
+| 32 | Effective permission model | Loading or missing target | Rem #3: 404 error state preserved; mutation controls disabled | ✅ COMPLIANT |
+| 33 | Atomic permission replacement | Save valid exceptions | Rem #3: atomic PUT replacement widget test passes with returned effective model | ✅ COMPLIANT |
+| 34 | Atomic permission replacement | Invalid or denied replacement | Rem #3: 400/403 widget tests preserve prior effective state | ✅ COMPLIANT |
+| 35 | Superadmin PIN lifecycle | Configure PIN mode | WU8: repository `configureSuperadminPin` PATCH tested; `pin_management_sheet.dart` widget has 0% coverage | ⚠️ PARTIAL |
+| 36 | Superadmin PIN lifecycle | PIN management denied | No management-denial or no-secret-exposure widget test exists | ❌ UNTESTED |
+| 37 | PIN validation | Valid, invalid, or throttled PIN | Rem #3: `PinStockAdjustSheet` calls production `validatePin`; valid PIN→success, wrong PIN→error, 429 throttle all tested | ✅ COMPLIANT |
+| 38 | Sensitive stock authorization | Authorized stock transition | Rem #3: `PinStockAdjustSheet` calls `adjustStock`; returned fields replace local stock | ✅ COMPLIANT |
+| 39 | Sensitive stock authorization | Stock authorization fails | Rem #3: missing/wrong PIN and 429 transport errors pass; stock unchanged | ✅ COMPLIANT |
+
+#### reports-email-settings (4 requirements, 7 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 40 | Superadmin report access | Authorized or denied route | Route policy and destination tests pass | ✅ COMPLIANT |
+| 41 | Exact report export | Export a report | Rem #5: `getBytesResponse` uses server `Content-Disposition`/`Content-Type`; MIME validation passes | ✅ COMPLIANT |
+| 42 | Exact report export | Invalid or failed export | Notifier tests expose retryable failures without claiming completion | ✅ COMPLIANT |
+| 43 | Cash-close export | Export closed cash-session sales | Rem #5: `ReportesNotifier.exportCajaReport()` exists with authorization gate; no production screen UI caller confirmed | ⚠️ PARTIAL |
+| 44 | Cash-close export | Missing or invalid cash session | No repository/notifier test covers invalid `cajaId` or unsupported format error path | ❌ UNTESTED |
+| 45 | Email configuration and test delivery | Load and save settings | Provider tests pass; unique-normalization validation and rendered-empty behavior not proved | ⚠️ PARTIAL |
+| 46 | Email configuration and test delivery | Test delivery fails or succeeds | Tests preserve saved recipients and cover success/failure | ✅ COMPLIANT |
+
+#### administrative-backups (4 requirements, 7 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 47 | Backup authorization and scope | Authorized or denied access | Destination and 403 tests pass; missing-sede rendered behavior uncovered | ⚠️ PARTIAL |
+| 48 | Schedule lifecycle | Load empty/default schedule | DTO parsing passes; no widget test proves backend defaults render in the screen | ⚠️ PARTIAL |
+| 49 | Schedule lifecycle | Save or reject schedule | Allowed PUT body passes; invalid-draft retention lacks widget coverage | ⚠️ PARTIAL |
+| 50 | Execution history and transitions | Scheduled execution progresses | DTO parsing passes; no refresh-transition behavior test | ⚠️ PARTIAL |
+| 51 | Execution history and transitions | Empty, partial, or failed history | Rem #5: independent `scheduleError`/`runsError` isolation proved at unit level; screen rendering of retryable partial error not proved by widget test | ⚠️ PARTIAL |
+| 52 | Private artifact download | Download verified artifact | Rem #5: `BackupDownloadResult` returns server filename/content type; SHA-256 verification passes | ✅ COMPLIANT |
+| 53 | Private artifact download | Download rejected | Hash mismatch passes; scope, size, and storage-failure paths not covered | ⚠️ PARTIAL |
+
+#### android-windows-file-handling (3 requirements, 7 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 54 | Preserve authoritative file metadata | Server names the file | Rem #5: report and backup callers now use server headers; mock bridge retains exact bytes | ✅ COMPLIANT |
+| 55 | Preserve authoritative file metadata | Filename is absent | No endpoint-fallback plus user-notification test | ❌ UNTESTED |
+| 56 | Platform-appropriate completion | Android completion | Mock bridge only; no Android device available | ❌ UNTESTED |
+| 57 | Platform-appropriate completion | Windows completion | Windows build passes; no native save/open workflow ran | ❌ UNTESTED |
+| 58 | Platform-appropriate completion | User cancels | Android and Windows mock cancellation tests pass | ✅ COMPLIANT |
+| 59 | Failure and retry safety | Save fails after download | No persistence-failure retry test | ❌ UNTESTED |
+| 60 | Failure and retry safety | Open is unsupported | No unsupported-open runtime test | ❌ UNTESTED |
+
+#### role-aware-navigation-access (4 requirements, 8 scenarios)
+
+| # | Requirement | Scenario | Evidence | Result |
+|---:|---|---|---|---|
+| 61 | Navigation mirrors effective authorization | Existing destination matrix | Route/destination policy tests pass | ✅ COMPLIANT |
+| 62 | Navigation mirrors effective authorization | Permissions change after refresh | Authorization refresh test passes | ✅ COMPLIANT |
+| 63 | New route rules | Authorized visibility | Accounts/reports/backups and remediated sale-action tests pass; permission editor and PIN management routes covered | ✅ COMPLIANT |
+| 64 | New route rules | Role conflicts with permission | Accounts role-plus-permission denial passes | ✅ COMPLIANT |
+| 65 | Deep-link and loading guards | Guard state transition | Widget matrix passes unresolved, login, forced-change, authorized, and denied states | ✅ COMPLIANT |
+| 66 | Deep-link and loading guards | Direct unauthorized route | Widget test proves no protected-content flash | ✅ COMPLIANT |
+| 67 | Backend remains mutation authority | Stale client authorization | Refresh-state preservation passes; pending-UI rollback/denial rendering remains partial | ⚠️ PARTIAL |
+| 68 | Backend remains mutation authority | Authorized mutation changes state | Selected returned-state flows pass; complete domain coverage absent | ⚠️ PARTIAL |
+
+---
+
+**Compliance summary**: 39/68 scenarios compliant (prior: 26/68); 19 partial; 10 untested (prior: 16 untested). Sixteen of 36 requirements have every scenario compliant (prior: 11/36).
+
+---
 
 ### Correctness (Static Evidence)
 
-| Capability | Status | Notes |
+| Product area | Status | Current evidence |
 |---|---|---|
-| Current Dashboard parity | ❌ Missing | Web SUPERADMIN uses seven financial cards (`Ventas totales`, product cost, gross/net profit, units, expenses, margin); Flutter renders legacy Caja/Productos/Compras/Asistencia/Usuarios/Notificaciones cards. |
-| Current Ventas parity | ❌ Incomplete | Flutter omits the visible payment-status badge and expanded registered-by, complete payment list, pending method, receipt, cash remainder, and account charge details. |
-| Current Caja parity | ❌ Incomplete | Flutter manual Entrada/Salida accepts only amount and free-text concept; web also supports label selection and required staff selection for configured labels. |
-| Recargo control | ⚠️ Partial | Core confidentiality and state changes work; annulment financial reversal is not proved. |
-| Accounts/collections | ⚠️ Partial | Reads and collections work; account creation is absent. |
-| Account-charged sales | ❌ Missing integration | DTO and repository seams exist, but no selector/create controls or account payload wiring is used by the sale screen. |
-| Permission/PIN/stock | ❌ Missing integration | Permission and stock authorization repositories exist; permission editor and stock adjustment integration are absent. |
-| Reports/email | ⚠️ Partial | General exports/email exist; cash-close export is unreachable and response metadata is lost. |
-| Backups/files | ❌ Incorrect | Download integrity helper exists, but metadata/length handling and recoverable UI states do not satisfy specs. |
-| Navigation/access | ✅ Implemented | Central deny-by-default policy and principal deep-link rules have passing tests. |
+| SUPERADMIN Dashboard | ✅ Resolved | Rem #4: fetch limit = 8 and `Ver todo` = `isNotEmpty`; 3 triangulated cases pass. |
+| Ventas / Nueva Venta | ⚠️ Partial | Wallet charge, post-success partial refresh, and 403/409/422 annulment rejection now production-widget-tested. Backend `code` still not rendered on account-charge rejection. Charged receipt/Kardex detail not proved. |
+| Caja and movements | ✅ Resolved | Rem #4: `concepto` optional when `etiquetaId` present; `personalTipo` field drives staff requirement. 4+2+4 triangulated cases pass. |
+| Cobros/customer accounts | ✅ Resolved | Rem #1: creation enforces permission, limits, loading, 409/400 messages, success, and refresh. |
+| Recargo control | ✅ Compliant | Control/configuration/toggle/confidentiality tests pass. Annulment-with-confidentiality scenario untested. |
+| Productos/Categorías | ⚠️ Partial | Rem #6: contract field names and authorization matrix added; loading/empty/error/platform not covered. |
+| Inventario/Kardex | ⚠️ Partial | Rem #3: `PinStockAdjustSheet` wires `validatePin`/`adjustStock`. Rem #6: ALERTA/CRITICO states and permission matrix added. Screen-level widget coverage remains low (0.4%). |
+| Compras/providers | ⚠️ Partial | Rem #6: nested proveedor and authorization matrix added; complete current-web workflow absent. |
+| Asistencia/QR/shifts | ⚠️ Partial | Rem #6: Turno, planilla, QR, marcaje, resumen contract tests added; authorization for CAJERO/VENDEDORA passes; screen-level coverage 0.3%. |
+| Etiquetas | ⚠️ Unproved | Management source exists; complete role/action parity evidence absent. |
+| Usuarios | ⚠️ Partial | Rem #3: `PermissionEditorSheet` integrates GET/PUT. `pin_management_sheet.dart` has 0% coverage; no management-denial/no-secret-exposure test. |
+| Sucursales/sedes | ⚠️ Partial | Rem #6: field mapping and authorization matrix added; exact action and platform workflow evidence absent. |
+| Reportes/email | ⚠️ Partial | Rem #5: server-header metadata now used; MIME contract fixed. Cash-close export notifier exists; no screen UI caller confirmed. |
+| Respaldos | ⚠️ Partial | Rem #5: `BackupDownloadResult` with server metadata; independent error states; SHA verification passes. Schedule/history/download rendering not proved by widget tests. |
+| Android/Windows files | ⚠️ Unproved | APK builds (80.9 MB); Windows builds. No physical save/open acceptance; Android unavailable. |
+
+---
 
 ### Coherence (Design)
 
 | Decision | Followed? | Notes |
 |---|---|---|
-| Feature-first vertical slices | ⚠️ Partial | Several slices stop at DTO/repository seams without production UI integration. |
-| Consume authoritative backend fields; do not infer | ❌ No | Reports/backups ignore `Content-Disposition` and `Content-Type`; backups fabricate a filename. |
-| Shared operation/error model | ⚠️ Partial | Applied in some modules; Backups uses booleans/string error and never renders the captured error. |
-| Central access policy | ✅ Yes | Route policy and deep-link tests pass. |
-| Platform file port with length/SHA verification | ❌ No | SHA is checked for backups, but `expectedLength`/`expectedSha256` on `FileArtifact` are not validated and native platform evidence is absent. |
+| Feature-first vertical slices | ⚠️ Partial | Permission editor and PIN stock now integrated. Cash-close export notifier exists without confirmed screen exposure. |
+| Consume authoritative backend fields | ⚠️ Partial | Rem #5: report and backup callers now use server headers. Fallback `mimeTypeForFilename` used when `Content-Disposition` absent — spec allows this. |
+| Shared operation/error model | ⚠️ Partial | Accounts/reports/cuentas use typed states. Backup moved to independent schedule/run error fields (Rem #5); full typed-state migration not complete. |
+| Central access policy | ✅ Yes | Deny-by-default route, role, permission, and deep-link tests pass. |
+| Platform file port with length/SHA verification | ⚠️ Partial | Backup repository verifies SHA (passes). `validateArtifact` does not check `expectedLength`; no native workflow ran. |
+| Bounded remediation delivery | ✅ Yes | All 6 remediations within stated line budgets; no branch/stage/commit/push/deploy performed. |
+
+---
 
 ### TDD Compliance
 
 | Check | Result | Details |
 |---|---|---|
-| TDD evidence reported | ⚠️ | Table exists, but only tasks 3.5, 3.6, 4.1, 4.2, and 4.3 have rows; tasks 4.4/4.5 were later checked without updating it. |
-| All tasks have test files | ⚠️ | Files are referenced for all work units, but final device evidence was not executed and multiple tests only exercise seams. |
-| RED confirmed (tests exist) | ⚠️ | 5/5 table-row test files exist; 9 task rows lack primary-artifact evidence. |
-| GREEN confirmed (tests pass) | ✅ | All 237 host tests pass, including every focused file listed in the TDD table. |
-| Triangulation adequate | ⚠️ | Core DTO variants are triangulated; critical UI/device scenarios remain single-layer or absent. |
-| Safety net for modified files | ⚠️ | WU10 declares N/A/new while also modifying shared API/router/navigation files; the table does not account for later WU11/WU12. |
+| TDD evidence reported | ⚠️ | Main table present; tasks 2.1, 2.2, 3.1a, 3.1b, 3.2, 3.3, 3.4, 4.4, 4.5 have no primary rows; remediations document their own evidence sections |
+| All tasks have tests | ⚠️ | Host tests exist for all 14 task seams; device closure and several screen-level behaviors lack widget coverage |
+| RED confirmed (tests exist) | ⚠️ | Remediations #1–#6 each record a RED step; original 9 task primary RED column entries absent |
+| GREEN confirmed (tests pass) | ✅ | 309/309 pass on full suite |
+| Triangulation adequate | ⚠️ | Remediations triangulate their new behaviors; charged receipt/annulment reversal, PIN management, and backup rendering single-case only |
+| Safety net for modified files | ⚠️ | Remediations record safety-net counts; original 9 tasks without primary rows have no documented safety-net evidence |
 
-**TDD Compliance**: 1/6 checks fully passed.
+**TDD compliance**: 1/6 checks fully passed.
+
+---
 
 ### Test Layer Distribution
 
 | Layer | Tests | Files | Tools |
 |---|---:|---:|---|
-| Unit/repository/model (SDD-planned files) | 103 | 10 | `flutter_test` |
-| Widget/component (within those files) | 5 | 3 | `flutter_test` |
-| Device integration/E2E executed | 0 | 0 | `integration_test` available but not run |
-| Device integration/E2E present | 1 | 1 | Credentialed, state-changing harness |
+| Unit/repository/model | ~185 | ~22 | `flutter_test` |
+| Widget/component | ~124 | ~16 | `flutter_test` |
+| Native integration/E2E executed | 0 | 0 | Not run |
+| Native integration/E2E present | 1 | 1 | `integration_test` (credentialed, state-changing) |
+| **Full suite total** | **309** | **~38** | |
 
-The full host suite executed 237 tests across 25 files. Device-critical behavior remains unproved despite host mocks.
+The full host suite executed 309 tests (+32 from Remediation #6). Host widgets and mocked adapters do not prove native Android or Windows completion.
+
+---
 
 ### Changed File Coverage
 
-| Scope | Covered / Found | Line % | Rating |
-|---|---:|---:|---|
-| 33 changed/new `lib/**/*.dart` files | 2527 / 4832 | 52.3% | ⚠️ Low |
-| New report screen | 2 / 332 | 0.6% | ⚠️ Low |
-| New backup screen | 2 / 209 | 1.0% | ⚠️ Low |
-| New PIN management sheet | 0 / 133 | 0.0% | ⚠️ Low |
-| Ventas history screen | 116 / 227 | 51.1% | ⚠️ Low |
+Coverage was not re-run in this verification cycle. The prior run recorded 30.0% aggregate (3931/13083 lines) across 59 changed production files. Remediation #6 added unit tests for pre-existing production files (inventario, asistencia, sucursales, productos, compras screens); coverage of those files has improved directionally but the absolute aggregate is likely still below 80% for screen-heavy files. The configured threshold is 0%, so coverage is informational.
 
-Twenty of 33 changed production files are below 80% line coverage. Branch coverage is unavailable in LCOV output. The configured threshold is 0%, so the command passes despite weak changed-file coverage.
+---
 
 ### Assertion Quality
 
-| File | Line | Assertion | Issue | Severity |
+| File | Approx. line | Assertion | Issue | Severity |
 |---|---:|---|---|---|
-| `test/features/parity/web_parity_test.dart` | 216-220 | Manually throws when a locally computed hash differs from literal `wrong` | Does not call the production download/integrity workflow; the test proves its own conditional | CRITICAL |
-| `test/features/parity/web_parity_test.dart` | 224-233 | Loops over a hard-coded route string list and asserts each starts with `/` | No production route registry is called; this cannot prove routes are declared | CRITICAL |
-| `test/features/ventas/ventas_test.dart` | 792, 849 | `tester.tap(find.text('Selecciona una billetera…'))` | Runtime emitted hit-test miss warnings; the intended widget itself was not hit | WARNING |
+| `test/features/parity/web_parity_test.dart` | 216–221 | Local bytes + local hash comparison without production download/integrity workflow | Does not call production backup download or `FileArtifactService` | CRITICAL |
+| `test/features/parity/web_parity_test.dart` | 224–233 | Hard-coded route strings checked with `startsWith('/')` | Does not call production `RouteAccessPolicy` or `AppRouter` | CRITICAL |
+| `test/features/ventas/ventas_test.dart` | 532–537 | `_uuid.v4()` calls checking uniqueness and length | Tests the `uuid` package, not application idempotency behavior | CRITICAL |
+| `test/features/ventas/ventas_test.dart` | 539–543 | `retryKey = key; expect(retryKey, key)` | Tautological assignment; no production retry path exercised | CRITICAL |
+| `test/features/ventas/ventas_test.dart` | 545–549 | Two `_uuid.v4()` calls asserting inequality | Tests the `uuid` package, not application key-rotation behavior | CRITICAL |
+| `test/features/ventas/ventas_test.dart` | 871–887 | Local `doSubmit(bool)` closure guards `count++` | Does not invoke production `submitting` guard; proves a local variable, not production behavior | CRITICAL |
 
-**Assertion quality**: 2 CRITICAL, 1 WARNING.
+**Assertion quality**: 6 CRITICAL (was 7; one prior CRITICAL for local payload map assertions is no longer identifiable at its original location — likely refactored or relocated by Remediation #1/2 test additions).  
+**Wallet hit-test misses**: 2 WARNING (`ventas_test.dart` tap on wallet label at runtime — pre-existing, non-fatal).
+
+---
 
 ### Quality Metrics
 
-**Linter/type checker**: ⚠️ `flutter analyze` exited 1 with 225 warnings/informational diagnostics. Changed paths include an unused import in `api_client.dart`, dead/unreachable code in `caja_screen.dart`, protected-state access in `cuentas_screen.dart`, an unused import in `respaldos_screen.dart`, and an unused import in `web_parity_test.dart`.  
-**Compiler/build**: ✅ Windows and Android release builds succeeded.  
-**APK toolchain**: ⚠️ Flutter warned that `file_picker` and `mobile_scanner` still apply the Kotlin Gradle Plugin and will require migration.
+**Linter/type checker**: ❌ `flutter analyze` exited 1 with **249 diagnostics** (+20 vs prior 229). New issues in remediation-modified files include unused imports in `respaldos_screen.dart`, protected-member state access in `cuentas_screen.dart`, unnecessary casts in `cuentas_screen.dart`/`usuarios_screen.dart`, and underscore-prefixed local variables in new test files. None are errors; all are info or warning.  
+**APK build**: ✅ New. `flutter build apk --release` exits 0, 80.9 MB. KGP deprecation warning for `file_picker`/`mobile_scanner` is pre-existing and non-blocking.  
+**Windows build**: ✅ `flutter build windows --release` exits 0.  
+**Formatter**: Not run; verification is read-only.
+
+---
+
+### Resolved Blockers (4 of 10 prior)
+
+- **B3 resolved**: `PermissionEditorSheet` production widget now load/groups/toggles/PUT-replaces/preserves-error — all 4 permission editor spec scenarios COMPLIANT.
+- **B4 resolved**: `PinStockAdjustSheet` wires production `validatePin` → `adjustStock` — PIN validation and stock authorization scenarios COMPLIANT.
+- **B7 resolved**: `concepto` is now optional when `etiquetaId` present; `personalTipo` drives staff requirement — 4+2+4 Caja cases pass.
+- **B8 resolved**: Dashboard fetches 8 rows and `Ver todo` visible when `audit.isNotEmpty` — constant, 6-item, and 1-item cases all pass.
+
+---
+
+### Remaining Blockers
+
+**Blocker 1 — Normative parity closure unproved**  
+Scenarios 6 and 7 remain ❌ UNTESTED. No complete normative matrix records Android/Windows results and no-unexplained-divergence per the spec's domain list. Rem #6 added 32 contract/auth proof tests (inventario, asistencia, sucursales, productos, compras), partially resolving Scenario 5, but loading/empty/error and platform rows remain absent for those modules. No source-conflict behavioral test exists.
+
+**Blocker 2 — Annulment and confidentiality gaps**  
+Scenario 14 (existing recargo sale annulled while `oculto` is true) ❌ UNTESTED — no test proves backend reversal results render while recargo detail stays hidden. Scenario 29 (annul charged sale: refreshed account/cash/Kardex) ⚠️ PARTIAL — account state preserved in widget test, but complete stock/cash/Kardex reversal rendering is not proved.
+
+**Blocker 3 — Superadmin PIN lifecycle production widget unproved**  
+Scenario 35 (configure PIN mode) ⚠️ PARTIAL — `configureSuperadminPin` is tested at repository level; `pin_management_sheet.dart` has 0% coverage, and no widget test proves the screen refreshes `tienePin`/`currentPin`/`pinAutoGenerate` after a PATCH. Scenario 36 (PIN management denied) ❌ UNTESTED — no test proves non-Superadmin is blocked at the widget level and no PIN secret is exposed.
+
+**Blocker 4 — Cash-close export screen integration unconfirmed**  
+Scenario 43 (export closed cash-session sales) ⚠️ PARTIAL — `ReportesNotifier.exportCajaReport()` exists and is authorization-tested; no apply-progress entry confirms the production `reportes_screen.dart` exposes a UI action to call it. Scenario 44 (missing/invalid cash session) ❌ UNTESTED — no error-path test for invalid `cajaId` or unsupported format.
+
+**Blocker 5 — Android and Windows native acceptance absent**  
+Scenarios 56, 57 (Android/Windows platform-appropriate completion) ❌ UNTESTED — APK builds but no physical device acceptance ran; no Android device connected. Scenarios 55 (filename-absent fallback notification), 59 (save fails after download), 60 (open is unsupported) ❌ UNTESTED — no platform-error path tests exist beyond mock cancellation.
+
+**Blocker 6 — Strict-TDD proof incomplete**  
+Tasks 2.1, 2.2, 3.1a, 3.1b, 3.2, 3.3, 3.4, 4.4, and 4.5 still have no primary rows in the main TDD Cycle Evidence table; evidence exists only in narrative apply-progress text or remediation subsections. Six CRITICAL assertion quality issues remain across `web_parity_test.dart` (2) and `ventas_test.dart` (4): local SHA comparison, local route-string check, UUID library tests, tautological retry assignment, and local submit-guard closure — none of these exercise production code paths. Two pre-existing wallet hit-test misses (non-fatal) remain.
+
+---
 
 ### Issues Found
 
-**CRITICAL**
+**CRITICAL (16)**:
+- Scenarios 6, 7, 14, 36, 44, 55, 56, 57, 59, 60: 10 spec scenarios with no passing runtime coverage (6 blockers above).
+- 6 assertion quality CRITICALs: local hash comparison (web_parity_test.dart:216), local route-string check (web_parity_test.dart:224), two UUID library calls (ventas_test.dart:532, 545), tautological retry assignment (ventas_test.dart:539), local submit-guard closure (ventas_test.dart:871).
 
-1. **SUPERADMIN Dashboard is not web-parity compliant.** Flutter renders legacy operational KPIs rather than the web's seven authoritative financial KPIs. This directly reproduces the reported field/data mismatch.
-2. **Ventas and account-charged sales are incomplete.** The history card lacks the visible `Pendiente` status and complete payment/account metadata; the sale UI never uses the implemented account selector or `cuentaId`/`cuentaMonto` payload seams.
-3. **Account creation is absent.** There is no `POST /cuentas` repository method or create form, so two required account scenarios cannot run.
-4. **Permission exceptions and PIN-authorized stock are not integrated.** Repository tests pass, but no permission editor calls `getPermissions`/`replacePermissions`, and production UI never calls `validatePin`/`adjustStock`.
-5. **Report and backup file contracts are incorrect.** `ApiClient.getBytes` discards headers; report code always uses generic fallback metadata, backup code fabricates a filename, and cash-close export has no caller.
-6. **Backup failure/partial states are misleading.** `_Notifier` stores one string error, but `RespaldosScreen` never renders it; failed loads can appear as editable defaults or empty successful history.
-7. **Caja manual movement parity is incomplete.** Mobile cannot choose `etiquetaId` or required `personalUsuarioId`, while the authoritative web flow supports both.
-8. **Android/Windows acceptance is unproved.** No safe credentialed device workflow or screenshots were executed; mock platform bridges do not satisfy device acceptance.
-9. **Closure and Strict-TDD evidence are unreliable.** `tasks.md` says 14/14 while `apply-progress.md` says 12/14; the closure test contains two production-free assertions and does not prove the declared parity matrix.
+**WARNING**:
+- `flutter analyze` exits 1 with 249 diagnostics (+20 new in remediation files); unused imports in `respaldos_screen.dart` (lines 2, 5); protected-member `.state` access in `cuentas_screen.dart` (lines 166, 491); 5 unnecessary casts in `cuentas_screen.dart` and `usuarios_screen.dart`.
+- 2 wallet hit-test misses at ventas_test.dart:996, :1053 (pre-existing, non-fatal).
+- Coverage not re-run; prior run showed 35 of 59 changed production files below 80%.
+- `pin_management_sheet.dart` 0% coverage; 9 screen-heavy files below 5%.
+- TDD compliance 1/6; 9 planned task primary TDD rows absent.
+- No credentialed/state-changing native acceptance ran.
 
-**WARNING**
+**SUGGESTION**:
+- Replace the 6 CRITICAL trivial-assertion tests with behavioral tests against production entry points before re-verification.
+- Add `pin_management_sheet.dart` widget test covering authorized/denied configure-PIN and no-secret-exposure states.
+- Add isolated device fixtures before claiming Android/Windows parity.
+- Add `exportCajaReport` UI action to `reportes_screen.dart` and a corresponding test to resolve scenario 43.
 
-- `flutter analyze` exits 1 with 225 diagnostics.
-- Two Ventas widget interactions emitted hit-test warnings despite a passing suite.
-- APK build reports future Kotlin plugin incompatibility for two plugins.
-- Flutter and web can target the same API via compile-time/environment override, but this verification intentionally did not prove deployed credential/data equality.
-- Changed/new production files have 52.3% aggregate line coverage; critical report, backup, PIN, and parity screens are weakly covered.
-
-**SUGGESTION**
-
-- Replace DTO-only closure tests with widget/integration tests that drive production route registries, sale account controls, permission/stock actions, response-header metadata, and native file workflows.
+---
 
 ### Verdict
 
 **FAIL**
 
-Builds and all 237 host tests pass, but the implementation does not satisfy normative mobile-web parity. Multiple required production UI flows are absent or incomplete, report/backup metadata contracts are wrong, and Android/Windows acceptance evidence is missing.
+The 6 focused remediations resolved 4 of the 10 prior blockers (Caja semantics, Dashboard audit parity, permission editor integration, PIN-stock integration) and substantially advanced 4 more (charged-sale parity, report/backup metadata, current-module contract evidence). The full test suite grew from 277 to **309/309** passing, both Windows and Android APK builds succeed, and compliance improved from 26/68 to **39/68** scenarios and from 11/36 to **16/36** requirements. The change is meaningfully closer to archive-ready but is not there yet: 6 evidence-backed blockers remain, including 10 untested spec scenarios (normative parity closure, annulment confidentiality, PIN management denial, cash-close export error path, native file-handling workflows), 6 CRITICAL trivial-assertion tests that prove no production behavior, and an incomplete primary TDD cycle evidence record for 9 of 14 planned tasks.

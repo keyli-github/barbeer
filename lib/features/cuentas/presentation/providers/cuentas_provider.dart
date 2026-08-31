@@ -39,6 +39,7 @@ class CuentasState {
 class CuentasNotifier extends StateNotifier<CuentasState> {
   final CuentasRepository _repository;
   final bool authorized;
+  final bool canCreate;
   final bool canCollect;
   final String? sedeId;
   final Future<void> Function()? onForbidden;
@@ -47,7 +48,8 @@ class CuentasNotifier extends StateNotifier<CuentasState> {
   Future<void>? _collectionFuture;
   String? _collectionFingerprint, _collectionKey;
   CuentasNotifier(this._repository, {required this.authorized, required this.sedeId,
-    this.canCollect = false, this.onForbidden, String Function()? keyFactory, int pageSize = 10})
+    this.canCreate = false, this.canCollect = false, this.onForbidden,
+    String Function()? keyFactory, int pageSize = 10})
     : _keyFactory = keyFactory ?? const Uuid().v4, super(CuentasState(pageSize: pageSize));
   Future<void> load({String? search}) async {
     final generation = ++_listGeneration;
@@ -89,6 +91,16 @@ class CuentasNotifier extends StateNotifier<CuentasState> {
       if (generation == _detailGeneration) state = state.copy(
         listState: OperationPartial(data: state.items, errors: {'detail': exception}),
         detailState: OperationRecoverableError(exception));
+    }
+  }
+  Future<Cuenta> create({required String nombre, String? documento, String? telefono}) async {
+    if (!canCreate) throw const AppException(message: 'No autorizado.', statusCode: 403);
+    try {
+      return await _repository.create(nombre: nombre, documento: documento, telefono: telefono);
+    } catch (error) {
+      final exception = _exception(error);
+      if (exception.statusCode == 403) await onForbidden?.call();
+      throw exception;
     }
   }
   Future<void> collect({required double monto, required String medioPago,
@@ -141,6 +153,7 @@ final cuentasProvider = StateNotifierProvider.autoDispose<CuentasNotifier, Cuent
     authorized: auth.canAccess(RoutePaths.cuentas),
     canCollect: auth.canPerform(const RouteAccessRule.both(
       {'SUPERADMIN', 'ADMIN'}, {'cuentas:editar'})),
+    canCreate: user?.hasPermission('cuentas:crear') ?? false,
     sedeId: user?.isSuperAdmin == true ? selectedSede : user?.sedeId,
     onForbidden: ref.read(authProvider.notifier).refreshAuthorizationAfterForbidden);
   Future.microtask(notifier.load);

@@ -8,6 +8,8 @@ import 'package:barbeer/core/errors/app_exception.dart';
 import 'package:barbeer/features/ventas/data/models/venta_models.dart';
 import 'package:barbeer/core/widgets/ds_product_image.dart';
 import 'package:barbeer/features/productos/data/productos_repository.dart';
+import 'package:barbeer/features/cuentas/data/cuentas_repository.dart';
+import 'package:barbeer/features/cuentas/presentation/providers/cuentas_provider.dart';
 import 'package:barbeer/features/ventas/data/ventas_repository.dart';
 import 'package:barbeer/features/ventas/presentation/providers/ventas_provider.dart';
 import 'package:barbeer/features/ventas/presentation/screens/nueva_venta_view.dart';
@@ -109,6 +111,20 @@ class _RetryVentasRepository extends VentasRepository {
   }
 }
 
+class _RejectedAccountSaleRepository extends VentasRepository {
+  _RejectedAccountSaleRepository() : super(ApiClient.instance);
+  final attempts = <CreateVentaPayload>[];
+  @override
+  Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
+    attempts.add(payload);
+    throw const AppException(
+      message: 'La cuenta del cliente no existe o está inactiva',
+      statusCode: 400,
+      code: 'CUENTA_INVALIDA',
+    );
+  }
+}
+
 class _ReceiptVentasRepository extends VentasRepository {
   _ReceiptVentasRepository({required this.analysis})
     : super(ApiClient.instance);
@@ -145,9 +161,11 @@ class _ReceiptVentasRepository extends VentasRepository {
 }
 
 class _ConfirmReceiptRepository extends VentasRepository {
-  _ConfirmReceiptRepository({required this.analysis}) : super(ApiClient.instance);
+  _ConfirmReceiptRepository({required this.analysis, this.result})
+    : super(ApiClient.instance);
 
   final ComprobanteAnalisis analysis;
+  final Venta? result;
   final creates = <CreateVentaPayload>[];
 
   @override
@@ -174,21 +192,22 @@ class _ConfirmReceiptRepository extends VentasRepository {
   @override
   Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
     creates.add(payload);
-    return Venta(
-      id: 'v1',
-      codigo: 'V-001',
-      cajaSesionId: 'c1',
-      sedeId: 's1',
-      total: 12,
-      estado: EstadoVenta.activa,
-      conciliacion: const ConciliacionVenta(
-        id: 'co1',
-        estado: EstadoConciliacion.billetera,
-        etiquetaId: 'et-1',
-      ),
-      items: const [],
-      createdAt: '2026-08-13T10:00:00Z',
-    );
+    return result ??
+        Venta(
+          id: 'v1',
+          codigo: 'V-001',
+          cajaSesionId: 'c1',
+          sedeId: 's1',
+          total: 12,
+          estado: EstadoVenta.activa,
+          conciliacion: const ConciliacionVenta(
+            id: 'co1',
+            estado: EstadoConciliacion.billetera,
+            etiquetaId: 'et-1',
+          ),
+          items: const [],
+          createdAt: '2026-08-13T10:00:00Z',
+        );
   }
 }
 
@@ -260,6 +279,7 @@ Future<void> _pumpNuevaVenta(
   required Future<List<Producto>> Function() loader,
   List<String> permissions = const [],
   VentasRepository? repository,
+  CuentasRepository? accountsRepository,
   PickedUploadImage? pickedVoucher,
   Future<PickedUploadImage?> Function()? voucherPicker,
 }) async {
@@ -293,6 +313,8 @@ Future<void> _pumpNuevaVenta(
         ventasRepositoryProvider.overrideWithValue(
           repository ?? VentasRepository(ApiClient.instance),
         ),
+        if (accountsRepository != null)
+          cuentasRepositoryProvider.overrideWithValue(accountsRepository),
         if (voucherPicker != null)
           voucherImagePickerProvider.overrideWithValue(voucherPicker)
         else if (pickedVoucher != null)
@@ -449,7 +471,10 @@ void main() {
       expect(find.byKey(const ValueKey('payment-pendiente')), findsNothing);
       expect(find.byKey(const ValueKey('payment-efectivo')), findsOneWidget);
       expect(find.byKey(const ValueKey('payment-billetera')), findsOneWidget);
-      expect(find.byKey(const Key('desktop-cart-save-pending')), findsOneWidget);
+      expect(
+        find.byKey(const Key('desktop-cart-save-pending')),
+        findsOneWidget,
+      );
       expect(find.textContaining('16.50'), findsWidgets);
     });
 
@@ -483,6 +508,351 @@ void main() {
       expect(repo.attempts.last.idempotencyKey, frozenPayload.idempotencyKey);
       await tester.pump(const Duration(seconds: 3));
     });
+
+    testWidgets(
+      'wallet charge sends authoritative fields and keeps backend result through refresh',
+      (tester) async {
+        var productLoads = 0;
+        final accounts = CuentasRepository(
+          ApiClient.instance,
+          request: (_, _) async => [
+            {
+              'id': 'account-wallet',
+              'nombre': 'Rosa',
+              'documento': null,
+              'telefono': null,
+              'saldo': 3,
+              'activo': true,
+              'esPersonal': false,
+              'cantidadPendientes': 2,
+              'createdAt': '2026-08-01T10:00:00Z',
+              'updatedAt': '2026-08-01T10:00:00Z',
+            },
+          ],
+        );
+        final analysis = ComprobanteAnalisis(
+          id: 'analysis-wallet',
+          estado: 'APTO',
+          posibleDuplicado: false,
+          coincidencias: const [],
+          entidad: 'Yape',
+          etiquetaSugerida: const Etiqueta(
+            id: 'et-1',
+            nombre: 'Yape',
+            activo: true,
+            requiereComprobante: true,
+            orden: 1,
+          ),
+          monto: 5,
+          codigoOperacion: 'YAPE-7788',
+          imagenUrl: '/wallet.jpg',
+          thumbnailUrl: '/wallet-thumb.jpg',
+          confianza: const ComprobanteConfianza(
+            documento: .9,
+            entidad: .9,
+            monto: .9,
+            operacion: .9,
+            fecha: .9,
+          ),
+          advertencias: const [],
+          expiraAt: DateTime(2099),
+        );
+        final result = Venta(
+          id: 'sale-wallet',
+          codigo: 'V-CEN-2026-0042',
+          cajaSesionId: 'cash-1',
+          sedeId: 's1',
+          total: 12,
+          estado: EstadoVenta.activa,
+          cuentaId: 'account-wallet',
+          cuentaNombre: 'Rosa',
+          cuentaMonto: 7,
+          conciliacion: const ConciliacionVenta(
+            id: 'pay-1',
+            estado: EstadoConciliacion.billetera,
+            etiquetaId: 'et-1',
+            etiquetaNombre: 'Yape',
+            monto: 5,
+            comprobante: '/wallet.jpg',
+            codigoOperacion: 'YAPE-7788',
+          ),
+          items: const [],
+          createdAt: '2026-08-30T10:00:00Z',
+        );
+        final sales = _ConfirmReceiptRepository(
+          analysis: analysis,
+          result: result,
+        );
+        await _pumpNuevaVenta(
+          tester,
+          size: const Size(1440, 900),
+          loader: () async {
+            productLoads++;
+            return _products;
+          },
+          permissions: const ['ventas:crear'],
+          repository: sales,
+          accountsRepository: accounts,
+          pickedVoucher: PickedUploadImage(
+            bytes: base64Decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            ),
+            filename: 'wallet.png',
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('+ Agregar').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirmar'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('payment-billetera')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('wallet-field')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Yape').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('voucher-picker')));
+        await tester.pumpAndSettle();
+        expect(find.text('Cargar diferencia a cuenta'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-open')),
+        );
+        await tester.tap(find.byKey(const Key('account-charge-open')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('account-option-account-wallet')),
+        );
+        await tester.pump();
+        expect(find.text('Monto en comprobante (S/)'), findsOneWidget);
+        expect(find.textContaining('7.00'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('account-charge-apply')));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('desktop-cart-confirm')),
+        );
+        await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+        await tester.pumpAndSettle();
+
+        final payload = sales.creates.single.json;
+        expect(payload['cuentaId'], 'account-wallet');
+        expect(payload['cuentaMonto'], 7);
+        expect(payload['comprobanteAnalisisId'], 'analysis-wallet');
+        expect(payload.containsKey('comprobante'), isFalse);
+        expect(find.text('Venta V-CEN-2026-0042 registrada'), findsOneWidget);
+        expect(find.textContaining('Billetera · Yape'), findsOneWidget);
+        expect(find.textContaining('Comprobante: YAPE-7788'), findsOneWidget);
+        expect(find.textContaining('Cuenta: Rosa · S/ 7.00'), findsOneWidget);
+        expect(productLoads, 2);
+      },
+    );
+
+    testWidgets(
+      'charged-sale selector retries, stays backend-backed, and preserves rejected draft',
+      (tester) async {
+        final first = Completer<Object?>();
+        var calls = 0;
+        final accounts = CuentasRepository(
+          ApiClient.instance,
+          request: (_, query) {
+            calls++;
+            if (calls == 1) return first.future;
+            if (calls == 2) return Future.value(<Object?>[]);
+            return Future.value([
+              {
+                'id': 'account-1',
+                'nombre': 'Ana',
+                'documento': null,
+                'telefono': null,
+                'saldo': 8,
+                'activo': true,
+                'esPersonal': true,
+                'cantidadPendientes': 1,
+                'createdAt': '2026-08-01T10:00:00Z',
+                'updatedAt': '2026-08-01T10:00:00Z',
+              },
+            ]);
+          },
+        );
+        final sales = _RejectedAccountSaleRepository();
+        await _pumpNuevaVenta(
+          tester,
+          size: const Size(1440, 900),
+          loader: () async => _products,
+          permissions: const ['ventas:crear'],
+          repository: sales,
+          accountsRepository: accounts,
+        );
+        await tester.pump();
+        await tester.tap(find.text('+ Agregar').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirmar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Cargar diferencia a cuenta'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('account-charge-open')));
+        await tester.pump();
+        expect(find.text('Buscando cuentas...'), findsOneWidget);
+        first.completeError(
+          const AppException(
+            message: 'No se pudieron buscar las cuentas.',
+            statusCode: 503,
+          ),
+        );
+        await tester.pump();
+        expect(find.text('No se pudieron buscar las cuentas.'), findsOneWidget);
+        await tester.tap(find.text('Reintentar'));
+        await tester.pumpAndSettle();
+        expect(find.text('No se encontraron resultados'), findsOneWidget);
+        await tester.enterText(find.byKey(const Key('account-search')), 'Ana');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('1 pendiente'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const Key('account-option-account-1')),
+        );
+        await tester.tap(find.byKey(const Key('account-option-account-1')));
+        await tester.pump();
+        expect(find.text('Cuenta personal'), findsOneWidget);
+        expect(find.text('Cliente Seleccionado: Ana'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const Key('account-cash-amount')),
+          '5',
+        );
+        await tester.pump();
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-apply')),
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('account-charge-apply')),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        await tester.tap(find.byKey(const Key('account-charge-apply')));
+        await tester.pumpAndSettle();
+        expect(find.text('Cargar a Cuenta de Cliente'), findsNothing);
+        expect(find.text('Cargado a cuenta (Ana)'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const Key('desktop-cart-confirm')),
+        );
+        await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+        await tester.pump();
+        expect(sales.attempts.single.json['cuentaId'], 'account-1');
+        expect(sales.attempts.single.json['cuentaMonto'], 7);
+        expect(
+          find.textContaining('La cuenta del cliente no existe o está inactiva'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('CUENTA_INVALIDA'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('desktop-cart-item-p1')),
+          findsOneWidget,
+        );
+        expect(find.text('Cargado a cuenta (Ana)'), findsOneWidget);
+      },
+    );
+
+    testWidgets('account charge stays hidden without selector permissions', (
+      tester,
+    ) async {
+      var selectorCalls = 0;
+      final accounts = CuentasRepository(
+        ApiClient.instance,
+        request: (_, _) async {
+          selectorCalls++;
+          return [];
+        },
+      );
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        accountsRepository: accounts,
+      );
+      await tester.pump();
+      await tester.tap(find.text('+ Agregar').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('account-charge-open')), findsNothing);
+      expect(selectorCalls, 0);
+    });
+
+    testWidgets(
+      'mobile creates an account then charges the full sale through production submit',
+      (tester) async {
+        late String createPath;
+        late Map<String, dynamic> createBody;
+        final accounts = CuentasRepository(
+          ApiClient.instance,
+          request: (_, _) async => [],
+          post: (path, body) async {
+            createPath = path;
+            createBody = body;
+            return {
+              'id': 'created-account',
+              'nombre': 'Luis',
+              'documento': null,
+              'telefono': null,
+              'saldo': '0',
+              'activo': true,
+              'cantidadPendientes': null,
+              'createdAt': '2026-08-01T10:00:00Z',
+              'updatedAt': '2026-08-01T10:00:00Z',
+            };
+          },
+        );
+        final sales = _ConfirmReceiptRepository(
+          analysis: _validAnalysis('unused', 'Yape'),
+        );
+        await _pumpNuevaVenta(
+          tester,
+          size: const Size(390, 844),
+          loader: () async => _products,
+          permissions: const ['ventas:crear', 'cuentas:crear'],
+          repository: sales,
+          accountsRepository: accounts,
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('mobile-product-p1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirmar'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('mobile-cart-bar')));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-open')),
+        );
+        await tester.tap(find.byKey(const Key('account-charge-open')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Crear Nueva Cuenta'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('account-name')), ' Luis ');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('account-create-submit')));
+        await tester.pumpAndSettle();
+        expect(find.text('Cliente Seleccionado: Luis'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const Key('account-cash-amount')),
+          '0',
+        );
+        await tester.pump();
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-apply')),
+        );
+        await tester.tap(find.byKey(const Key('account-charge-apply')));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('CONFIRMAR VENTA'));
+        await tester.tap(find.text('CONFIRMAR VENTA'));
+        await tester.pumpAndSettle();
+        expect(createPath, '/cuentas');
+        expect(createBody, {'nombre': 'Luis'});
+        expect(sales.creates.single.json['cuentaId'], 'created-account');
+        expect(sales.creates.single.json['cuentaMonto'], 12);
+        expect(find.byKey(const Key('mobile-cart-bar')), findsNothing);
+      },
+    );
 
     testWidgets('duplicado muestra alerta exacta y bloquea la venta', (
       tester,
@@ -612,7 +982,10 @@ void main() {
       );
       expect(field.enabled, isTrue);
 
-      await tester.enterText(find.byKey(const Key('custom-price-field')), '8.75');
+      await tester.enterText(
+        find.byKey(const Key('custom-price-field')),
+        '8.75',
+      );
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
 
@@ -798,7 +1171,8 @@ void main() {
       expect(
         find.textContaining('supera el total'),
         findsOneWidget,
-        reason: 'El monto del comprobante supera el total → no se puede confirmar',
+        reason:
+            'El monto del comprobante supera el total → no se puede confirmar',
       );
 
       await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
@@ -808,5 +1182,240 @@ void main() {
       expect(repo.createCalls, 0, reason: 'No debe crear la venta');
       await tester.pump(const Duration(seconds: 3));
     });
+
+    testWidgets(
+      'post-success partial refresh shows sale result and stock warning without retrying',
+      (tester) async {
+        var productLoads = 0;
+        final result = Venta(
+          id: 'sale-refresh',
+          codigo: 'V-REF-001',
+          cajaSesionId: 'c1',
+          sedeId: 's1',
+          total: 12,
+          estado: EstadoVenta.activa,
+          cuentaId: 'acc-1',
+          cuentaNombre: 'Elena',
+          cuentaMonto: 12,
+          conciliacion: const ConciliacionVenta(
+            id: 'pay-1',
+            estado: EstadoConciliacion.efectivo,
+          ),
+          items: const [],
+          createdAt: '2026-08-30T10:00:00Z',
+        );
+        final sales = _ConfirmReceiptRepository(
+          analysis: _validAnalysis('unused', 'Yape'),
+          result: result,
+        );
+        await _pumpNuevaVenta(
+          tester,
+          size: const Size(1440, 900),
+          loader: () async {
+            productLoads++;
+            if (productLoads > 1) throw Exception('stock refresh failure');
+            return _products;
+          },
+          repository: sales,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('+ Agregar').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirmar'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('desktop-cart-confirm')),
+        );
+        await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+        await tester.pumpAndSettle();
+
+        expect(sales.creates, hasLength(1));
+        expect(find.text('Venta V-REF-001 registrada'), findsOneWidget);
+        expect(find.textContaining('Cuenta: Elena'), findsOneWidget);
+        expect(
+          find.textContaining('no se pudo actualizar el stock'),
+          findsOneWidget,
+        );
+        expect(productLoads, 2);
+        // Cart cleared — sale was NOT retried with a new key
+        expect(
+          find.byKey(const ValueKey('desktop-cart-item-p1')),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'wallet 400 rejection preserves billetera, receipt, account, and cart intact',
+      (tester) async {
+        final analysis = ComprobanteAnalisis(
+          id: 'analysis-rej',
+          estado: 'APTO',
+          posibleDuplicado: false,
+          coincidencias: const [],
+          entidad: 'BCP',
+          etiquetaSugerida: const Etiqueta(
+            id: 'et-1',
+            nombre: 'Yape',
+            activo: true,
+            requiereComprobante: true,
+            orden: 1,
+          ),
+          monto: 5,
+          codigoOperacion: 'BCP-9900',
+          imagenUrl: '/bcp.jpg',
+          thumbnailUrl: '/bcp-thumb.jpg',
+          confianza: const ComprobanteConfianza(
+            documento: .9,
+            entidad: .9,
+            monto: .9,
+            operacion: .9,
+            fecha: .9,
+          ),
+          advertencias: const [],
+          expiraAt: DateTime(2099),
+        );
+        final creates = <CreateVentaPayload>[];
+        final repo = _WalletRejectedRepository(
+          analysis: analysis,
+          creates: creates,
+        );
+        final accounts = CuentasRepository(
+          ApiClient.instance,
+          request: (_, _) async => [
+            {
+              'id': 'acc-w',
+              'nombre': 'Pedro',
+              'documento': null,
+              'telefono': null,
+              'saldo': 5,
+              'activo': true,
+              'esPersonal': false,
+              'cantidadPendientes': 0,
+              'createdAt': '2026-01-01T00:00:00Z',
+              'updatedAt': '2026-01-01T00:00:00Z',
+            },
+          ],
+        );
+        await _pumpNuevaVenta(
+          tester,
+          size: const Size(1440, 900),
+          loader: () async => _products,
+          permissions: const ['ventas:crear'],
+          repository: repo,
+          accountsRepository: accounts,
+          pickedVoucher: PickedUploadImage(
+            bytes: base64Decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+            ),
+            filename: 'receipt.png',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Add product to cart
+        await tester.tap(find.text('+ Agregar').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirmar'));
+        await tester.pumpAndSettle();
+
+        // Select billetera payment
+        await tester.tap(find.byKey(const ValueKey('payment-billetera')));
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('wallet-field')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Yape').last);
+        await tester.pumpAndSettle();
+
+        // Pick and analyze receipt
+        await tester.tap(find.byKey(const Key('voucher-picker')));
+        await tester.pumpAndSettle();
+        expect(find.text('BCP'), findsOneWidget);
+
+        // Open account charge and select account
+        expect(find.text('Cargar diferencia a cuenta'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-open')),
+        );
+        await tester.tap(find.byKey(const Key('account-charge-open')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('account-option-acc-w')),
+        );
+        await tester.pump();
+        expect(find.text('Monto en comprobante (S/)'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('account-charge-apply')));
+        await tester.pumpAndSettle();
+        expect(find.text('Cargado a cuenta (Pedro)'), findsOneWidget);
+
+        // Submit → 400 rejection
+        await tester.ensureVisible(
+          find.byKey(const Key('desktop-cart-confirm')),
+        );
+        await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+        await tester.pump();
+
+        // Assert full state preserved
+        expect(creates, hasLength(1));
+        expect(
+          find.textContaining('Cuenta inactiva'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('CUENTA_INACTIVA'), findsOneWidget);
+        // Cart item preserved
+        expect(
+          find.byKey(const ValueKey('desktop-cart-item-p1')),
+          findsOneWidget,
+        );
+        // Account charge preserved
+        expect(find.text('Cargado a cuenta (Pedro)'), findsOneWidget);
+        // Receipt analysis preserved
+        expect(
+          find.byKey(const Key('receipt-analysis-panel')),
+          findsOneWidget,
+        );
+        expect(find.text('BCP'), findsOneWidget);
+        // Wallet still selected
+        expect(find.byKey(const Key('wallet-field')), findsOneWidget);
+      },
+    );
   });
+}
+
+class _WalletRejectedRepository extends VentasRepository {
+  _WalletRejectedRepository({required this.analysis, required this.creates})
+    : super(ApiClient.instance);
+  final ComprobanteAnalisis analysis;
+  final List<CreateVentaPayload> creates;
+
+  @override
+  Future<List<Etiqueta>> listEtiquetasActivas({String? sedeId}) async => const [
+    Etiqueta(
+      id: 'et-1',
+      nombre: 'Yape',
+      activo: true,
+      requiereComprobante: true,
+      orden: 1,
+    ),
+  ];
+
+  @override
+  Future<ComprobanteAnalisis> analizarComprobante({
+    required Uint8List bytes,
+    required String filename,
+    String? sedeId,
+  }) async => analysis;
+
+  @override
+  Future<void> cancelarComprobanteAnalisis(String id) async {}
+
+  @override
+  Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
+    creates.add(payload);
+    throw const AppException(
+      message: 'Cuenta inactiva o monto insuficiente',
+      statusCode: 400,
+      code: 'CUENTA_INACTIVA',
+    );
+  }
 }

@@ -4,6 +4,12 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/network/upload_client.dart';
 import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../caja/presentation/providers/caja_provider.dart';
+import '../../../caja/presentation/providers/movimientos_provider.dart';
+import '../../../cuentas/presentation/providers/cuentas_provider.dart';
+import '../../../kardex/presentation/providers/kardex_provider.dart';
+import '../../../productos/presentation/providers/productos_provider.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../data/models/venta_models.dart';
 import '../../data/ventas_repository.dart';
 
@@ -34,6 +40,23 @@ final voucherImagePickerProvider =
         return PickedUploadImage(bytes: bytes, filename: file.name);
       };
     });
+
+String saleMutationError(Object error) {
+  if (error is! AppException) return error.toString();
+  return [
+    error.message,
+    if (error.code?.isNotEmpty == true) error.code!,
+    ...error.details,
+  ].where((value) => value.isNotEmpty).join(' · ');
+}
+
+void invalidateSaleSideEffects(WidgetRef ref) {
+  ref.invalidate(cuentasProvider);
+  ref.invalidate(cajaProvider);
+  ref.invalidate(movimientosProvider);
+  ref.invalidate(kardexProvider);
+  ref.invalidate(productosProvider);
+}
 
 // ── Ventas list state ────────────────────────────────────────────────────────
 
@@ -205,7 +228,11 @@ final ventasListProvider =
     ) {
       final repo = ref.watch(ventasRepositoryProvider);
       final sedeId = ref.watch(globalSedeIdProvider);
-      return VentasListNotifier(repo, useMisVentas: useMisVentas, sedeId: sedeId);
+      return VentasListNotifier(
+        repo,
+        useMisVentas: useMisVentas,
+        sedeId: sedeId,
+      );
     });
 
 // ── Etiquetas activas ────────────────────────────────────────────────────────

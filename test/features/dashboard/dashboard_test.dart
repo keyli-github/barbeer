@@ -5,6 +5,7 @@ import 'package:barbeer/features/dashboard/presentation/providers/dashboard_prov
 import 'package:barbeer/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   final auth = AuthState(
@@ -82,5 +83,53 @@ void main() {
     expect(find.text('12'), findsOneWidget);
     expect(find.text('53.5%'), findsOneWidget);
     expect(find.byKey(const Key('dashboard-kpi-value-skeleton')), findsNothing);
+  });
+
+  group('Blocker 8: Dashboard recent activity', () {
+    List<Map<String, dynamic>> makeAudit(int count) => List.generate(
+          count,
+          (i) => {
+            'id': 'a$i',
+            'accion': 'CREAR_VENTA',
+            'usuario': {'username': 'user$i'},
+            'createdAt': '2026-08-29T1$i:00:00Z',
+          },
+        );
+
+    testWidgets('Ver todo link is visible with 6 audit items', (
+      tester,
+    ) async {
+      final router = GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (_, __) => const SizedBox()),
+          GoRoute(path: '/auditoria', builder: (_, __) => const SizedBox()),
+        ],
+      );
+      await tester.pumpWidget(MaterialApp.router(
+        routerConfig: router,
+      ));
+      // Now test the DashboardRecentActivity widget directly
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DashboardRecentActivity(audit: makeAudit(6)),
+        ),
+      ));
+      expect(find.text('Ver todo'), findsOneWidget);
+    });
+
+    testWidgets('Ver todo link is visible with exactly 1 audit item', (
+      tester,
+    ) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: DashboardRecentActivity(audit: makeAudit(1)),
+        ),
+      ));
+      expect(find.text('Ver todo'), findsOneWidget);
+    });
+
+    test('audit fetch limit constant matches web parity (8)', () {
+      expect(dashboardAuditLimit, 8);
+    });
   });
 }

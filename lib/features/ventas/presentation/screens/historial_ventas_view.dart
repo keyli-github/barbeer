@@ -44,10 +44,11 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
           .read(ventasRepositoryProvider)
           .anularVenta(venta.id, motivo: motivo);
       if (!mounted) return;
+      invalidateSaleSideEffects(ref);
       AppFeedback.success(context, 'Venta anulada');
       await _refresh();
     } catch (error) {
-      if (mounted) AppFeedback.error(context, 'No se pudo anular la venta');
+      if (mounted) AppFeedback.error(context, saleMutationError(error));
     }
   }
 
@@ -80,7 +81,8 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(15, 4, 15, 120),
                     itemCount:
-                        state.ventas.length + 1 +
+                        state.ventas.length +
+                        1 +
                         (state.totalPaginas > state.pagina ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index == 0) {
@@ -112,7 +114,7 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                           venta.conciliacion != null && !venta.isPendiente;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                          child: VentaHistoryCard(
+                        child: VentaHistoryCard(
                           venta: venta,
                           onConciliar: canConciliar(auth) && venta.isPendiente
                               ? () => _openConciliar(venta)
@@ -379,7 +381,6 @@ class _VentaCardState extends State<VentaHistoryCard> {
       ),
     );
   }
-
 }
 
 class _ExpandedSale extends StatelessWidget {
@@ -442,14 +443,15 @@ class _ExpandedSale extends StatelessWidget {
           ),
         if (venta.registradaPorUsername != null)
           _PaymentLine('Registrado por: ${venta.registradaPorUsername}'),
-        for (final payment in venta.conciliaciones.isNotEmpty
-            ? venta.conciliaciones
-            : [if (venta.conciliacion != null) venta.conciliacion!]) ...[
+        for (final payment
+            in venta.conciliaciones.isNotEmpty
+                ? venta.conciliaciones
+                : [if (venta.conciliacion != null) venta.conciliacion!]) ...[
           _PaymentLine(
             payment.estado == EstadoConciliacion.pendiente
                 ? payment.metodoPagoPendiente == 'BILLETERA'
-                    ? 'Pendiente · Transferencia'
-                    : 'Pendiente · Efectivo'
+                      ? 'Pendiente · Transferencia'
+                      : 'Pendiente · Efectivo'
                 : estadoConciliacionLabel(payment.estado),
           ),
           if (payment.monto != null)
@@ -499,7 +501,10 @@ class _PaymentLine extends StatelessWidget {
     alignment: Alignment.centerLeft,
     child: Padding(
       padding: const EdgeInsets.only(top: 7),
-      child: Text(text, style: TextStyle(fontSize: 11, color: context.colors.textSecondary)),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, color: context.colors.textSecondary),
+      ),
     ),
   );
 }

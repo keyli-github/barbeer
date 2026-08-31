@@ -13,6 +13,9 @@ class Etiqueta {
   final String tipo;
   final int orden;
 
+  /// Backend `personalTipo` — when non-null, staff selection is required.
+  final String? personalTipo;
+
   const Etiqueta({
     required this.id,
     required this.nombre,
@@ -22,6 +25,7 @@ class Etiqueta {
     this.esSistema = false,
     this.tipo = 'ENTRADA',
     required this.orden,
+    this.personalTipo,
   });
 
   factory Etiqueta.fromJson(Map<String, dynamic> j) => Etiqueta(
@@ -33,6 +37,7 @@ class Etiqueta {
     esSistema: j['esSistema'] as bool? ?? false,
     tipo: j['tipo'] as String? ?? 'ENTRADA',
     orden: (j['orden'] as num?)?.toInt() ?? 0,
+    personalTipo: j['personalTipo'] as String?,
   );
 }
 
@@ -40,9 +45,7 @@ bool isBilleteraEtiqueta(Etiqueta etiqueta) {
   final nombre = etiqueta.nombre.trim().toUpperCase();
   // El tipo (ENTRADA/SALIDA/AMBOS) no se filtra porque el usuario puede haber
   // configurado sus billeteras con tipo SALIDA y aun necesita usarlas para cobrar
-  return etiqueta.activo &&
-      !etiqueta.esSistema &&
-      nombre != 'TOTAL DE VENTAS';
+  return etiqueta.activo && !etiqueta.esSistema && nombre != 'TOTAL DE VENTAS';
 }
 
 // ─── Analisis de comprobante ────────────────────────────────────────────────
@@ -318,6 +321,7 @@ class Venta {
   final double? cuentaMonto;
   final ConciliacionVenta? conciliacion;
   final List<ConciliacionVenta> conciliaciones;
+  final List<ComprobanteAnalisis> comprobantesAnalisis;
   final List<VentaItem> items;
   final String createdAt;
 
@@ -340,6 +344,7 @@ class Venta {
     this.cuentaMonto,
     this.conciliacion,
     this.conciliaciones = const [],
+    this.comprobantesAnalisis = const [],
     required this.items,
     required this.createdAt,
   });
@@ -368,7 +373,16 @@ class Venta {
         : null,
     conciliaciones: (j['conciliaciones'] as List? ?? const [])
         .whereType<Map>()
-        .map((item) => ConciliacionVenta.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) => ConciliacionVenta.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList(),
+    comprobantesAnalisis: (j['comprobantesAnalisis'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) =>
+              ComprobanteAnalisis.fromJson(Map<String, dynamic>.from(item)),
+        )
         .toList(),
     items: (j['items'] as List? ?? const [])
         .map(
@@ -381,6 +395,11 @@ class Venta {
   bool get isAnulada => estado == EstadoVenta.anulada;
   bool get isPendiente => conciliacion?.estado == EstadoConciliacion.pendiente;
 }
+
+/// Returns true when the recargo amount should be surfaced to the user.
+/// Recargo is hidden when a sale is annulled — the charge becomes void
+/// server-side and showing it would mislead the operator.
+bool ventaHasVisibleRecargo(Venta v) => !v.isAnulada && v.recargoMonto != null;
 
 class VendedorVenta {
   final String id;

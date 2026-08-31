@@ -13,7 +13,9 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/routes/route_paths.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../reportes/presentation/providers/reportes_provider.dart';
 import '../../../ventas/data/models/venta_models.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
@@ -982,7 +984,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
       _etiquetaId == null ? null : _etiquetas.where((e) => e.id == _etiquetaId).firstOrNull;
 
   bool get _requierePersonal =>
-      widget.tipo == 'SALIDA' && (_selectedEtiqueta?.tipo == 'SALIDA' || _selectedEtiqueta?.tipo == 'AMBOS');
+      _selectedEtiqueta != null && cajaRequiresStaff(personalTipo: _selectedEtiqueta!.personalTipo);
 
   List<Etiqueta> get _filteredEtiquetas => _etiquetas
       .where((e) => e.tipo == 'AMBOS' || e.tipo == widget.tipo)
@@ -1039,9 +1041,13 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
                 controller: _conceptController,
                 maxLength: 160,
                 textCapitalization: TextCapitalization.sentences,
-                validator: (text) => (text?.trim().isEmpty ?? true)
-                    ? 'Ingresa un concepto'
-                    : null,
+                validator: (text) {
+                  final empty = text?.trim().isEmpty ?? true;
+                  if (empty && _etiquetaId == null) {
+                    return 'Ingresa un concepto o selecciona una etiqueta';
+                  }
+                  return null;
+                },
               ),
               if (_loadingEtiquetas) ...[
                 const SizedBox(height: 14),
@@ -1236,6 +1242,8 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
 
         final resumen = session.resumen;
         final v2 = resumen?.v2;
+        final canExportCaja =
+            ref.read(authProvider).canAccess(RoutePaths.reportes);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -1547,6 +1555,20 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
                 isLoading: _reopening,
                 onPressed: _reopen,
               ),
+            ],
+
+            // ── Exportar ventas del turno (Scenario 44) ───────────────────
+            if (canExportCaja) ...[
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                key: const Key('caja-export'),
+                onPressed: () => ref
+                    .read(reportesProvider.notifier)
+                    .exportCajaReport(session.id, formato: 'XLSX'),
+                icon: const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Exportar ventas del turno'),
+              ),
+              const SizedBox(height: 8),
             ],
           ],
         );

@@ -1,4 +1,6 @@
 import 'package:barbeer/features/compras/data/compras_repository.dart';
+import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
+import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -219,6 +221,65 @@ void main() {
         () => CompraSede.fromJson({'id': 1, 'nombre': false}),
         returnsNormally,
       );
+    });
+  });
+
+  group('Compra backend contract', () {
+    test('fromJson maps nested proveedor as provider name string', () {
+      final compra = Compra.fromJson({
+        'id': 'c-1',
+        'orden': 'OC-001',
+        'fecha': '2026-08-10',
+        'proveedor': {'id': 'prov-1', 'nombre': 'Distribuidora Sur'},
+        'proveedorId': 'prov-1',
+        'estado': 'PENDIENTE',
+        'solicitadoPor': {'username': 'admin'},
+        'notas': '',
+        'articulos': '3',
+        'total': '120.50',
+      });
+
+      expect(compra.proveedor, 'Distribuidora Sur');
+      expect(compra.proveedorId, 'prov-1');
+      expect(compra.estado, 'PENDIENTE');
+      expect(compra.solicitadoPor, 'admin');
+      expect(compra.articulos, 3);
+      expect(compra.total, 120.50);
+    });
+
+    test('fromJson defaults estado to PENDIENTE when field is absent', () {
+      final sin = Compra.fromJson({
+        'id': 'c-2',
+        'proveedorId': 'prov-1',
+        'notas': '',
+        'articulos': 1,
+        'total': 10.0,
+      });
+
+      expect(sin.estado, 'PENDIENTE');
+    });
+  });
+
+  group('Compras and providers authorization matrix', () {
+    AuthState _auth(String rol, List<String> permisos) => AuthState(
+      status: AuthStatus.authenticated,
+      user: UserProfile(
+        id: 'u1',
+        username: 'test',
+        rol: rol,
+        nivel: 10,
+        createdAt: '2026-01-01',
+        permisos: permisos,
+      ),
+    );
+
+    test('compras:leer grants access to /compras', () {
+      expect(_auth('ALMACENERO', ['compras:leer']).canAccess('/compras'), isTrue);
+    });
+
+    test('no compras permission denies /compras', () {
+      final auth = _auth('CAJERO', ['caja:leer', 'ventas:leer']);
+      expect(auth.canAccess('/compras'), isFalse);
     });
   });
 }

@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../data/models/cuenta_models.dart';
 import '../providers/cuentas_provider.dart';
+import '../widgets/cuenta_selector.dart';
 
 class CuentasScreen extends ConsumerStatefulWidget {
   const CuentasScreen({super.key});
@@ -74,6 +75,17 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
                 ),
               ]),
               const SizedBox(height: 12),
+            ],
+            if (notifier.canCreate) ...[
+              Align(alignment: Alignment.centerRight, child: FilledButton.icon(
+                key: const Key('account-create-open'), icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('Crear cuenta'), onPressed: () async {
+                  final created = await showCreateCuentaDialog(context, notifier.create);
+                  if (created == null || !context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cuenta creada.')));
+                  await notifier.load();
+                })),
+              const SizedBox(height: 8),
             ],
             // ── Search ────────────────────────────────────────────────────
             TextField(

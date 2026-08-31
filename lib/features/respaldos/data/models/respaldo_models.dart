@@ -122,6 +122,18 @@ class BackupIntegrityException implements Exception {
   String toString() => 'BackupIntegrityException: $message';
 }
 
+/// Server-sourced download metadata for backup artifacts.
+class BackupDownloadResult {
+  final Uint8List bytes;
+  final String filename;
+  final String contentType;
+  const BackupDownloadResult({
+    required this.bytes,
+    required this.filename,
+    required this.contentType,
+  });
+}
+
 String sha256HexOf(Uint8List bytes) {
   final digest = sha256.convert(bytes);
   return digest.toString();

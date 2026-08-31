@@ -3,6 +3,7 @@ import 'package:barbeer/features/caja/data/caja_repository.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:barbeer/features/caja/presentation/providers/movimientos_provider.dart';
+import 'package:barbeer/features/etiquetas/data/models/etiqueta.dart' as etq;
 import 'package:barbeer/core/network/api_client.dart';
 
 class _FakeCajaRepository extends CajaRepository {
@@ -475,6 +476,85 @@ void main() {
       expect(count, 0, reason: 'No ejecuta si isActing=true');
       doAction(false);
       expect(count, 1);
+    });
+  });
+
+  group('Blocker 7: Caja movement semantics', () {
+    test('concepto is optional when etiquetaId is present', () {
+      final payload = cajaMovimientoPayload(
+        tipo: 'SALIDA',
+        monto: 50.0,
+        concepto: null,
+        etiquetaId: 'e1',
+      );
+      expect(payload.containsKey('concepto'), isFalse);
+      expect(payload['etiquetaId'], 'e1');
+    });
+
+    test('concepto is included when provided alongside etiquetaId', () {
+      final payload = cajaMovimientoPayload(
+        tipo: 'ENTRADA',
+        monto: 100.0,
+        concepto: 'Pago proveedor',
+        etiquetaId: 'e2',
+      );
+      expect(payload['concepto'], 'Pago proveedor');
+      expect(payload['etiquetaId'], 'e2');
+    });
+
+    test('empty concepto is omitted when etiquetaId is present', () {
+      final payload = cajaMovimientoPayload(
+        tipo: 'SALIDA',
+        monto: 25.0,
+        concepto: '   ',
+        etiquetaId: 'e3',
+      );
+      expect(payload.containsKey('concepto'), isFalse);
+    });
+
+    test('concepto alone without etiquetaId is still valid', () {
+      final payload = cajaMovimientoPayload(
+        tipo: 'ENTRADA',
+        monto: 30.0,
+        concepto: 'Vuelto de cambio',
+      );
+      expect(payload['concepto'], 'Vuelto de cambio');
+      expect(payload.containsKey('etiquetaId'), isFalse);
+    });
+
+    test('Etiqueta parses personalTipo from JSON', () {
+      final etiqueta = etq.Etiqueta.fromJson({
+        'id': 'e1',
+        'nombre': 'Comisión',
+        'activo': true,
+        'requiereComprobante': false,
+        'tipo': 'SALIDA',
+        'esSistema': false,
+        'orden': 1,
+        'personalTipo': 'CARGO',
+      });
+      expect(etiqueta.personalTipo, 'CARGO');
+    });
+
+    test('Etiqueta personalTipo is null when not in JSON', () {
+      final etiqueta = etq.Etiqueta.fromJson({
+        'id': 'e2',
+        'nombre': 'Yape',
+        'activo': true,
+        'requiereComprobante': false,
+        'tipo': 'ENTRADA',
+        'esSistema': false,
+        'orden': 2,
+      });
+      expect(etiqueta.personalTipo, isNull);
+    });
+
+    test('requiresStaff returns true only when personalTipo is set on the etiqueta', () {
+      // Staff required when etiqueta has personalTipo, regardless of direction
+      expect(cajaRequiresStaff(personalTipo: 'CARGO'), isTrue);
+      expect(cajaRequiresStaff(personalTipo: 'PAGO'), isTrue);
+      expect(cajaRequiresStaff(personalTipo: null), isFalse);
+      expect(cajaRequiresStaff(), isFalse);
     });
   });
 }

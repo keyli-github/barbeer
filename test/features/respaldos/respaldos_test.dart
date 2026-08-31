@@ -150,7 +150,7 @@ void main() {
       expect(captured!['limit'], 10);
     });
 
-    test('downloadArtifact returns bytes and verifies SHA-256', () async {
+    test('downloadArtifact returns BackupDownloadResult with metadata', () async {
       final fakeBytes = Uint8List.fromList([1, 2, 3, 4]);
       final repo = RespaldosRepository(
         null,
@@ -163,26 +163,58 @@ void main() {
       );
     });
 
-    test('downloadArtifact passes with correct SHA-256 or null check', () async {
-      // No sha256 provided → pass through
+    test('downloadArtifact returns result with filename and contentType', () async {
       final fakeBytes = Uint8List.fromList([1, 2, 3]);
       final repo = RespaldosRepository(
         null,
         bytesRequest: (path) async => fakeBytes,
       );
       final result = await repo.downloadArtifact('run-1', 'JSON');
-      expect(result, fakeBytes);
+      expect(result.bytes, fakeBytes);
+      expect(result.filename, contains('run-1'));
+      expect(result.contentType, 'application/json');
+    });
+
+    test('downloadArtifact xlsx gets correct MIME in result', () async {
+      final repo = RespaldosRepository(
+        null,
+        bytesRequest: (path) async => Uint8List.fromList([1]),
+      );
+      final result = await repo.downloadArtifact('run-abc123', 'XLSX');
+      expect(result.filename, 'respaldo-run-abc1.xlsx');
+      expect(result.contentType,
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     });
   });
 
-  // ── Authorization ─────────────────────────────────────────────────────────
-  group('Backup authorization', () {
-    test('403 from server propagates as exception', () async {
+  // ── Blocker 6: Independent schedule and runs errors ─────────────────────
+  group('independent error isolation', () {
+    test('schedule error does not prevent runs from loading', () async {
       final repo = RespaldosRepository(
         null,
-        getRequest: (path) async => throw Exception('403 Forbidden'),
+        getRequest: (_) async => throw Exception('schedule API down'),
+        getWithQueryRequest: (_, __) async => {
+          'data': [], 'total': 0, 'page': 1, 'limit': 20, 'totalPages': 0,
+        },
       );
-      expect(() => repo.getSchedule(), throwsException);
+      await expectLater(() => repo.getSchedule(), throwsException);
+      final runs = await repo.listRuns();
+      expect(runs.total, 0);
+    });
+
+    test('runs error does not prevent schedule from loading', () async {
+      final repo = RespaldosRepository(
+        null,
+        getRequest: (_) async => {
+          'enabled': false, 'frequency': 'DAILY', 'formats': ['JSON'],
+          'timezone': 'UTC', 'nextRunAt': null, 'lastRunAt': null,
+        },
+        getWithQueryRequest: (_, __) async =>
+            throw Exception('runs API down'),
+      );
+      final schedule = await repo.getSchedule();
+      expect(schedule.frequency, 'DAILY');
+      await expectLater(() => repo.listRuns(), throwsException);
     });
   });
 }

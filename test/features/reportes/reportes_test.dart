@@ -1,14 +1,80 @@
+import 'dart:typed_data';
 import 'package:barbeer/core/async/operation_state.dart';
 import 'package:barbeer/core/constants/api_constants.dart';
 import 'package:barbeer/core/errors/app_exception.dart';
+import 'package:barbeer/core/files/file_artifact.dart';
+import 'package:barbeer/core/files/file_artifact_service.dart';
 import 'package:barbeer/core/navigation/route_access_policy.dart';
 import 'package:barbeer/core/network/api_client.dart';
+import 'package:barbeer/core/network/http_header_utils.dart';
 import 'package:barbeer/core/routes/route_paths.dart';
 import 'package:barbeer/features/reportes/data/models/reporte_models.dart';
 import 'package:barbeer/features/reportes/data/reportes_repository.dart';
 import 'package:barbeer/features/reportes/presentation/providers/reportes_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 void main() {
+  // ── Blocker 5: Content-Disposition parsing ──────────────────────────────
+  group('parseContentDispositionFilename', () {
+    test('extracts quoted filename from standard attachment header', () {
+      expect(
+        parseContentDispositionFilename('attachment; filename="ventas-2026-01-01.xlsx"'),
+        'ventas-2026-01-01.xlsx',
+      );
+    });
+    test('extracts unquoted filename', () {
+      expect(
+        parseContentDispositionFilename('attachment; filename=report.json'),
+        'report.json',
+      );
+    });
+    test('returns null for null header or missing filename param', () {
+      expect(parseContentDispositionFilename(null), isNull);
+      expect(parseContentDispositionFilename('inline'), isNull);
+      expect(parseContentDispositionFilename(''), isNull);
+    });
+  });
+  // ── Blocker 5: Proper MIME passes artifact validation ───────────────────
+  group('artifact MIME validation', () {
+    test('server-provided xlsx MIME passes validateArtifact', () {
+      expect(validateArtifact(FileArtifact(
+        bytes: Uint8List.fromList([1, 2]),
+        filename: 'ventas-2026.xlsx',
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      )), isNull);
+    });
+    test('fabricated octet-stream FAILS validateArtifact for xlsx', () {
+      expect(validateArtifact(FileArtifact(
+        bytes: Uint8List.fromList([1]),
+        filename: 'reporte.xlsx',
+        contentType: 'application/octet-stream',
+      )), isNotNull);
+    });
+  });
+  // ── Blocker 5: Caja export production caller ────────────────────────────
+  group('caja export', () {
+    test('exportCajaReport dispatches to repo and produces OperationContent', () async {
+      final repo = ReportesRepository(ApiClient.instance,
+          bytesRequest: (path, q) async => ReporteExportado(
+              bytes: [1], contentType: 'application/json', filename: 'cierre-caja.json'));
+      final notifier = ReportesNotifier(repo, authorized: true);
+      await notifier.exportCajaReport('caja-uuid', formato: 'json');
+      expect(notifier.state.exportState, isA<OperationContent<ReporteExportado>>());
+      final data = (notifier.state.exportState as OperationContent<ReporteExportado>).data;
+      expect(data.filename, 'cierre-caja.json');
+      expect(data.contentType, 'application/json');
+    });
+    test('unauthorized caja export returns 403 without calling repo', () async {
+      var called = false;
+      final repo = ReportesRepository(ApiClient.instance,
+          bytesRequest: (_, __) async { called = true; return ReporteExportado(bytes: [], contentType: '', filename: ''); });
+      final notifier = ReportesNotifier(repo, authorized: false);
+      await notifier.exportCajaReport('caja-uuid', formato: 'xlsx');
+      expect(called, isFalse);
+      expect(notifier.state.exportState, isA<OperationRecoverableError<ReporteExportado>>());
+      expect((notifier.state.exportState as OperationRecoverableError<ReporteExportado>).error.statusCode, 403);
+    });
+  });
+
   group('DTO mapping', () {
     test('ReporteEmailConfig maps recipients, smtpConfigured, updatedAt for full and empty', () {
       final full = ReporteEmailConfig.fromJson(

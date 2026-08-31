@@ -24,6 +24,7 @@ class Etiqueta {
     required this.tipo,
     required this.esSistema,
     required this.orden,
+    this.personalTipo,
   });
 
   final String id;
@@ -35,6 +36,9 @@ class Etiqueta {
   final bool esSistema;
   final int orden;
 
+  /// Backend `personalTipo` — when non-null, staff selection is required.
+  final String? personalTipo;
+
   factory Etiqueta.fromJson(Map<String, dynamic> json) => Etiqueta(
     id: json['id'] as String? ?? '',
     nombre: json['nombre'] as String? ?? '',
@@ -44,5 +48,6 @@ class Etiqueta {
     tipo: EtiquetaTipo.fromJson(json['tipo']),
     esSistema: json['esSistema'] as bool? ?? false,
     orden: (json['orden'] as num?)?.toInt() ?? 0,
+    personalTipo: json['personalTipo'] as String?,
   );
 }

@@ -46,18 +46,25 @@ Map<double, int> cajaCantidadesFromResponse(dynamic data) {
 Map<String, dynamic> cajaMovimientoPayload({
   required String tipo,
   required double monto,
-  required String concepto,
+  String? concepto,
   String? etiquetaId,
   String? personalUsuarioId,
-}) => {
-  'tipo': tipo,
-  'origen': 'MANUAL',
-  'medioPago': 'EFECTIVO',
-  'monto': monto,
-  'concepto': concepto.trim(),
-  if (etiquetaId != null) 'etiquetaId': etiquetaId,
-  if (personalUsuarioId != null) 'personalUsuarioId': personalUsuarioId,
-};
+}) {
+  final trimmed = concepto?.trim();
+  return {
+    'tipo': tipo,
+    'origen': 'MANUAL',
+    'medioPago': 'EFECTIVO',
+    'monto': monto,
+    if (trimmed != null && trimmed.isNotEmpty) 'concepto': trimmed,
+    if (etiquetaId != null) 'etiquetaId': etiquetaId,
+    if (personalUsuarioId != null) 'personalUsuarioId': personalUsuarioId,
+  };
+}
+
+/// Whether a movement requires staff selection — based on the etiqueta's
+/// `personalTipo` field from the backend, not on label direction.
+bool cajaRequiresStaff({String? personalTipo}) => personalTipo != null;
 
 Map<String, dynamic> cajaCierrePayload(
   Map<double, int> cantidades, {
@@ -573,7 +580,7 @@ class CajaRepository {
     String id, {
     required String tipo,
     required double monto,
-    required String concepto,
+    String? concepto,
     String? etiquetaId,
     String? personalUsuarioId,
   }) async {

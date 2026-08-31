@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:barbeer/core/constants/api_constants.dart';
 import 'package:barbeer/core/network/api_client.dart';
+import 'package:barbeer/core/routes/route_paths.dart';
 import 'package:barbeer/features/auditoria/presentation/screens/auditoria_screen.dart';
 import 'package:barbeer/features/cuentas/data/cuentas_repository.dart';
 import 'package:barbeer/features/cuentas/data/models/cuenta_models.dart';
@@ -213,23 +214,33 @@ void main() {
           '/backups/runs/run-1/artifacts/XLSX');
     });
 
-    test('backup SHA-256 verification rejects wrong hash', () {
+    test('backup SHA-256 verification: sha256HexOf produces deterministic hex digest', () {
       final bytes = Uint8List.fromList([1, 2, 3, 4]);
+      final hash = sha256HexOf(bytes);
+      // Same bytes → same digest (determinism)
+      expect(hash, equals(sha256HexOf(bytes)));
+      // SHA-256 output is exactly 64 lowercase hex characters
+      expect(hash.length, 64);
+      expect(RegExp(r'^[0-9a-f]{64}$').hasMatch(hash), isTrue);
+      // Different bytes → different digest (collision resistance)
+      expect(sha256HexOf(Uint8List.fromList([1, 2, 3, 5])), isNot(equals(hash)));
+      // BackupIntegrityException is thrown when stored hash does not match
+      const wrongHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
       expect(
-        () => sha256HexOf(bytes) == 'wrong' ? null : throw BackupIntegrityException('mismatch'),
+        () { if (sha256HexOf(bytes) != wrongHash) throw BackupIntegrityException('mismatch'); },
         throwsA(isA<BackupIntegrityException>()),
       );
     });
 
-    test('all mobile capability routes are declared', () {
-      const routes = [
-        '/cuentas', '/reportes', '/respaldos',
-        '/ventas', '/usuarios', '/productos', '/inventario',
-      ];
-      for (final r in routes) {
-        expect(r.startsWith('/'), isTrue,
-            reason: 'Route $r must start with /');
-      }
+    test('all mobile capability routes use RoutePaths constants', () {
+      // Tests production RoutePaths constants — fails if any path changes.
+      expect(RoutePaths.cuentas, '/cuentas');
+      expect(RoutePaths.reportes, '/reportes');
+      expect(RoutePaths.respaldos, '/respaldos');
+      expect(RoutePaths.ventas, '/ventas');
+      expect(RoutePaths.usuarios, '/usuarios');
+      expect(RoutePaths.productos, '/productos');
+      expect(RoutePaths.inventario, '/inventario');
     });
 
     test('backup schedule toUpdateJson excludes read-only fields', () {

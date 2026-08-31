@@ -189,7 +189,7 @@ class CajaNotifier extends StateNotifier<CajaState> {
   Future<void> registrarMovimiento({
     required String tipo,
     required double monto,
-    required String concepto,
+    String? concepto,
     String? etiquetaId,
     String? personalUsuarioId,
   }) async {

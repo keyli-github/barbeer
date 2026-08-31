@@ -16,6 +16,8 @@ import '../../../../core/widgets/ds_product_image.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categorias/data/categorias_repository.dart' show Categoria;
 import '../../../productos/data/productos_repository.dart' as products;
+import '../../../usuarios/data/usuario_admin_repository.dart';
+import '../../../usuarios/presentation/widgets/pin_stock_adjust_sheet.dart';
 import '../../data/inventario_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
@@ -266,10 +268,13 @@ class InventarioScreen extends ConsumerWidget {
   }
 
   void _showAdjust(BuildContext context, WidgetRef ref, InventarioItem item) {
+    final auth = ref.read(authProvider);
     AppNav.push(
       context,
-      _AdjustSheet(
+      _PinAdjustWrapper(
         item: item,
+        isSuperAdmin: auth.user?.isSuperAdmin == true,
+        sedeId: ref.read(globalSedeIdProvider),
         onSaved: () => ref.read(_invProvider.notifier).load(),
         repo: ref.read(_invRepoProvider),
       ),
@@ -290,6 +295,40 @@ class InventarioScreen extends ConsumerWidget {
         sedes: ref.read(sedeScopeOptionsProvider).valueOrNull ?? const [],
         repo: ref.read(_invRepoProvider),
         onSaved: () => ref.read(_invProvider.notifier).load(),
+      ),
+    );
+  }
+}
+
+// ─── PIN-authorized stock adjustment wrapper ─────────────────────────────────
+
+class _PinAdjustWrapper extends StatelessWidget {
+  final InventarioItem item;
+  final bool isSuperAdmin;
+  final String? sedeId;
+  final VoidCallback onSaved;
+  final InventarioRepository repo;
+
+  const _PinAdjustWrapper({
+    required this.item,
+    required this.isSuperAdmin,
+    required this.sedeId,
+    required this.onSaved,
+    required this.repo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ajuste de stock')),
+      body: PinStockAdjustSheet(
+        productId: item.productoId,
+        productName: item.producto,
+        currentStock: item.stock,
+        sedeId: item.sedeId.isNotEmpty ? item.sedeId : sedeId,
+        isSuperAdmin: isSuperAdmin,
+        repo: UsuarioAdminRepository(ApiClient.instance),
+        onSaved: onSaved,
       ),
     );
   }
