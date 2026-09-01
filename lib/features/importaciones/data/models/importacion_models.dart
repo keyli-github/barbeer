@@ -94,6 +94,8 @@ class ExcelImportDuplicate {
 
 class ExcelImportSummary {
   final int products;
+  final int newProducts;
+  final int reusedProducts;
   final int sales;
   final int expenses;
   final ImportDateRange? salesDateRange;
@@ -101,6 +103,8 @@ class ExcelImportSummary {
 
   const ExcelImportSummary({
     this.products = 0,
+    this.newProducts = 0,
+    this.reusedProducts = 0,
     this.sales = 0,
     this.expenses = 0,
     this.salesDateRange,
@@ -111,6 +115,8 @@ class ExcelImportSummary {
     final json = _json(value);
     return ExcelImportSummary(
       products: _int(json['products']),
+      newProducts: _int(json['newProducts']),
+      reusedProducts: _int(json['reusedProducts']),
       sales: _int(json['sales']),
       expenses: _int(json['expenses']),
       salesDateRange: _nullableRange(json['salesDateRange']),
@@ -122,6 +128,10 @@ class ExcelImportSummary {
 class ExcelImportProduct {
   final String sku;
   final String name;
+  /// "NEW" = producto nuevo | "REUSED" = producto existente reutilizado
+  final String status;
+  final String? existingCode;
+  final String? existingName;
   final String category;
   final double unitCost;
   final double salePrice;
@@ -131,6 +141,9 @@ class ExcelImportProduct {
   const ExcelImportProduct({
     required this.sku,
     required this.name,
+    this.status = 'NEW',
+    this.existingCode,
+    this.existingName,
     required this.category,
     required this.unitCost,
     required this.salePrice,
@@ -138,11 +151,16 @@ class ExcelImportProduct {
     required this.currentStock,
   });
 
+  bool get isReused => status == 'REUSED';
+
   factory ExcelImportProduct.fromJson(Object? value) {
     final json = _json(value);
     return ExcelImportProduct(
       sku: _string(json['sku']),
       name: _string(json['name']),
+      status: _string(json['status']).isEmpty ? 'NEW' : _string(json['status']),
+      existingCode: _nullableString(json['existingCode']),
+      existingName: _nullableString(json['existingName']),
       category: _string(json['category']),
       unitCost: _double(json['unitCost']),
       salePrice: _double(json['salePrice']),
@@ -255,6 +273,8 @@ class ExcelImportPreview {
 
 class ExcelImportedCounts {
   final int products;
+  final int productsCreated;
+  final int productsReused;
   final int sales;
   final int expenses;
   final int imagesGenerated;
@@ -262,6 +282,8 @@ class ExcelImportedCounts {
 
   const ExcelImportedCounts({
     this.products = 0,
+    this.productsCreated = 0,
+    this.productsReused = 0,
     this.sales = 0,
     this.expenses = 0,
     this.imagesGenerated = 0,
@@ -272,6 +294,8 @@ class ExcelImportedCounts {
     final json = _json(value);
     return ExcelImportedCounts(
       products: _int(json['products']),
+      productsCreated: _int(json['productsCreated']),
+      productsReused: _int(json['productsReused']),
       sales: _int(json['sales']),
       expenses: _int(json['expenses']),
       imagesGenerated: _int(json['imagesGenerated']),

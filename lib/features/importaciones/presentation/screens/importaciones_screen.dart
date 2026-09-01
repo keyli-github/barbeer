@@ -99,9 +99,10 @@ class _PageHeader extends StatelessWidget {
       ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: Text(
-          'Carga el catálogo, las ventas históricas y los gastos. El sistema '
-          'valida los cálculos del PANEL antes de guardar y genera las imágenes '
-          'faltantes de los productos con Gemini.',
+          'Carga productos, ventas históricas y gastos. Los productos ya '
+          'existentes se reutilizan por código o nombre normalizado; solo se '
+          'crean los nuevos. El sistema valida los cálculos del PANEL y '
+          'Gemini completa las imágenes faltantes.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: context.colors.textSecondary,
             height: 1.45,
@@ -358,6 +359,8 @@ class _ImportPreviewPanel extends StatelessWidget {
             desktop: desktop,
             values: [
               ('Productos', result.summary.products, null),
+              ('Productos nuevos', result.summary.newProducts, null),
+              ('Reutilizados', result.summary.reusedProducts, null),
               ('Líneas de venta', result.summary.sales, null),
               ('Gastos', result.summary.expenses, null),
             ],
@@ -374,6 +377,7 @@ class _ImportPreviewPanel extends StatelessWidget {
             columns: const [
               'Código',
               'Producto',
+              'Estado',
               'Categoría',
               'Costo',
               'Venta',
@@ -384,6 +388,9 @@ class _ImportPreviewPanel extends StatelessWidget {
                   (product) => [
                     product.sku,
                     product.name,
+                    product.isReused
+                        ? 'Existente (${product.existingCode ?? product.existingName ?? 'coincidencia'})'
+                        : 'Nuevo',
                     product.category,
                     _currency(product.unitCost),
                     _currency(product.salePrice),
@@ -680,6 +687,8 @@ class _ImportResultPanel extends StatelessWidget {
             desktop: desktop,
             values: [
               ('Productos', result.imported.products, null),
+              ('Nuevos', result.imported.productsCreated, null),
+              ('Reutilizados', result.imported.productsReused, null),
               ('Líneas de venta', result.imported.sales, null),
               ('Gastos', result.imported.expenses, null),
               (
@@ -894,7 +903,8 @@ class _Confirmation extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'La importación creará productos, ventas, gastos, caja e imágenes.',
+                  'La importación reutilizará los productos existentes y creará '
+                  'únicamente los nuevos. También cargará ventas, gastos e imágenes faltantes.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: context.colors.textSecondary,
                   height: 1.4,
