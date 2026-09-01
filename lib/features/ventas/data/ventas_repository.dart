@@ -131,22 +131,53 @@ class VentasRepository {
     String id, {
     required String estado,
     String? etiquetaId,
+    // Singular (legacy, backward compat).
     String? comprobanteAnalisisId,
+    // Plural (preferred when ≥1 comprobante).
+    List<String>? comprobanteAnalisisIds,
     String? codigoOperacion,
+    // Diferencia cubierta en efectivo (vuelto).
+    bool? pagoRestoEfectivo,
   }) async {
+    final useIds =
+        comprobanteAnalisisIds != null && comprobanteAnalisisIds.isNotEmpty;
     final response = await _api.patch(
       ApiConstants.conciliarVenta(id),
       data: {
         'estado': estado,
         'etiquetaId': ?etiquetaId,
-        'comprobanteAnalisisId': ?comprobanteAnalisisId,
-        if (comprobanteAnalisisId == null &&
+        if (useIds)
+          'comprobanteAnalisisIds': comprobanteAnalisisIds
+        else
+          'comprobanteAnalisisId': ?comprobanteAnalisisId,
+        if (!useIds &&
+            comprobanteAnalisisId == null &&
             codigoOperacion != null &&
             codigoOperacion.isNotEmpty)
           'codigoOperacion': codigoOperacion,
+        if (pagoRestoEfectivo == true) 'pagoRestoEfectivo': true,
       },
     );
     return Venta.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  /// Solicita autorización de precio (PIN de SUPERADMIN).
+  /// Retorna el token que debe incluirse en [CreateVentaPayload.precioAuthTokens].
+  Future<String> autorizarPrecio({
+    required String productoId,
+    required double precioNuevo,
+    required String pin,
+  }) async {
+    final response = await _api.post(
+      ApiConstants.autorizarPrecio,
+      data: {
+        'productoId': productoId,
+        'precioNuevo': precioNuevo,
+        'pin': pin,
+      },
+    );
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return data['token'] as String;
   }
 
   // ── Etiquetas ──────────────────────────────────────────────────────────────

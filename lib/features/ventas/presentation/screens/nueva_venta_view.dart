@@ -65,6 +65,12 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   int _voucherRequestToken = 0;
   String? _loadedSedeId;
   late final VentasRepository _repository;
+  // Comprobantes adicionales ya confirmados (APTO).
+  final List<ComprobanteAnalisis> _comprobantesAdicionales = [];
+  // Diferencia de billetera cubierta en efectivo (vuelto).
+  bool _pagoRestoEfectivo = false;
+  // Tokens de autorización para precios custom (productoId → token).
+  final Map<String, String> _precioAuthTokens = {};
 
   /// true después de un intento fallido ambiguo (timeout, error de red).
   /// Mientras está congelado, no se puede modificar el carrito.
@@ -85,6 +91,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   void dispose() {
     _voucherRequestToken++;
     _cancelAnalysis(_comprobanteAnalisis);
+    for (final a in _comprobantesAdicionales) {
+      _cancelAnalysis(a);
+    }
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -205,189 +214,310 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Future<void> _selectProduct(Producto product) async {
     if (_frozen) return;
-    final price = await _showProductModal(
+    final auth = ref.read(authProvider);
+    final isSuperAdmin = auth.user?.isSuperAdmin ?? false;
+    final result = await _showProductModal(
       nombre: product.nombre,
       imageUrl: product.imageUrl,
       basePrice: product.precioVenta,
+      requiresPin: !isSuperAdmin,
     );
-    if (price != null && mounted) _addToCart(product, precioVenta: price);
+    if (result == null || !mounted) return;
+
+    // Authorize custom price when non-SUPERADMIN changes price.
+    final priceChanged = (result.price - product.precioVenta).abs() > 0.009;
+    if (priceChanged && !isSuperAdmin) {
+      final pin = result.pin ?? '';
+      if (pin.isEmpty) {
+        AppFeedback.error(
+          context,
+          'Se requiere el PIN de Superadmin para cambiar el precio',
+        );
+        return;
+      }
+      try {
+        final token = await _repository.autorizarPrecio(
+          productoId: product.id,
+          precioNuevo: result.price,
+          pin: pin,
+        );
+        if (!mounted) return;
+        setState(() => _precioAuthTokens[product.id] = token);
+        AppFeedback.success(context, 'Precio autorizado');
+      } catch (e) {
+        if (mounted) {
+          AppFeedback.error(context, _friendlyPinError(e));
+        }
+        return;
+      }
+    }
+
+    if (mounted) _addToCart(product, precioVenta: result.price);
   }
 
   /// Modal "Añadir a la Venta" equivalente al de la web:
   /// imagen, nombre, precio base, precio a cobrar y confirmación.
-  Future<double?> _showProductModal({
+  /// Cuando [requiresPin] es true y el precio cambia, muestra campo PIN
+  /// (4 dígitos) que el SUPERADMIN debe ingresar para autorizar el precio.
+  Future<({double price, String? pin})?> _showProductModal({
     required String nombre,
     required String? imageUrl,
     required double basePrice,
+    bool requiresPin = false,
   }) async {
-    var text = basePrice.toStringAsFixed(2);
+    var priceText = basePrice.toStringAsFixed(2);
+    var pinText = '';
     String? error;
-    final result = await showDialog<double>(
+    final result = await showDialog<({double price, String? pin})>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          key: const Key('add-to-sale-modal'),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // ── Header ───────────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Añadir a la Venta',
+        builder: (context, setDialogState) {
+          final entered = double.tryParse(priceText) ?? 0;
+          final priceChanged = (entered - basePrice).abs() > 0.009;
+          final showPin = priceChanged && requiresPin;
+          return Dialog(
+            key: const Key('add-to-sale-modal'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── Header ───────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Añadir a la Venta',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: context.colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            onPressed: () => Navigator.of(context).pop(),
+                            color: context.colors.textTertiary,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: context.colors.border),
+                    // ── Cuerpo ───────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 64,
+                                  height: 64,
+                                  child: DSProductImage(
+                                    imageUrl: imageUrl,
+                                    productName: nombre,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    radius: 0,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      nombre,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.25,
+                                        color: context.colors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Precio base: ${_fmt(basePrice)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: context.colors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Precio a cobrar (S/)',
                             style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                               color: context.colors.textPrimary,
                             ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                          onPressed: () => Navigator.of(context).pop(),
-                          color: context.colors.textTertiary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 1, color: context.colors.border),
-                  // ── Cuerpo ───────────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
-                                width: 64,
-                                height: 64,
-                                child: DSProductImage(
-                                  imageUrl: imageUrl,
-                                  productName: nombre,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  radius: 0,
-                                ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            key: const Key('custom-price-field'),
+                            initialValue: priceText,
+                            autofocus: true,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d{0,2}'),
+                              ),
+                            ],
+                            decoration: InputDecoration(
+                              hintText: '0.00',
+                              errorText: error,
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
+                            onChanged: (value) {
+                              priceText = value;
+                              setDialogState(() {});
+                            },
+                          ),
+                          // ── PIN de autorización (solo cuando cambia precio) ──
+                          if (showPin) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.warning.withValues(
+                                  alpha: 0.08,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: AppColors.warning.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    nombre,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.25,
-                                      color: context.colors.textPrimary,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.lock_outline_rounded,
+                                        size: 14,
+                                        color: AppColors.warning,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'PIN de Superadmin (4 dígitos) *',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.warning,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Precio base: ${_fmt(basePrice)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.colors.textSecondary,
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    key: const Key('precio-auth-pin'),
+                                    obscureText: true,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 4,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 8,
                                     ),
+                                    decoration: InputDecoration(
+                                      hintText: '••••',
+                                      counterText: '',
+                                      isDense: true,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onChanged: (value) => pinText = value,
                                   ),
                                 ],
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Precio a cobrar (S/)',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: context.colors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          key: const Key('custom-price-field'),
-                          initialValue: text,
-                          autofocus: true,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d{0,2}'),
-                            ),
-                          ],
-                          decoration: InputDecoration(
-                            hintText: '0.00',
-                            errorText: error,
-                            isDense: true,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onChanged: (value) => text = value,
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          alignment: WrapAlignment.end,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Cancelar'),
-                            ),
-                            FilledButton(
-                              onPressed: () {
-                                final value = double.tryParse(text.trim());
-                                if (value == null || value <= 0) {
-                                  setDialogState(
-                                    () => error = 'Ingresa un precio mayor a 0',
-                                  );
-                                  return;
-                                }
-                                Navigator.of(context).pop(value);
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.brand,
-                                foregroundColor: Colors.white,
+                          const SizedBox(height: 16),
+                          Wrap(
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Cancelar'),
                               ),
-                              child: const Text('Confirmar'),
-                            ),
-                          ],
-                        ),
-                      ],
+                              FilledButton(
+                                onPressed: () {
+                                  final value = double.tryParse(
+                                    priceText.trim(),
+                                  );
+                                  if (value == null || value <= 0) {
+                                    setDialogState(
+                                      () =>
+                                          error = 'Ingresa un precio mayor a 0',
+                                    );
+                                    return;
+                                  }
+                                  Navigator.of(context).pop((
+                                    price: value,
+                                    pin: showPin ? pinText : null,
+                                  ));
+                                },
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.brand,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Confirmar'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
     return result;
@@ -395,16 +525,47 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Future<void> _editPrice(CarritoItem item) async {
     if (_frozen) return;
+    final auth = ref.read(authProvider);
+    final isSuperAdmin = auth.user?.isSuperAdmin ?? false;
     final product = _productos
         .where((p) => p.id == item.productoId)
         .firstOrNull;
-    final price = await _showProductModal(
+    final catalogPrice = product?.precioVenta ?? item.precio;
+    final result = await _showProductModal(
       nombre: item.nombre,
       imageUrl: product?.imageUrl,
       basePrice: item.precio,
+      requiresPin: !isSuperAdmin,
     );
-    if (price != null && mounted) {
-      setState(() => item.precio = price);
+    if (result == null || !mounted) return;
+
+    final priceChanged = (result.price - catalogPrice).abs() > 0.009;
+    if (priceChanged && !isSuperAdmin) {
+      final pin = result.pin ?? '';
+      if (pin.isEmpty) {
+        AppFeedback.error(
+          context,
+          'Se requiere el PIN de Superadmin para cambiar el precio',
+        );
+        return;
+      }
+      try {
+        final token = await _repository.autorizarPrecio(
+          productoId: item.productoId,
+          precioNuevo: result.price,
+          pin: pin,
+        );
+        if (!mounted) return;
+        setState(() => _precioAuthTokens[item.productoId] = token);
+        AppFeedback.success(context, 'Precio autorizado');
+      } catch (e) {
+        if (mounted) AppFeedback.error(context, _friendlyPinError(e));
+        return;
+      }
+    }
+
+    if (mounted) {
+      setState(() => item.precio = result.price);
       _invalidateAnalysisIfAmountChanged();
     }
   }
@@ -431,6 +592,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     if (_frozen) return; // Carrito congelado tras error ambiguo
     setState(() {
       _carrito.removeWhere((i) => i.productoId == productoId);
+      _precioAuthTokens.remove(productoId); // Limpiar token si se quita el ítem
     });
     _invalidateAnalysisIfAmountChanged();
   }
@@ -450,6 +612,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   void _clearCart() {
     _cancelAnalysis(_comprobanteAnalisis);
+    for (final a in _comprobantesAdicionales) {
+      _cancelAnalysis(a);
+    }
     _voucherRequestToken++;
     setState(() {
       _carrito.clear();
@@ -465,6 +630,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _comprobanteError = null;
       _analisisInvalidado = false;
       _analizandoComprobante = false;
+      _comprobantesAdicionales.clear();
+      _pagoRestoEfectivo = false;
+      _precioAuthTokens.clear();
       _idempotencyKey = ref
           .read(ventasRepositoryProvider)
           .generateIdempotencyKey();
@@ -557,6 +725,11 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _analisisInvalidado = true;
       _comprobanteError =
           'El monto cambió. Selecciona y analiza un nuevo comprobante.';
+      // Los comprobantes adicionales también quedan obsoletos.
+      for (final a in _comprobantesAdicionales) {
+        _cancelAnalysis(a);
+      }
+      _comprobantesAdicionales.clear();
     });
   }
 
@@ -862,6 +1035,111 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             if (_voucherBytes != null || _comprobanteAnalisis != null) ...[
               const SizedBox(height: AppSpacing.xs),
               _buildReceiptPanel(),
+            ],
+            // Comprobantes adicionales ya confirmados
+            if (_comprobantesAdicionales.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Column(
+                children: _comprobantesAdicionales
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: context.colors.successLight,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: context.colors.successBorder,
+                            ),
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            leading: const Icon(
+                              Icons.verified_rounded,
+                              size: 18,
+                              color: AppColors.success,
+                            ),
+                            title: Text(
+                              entry.value.entidad ??
+                                  'Comprobante ${entry.key + 1}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              entry.value.monto != null
+                                  ? _fmt(entry.value.monto!)
+                                  : 'Monto no identificado',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              onPressed: _frozen
+                                  ? null
+                                  : () {
+                                      _cancelAnalysis(entry.value);
+                                      setState(
+                                        () => _comprobantesAdicionales.removeAt(
+                                          entry.key,
+                                        ),
+                                      );
+                                    },
+                              tooltip: 'Quitar comprobante',
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+            // Botón para agregar otro comprobante
+            if (_comprobanteAnalisis?.esApto == true &&
+                !_analisisInvalidado &&
+                !_frozen) ...[
+              const SizedBox(height: AppSpacing.xs),
+              TextButton.icon(
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                label: const Text('Agregar otro comprobante'),
+                onPressed: () {
+                  setState(() {
+                    _comprobantesAdicionales.add(_comprobanteAnalisis!);
+                    _comprobanteAnalisis = null;
+                    _voucherBytes = null;
+                    _voucherFilename = null;
+                    _comprobanteError = null;
+                    _analisisInvalidado = false;
+                  });
+                },
+              ),
+            ],
+            // Toggle pagoRestoEfectivo (vuelto)
+            if (_payment == EstadoConciliacion.billetera &&
+                !_analisisInvalidado &&
+                (_comprobantesAdicionales.isNotEmpty ||
+                    _comprobanteAnalisis?.monto != null)) ...[
+              const SizedBox(height: AppSpacing.xs),
+              CheckboxListTile.adaptive(
+                key: const Key('pago-resto-efectivo'),
+                value: _pagoRestoEfectivo,
+                onChanged: _frozen
+                    ? null
+                    : (v) => setState(() => _pagoRestoEfectivo = v ?? false),
+                title: const Text(
+                  'La diferencia se cobra en efectivo',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'El monto no cubierto por los comprobantes se registra como efectivo.',
+                  style: TextStyle(fontSize: 11),
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
             ],
             if (_comprobanteError != null) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -1180,6 +1458,14 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       _submitError = null;
     });
     try {
+      // Collect all comprobante IDs (primary + additional confirmed ones).
+      final allAnalysisIds = [
+        if (_payment == EstadoConciliacion.billetera &&
+            analysis?.id != null &&
+            !_analisisInvalidado)
+          analysis!.id,
+        ..._comprobantesAdicionales.map((a) => a.id),
+      ];
       final payload = CreateVentaPayload(
         idempotencyKey: _idempotencyKey,
         items: _carrito
@@ -1197,13 +1483,22 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         etiquetaId: _payment == EstadoConciliacion.billetera
             ? _etiquetaId
             : null,
-        comprobanteAnalisisId: _payment == EstadoConciliacion.billetera
-            ? analysis?.id
+        comprobanteAnalisisIds:
+            _payment == EstadoConciliacion.billetera &&
+                allAnalysisIds.isNotEmpty
+            ? allAnalysisIds
             : null,
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
         cuentaId: _cuenta?.id,
         cuentaMonto: _cuentaMonto,
+        pagoRestoEfectivo:
+            _payment == EstadoConciliacion.billetera && _pagoRestoEfectivo
+            ? true
+            : null,
+        precioAuthTokens: _precioAuthTokens.isNotEmpty
+            ? _precioAuthTokens.values.toList()
+            : null,
       );
       await _executePayload(payload);
     } catch (e) {
@@ -1252,6 +1547,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _comprobanteError = null;
         _analisisInvalidado = false;
         _analizandoComprobante = false;
+        _comprobantesAdicionales.clear();
+        _pagoRestoEfectivo = false;
+        _precioAuthTokens.clear();
       });
     } catch (e) {
       if (!mounted) return;
@@ -1310,6 +1608,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         sedeId: auth.user?.isSuperAdmin == true ? sedeId : null,
         vendedoraId: _vendedoraId ?? auth.user?.id,
         estadoConciliacion: EstadoConciliacion.pendiente,
+        metodoPagoPendiente: _payment == EstadoConciliacion.billetera
+            ? 'BILLETERA'
+            : 'EFECTIVO',
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
         cuentaId: _cuenta?.id,
@@ -1360,6 +1661,22 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     if (s.contains('409')) return 'Esta venta ya fue registrada anteriormente';
     if (s.contains('403')) return 'No tienes permiso para registrar ventas';
     return 'No se pudo registrar la venta. Intenta de nuevo.';
+  }
+
+  String _friendlyPinError(Object e) {
+    final s = e.toString();
+    if (s.contains('PIN_INVALIDO') ||
+        s.contains('INVALID_PIN') ||
+        s.contains('pin') ||
+        s.contains('401')) {
+      return 'PIN incorrecto. Verifica con el Superadmin.';
+    }
+    if (s.contains('TOKEN_EXPIRADO') || s.contains('expired')) {
+      return 'El token expiró. Solicita una nueva autorización.';
+    }
+    if (s.contains('403')) return 'Sin permiso para autorizar precios.';
+    if (e is AppException && e.message.isNotEmpty) return e.message;
+    return 'No se pudo autorizar el precio. Intenta de nuevo.';
   }
 
   bool _blockHiddenRecargo(num? amount) {
@@ -1665,7 +1982,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           AppSpacing.md,
           AppSpacing.sm,
           AppSpacing.md,
-          100,
+          76,
         ),
         itemCount: products.length,
         itemBuilder: (_, i) => Padding(
@@ -2785,89 +3102,86 @@ class _CartBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Container(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.xs,
-        AppSpacing.md,
-        AppSpacing.sm,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.md,
+      AppSpacing.xs,
+      AppSpacing.md,
+      AppSpacing.sm,
+    ),
+    decoration: BoxDecoration(
+      color: context.colors.background,
+      border: Border(
+        top: BorderSide(color: context.colors.border, width: 0.75),
       ),
-      decoration: BoxDecoration(
-        color: context.colors.background,
-        border: Border(
-          top: BorderSide(color: context.colors.border, width: 0.75),
+    ),
+    child: GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        onTap();
+      },
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: frozen ? AppColors.warning : AppColors.primary,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: (frozen ? AppColors.warning : AppColors.primary)
+                  .withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ),
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.mediumImpact();
-          onTap();
-        },
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: frozen ? AppColors.warning : AppColors.primary,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: (frozen ? AppColors.warning : AppColors.primary)
-                    .withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+        child: Row(
+          children: [
+            const SizedBox(width: AppSpacing.md),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              const SizedBox(width: AppSpacing.md),
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    '$count',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
+              child: Center(
                 child: Text(
-                  frozen ? 'Revisar carrito (error)' : 'Ver carrito',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  '$count',
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
                 ),
               ),
-              Flexible(
-                child: Text(
-                  FormatUtils.currency(total),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                frozen ? 'Revisar carrito (error)' : 'Ver carrito',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-            ],
-          ),
+            ),
+            Flexible(
+              child: Text(
+                FormatUtils.currency(total),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+          ],
         ),
       ),
     ),

@@ -432,11 +432,20 @@ class CreateVentaPayload {
     String? etiquetaId,
     String? comprobante,
     String? codigoOperacion,
+    // Singular kept for backward compat; prefer ids when sending ≥1 comprobante.
     String? comprobanteAnalisisId,
+    // Plural: overrides singular when non-empty (aligns with web client).
+    List<String>? comprobanteAnalisisIds,
     double? recargoMonto,
     String? recargoMotivo,
     String? cuentaId,
     double? cuentaMonto,
+    // Método cuando se guarda PENDIENTE (EFECTIVO o BILLETERA).
+    String? metodoPagoPendiente,
+    // Diferencia de billetera cubierta en efectivo (vuelto).
+    bool? pagoRestoEfectivo,
+    // Tokens de autorización para precios customizados por no-SUPERADMIN.
+    List<String>? precioAuthTokens,
   }) : json = Map.unmodifiable({
          'idempotencyKey': idempotencyKey,
          'items': List.unmodifiable(
@@ -446,13 +455,25 @@ class CreateVentaPayload {
          'vendedoraId': ?vendedoraId,
          'estadoConciliacion': estadoConciliacion.name.toUpperCase(),
          'etiquetaId': ?etiquetaId,
-         'comprobanteAnalisisId': ?comprobanteAnalisisId,
-         if (comprobanteAnalisisId == null) 'comprobante': ?comprobante,
-         if (comprobanteAnalisisId == null) 'codigoOperacion': ?codigoOperacion,
+         // Use plural when available (supports multiple receipts).
+         if (comprobanteAnalisisIds != null && comprobanteAnalisisIds.isNotEmpty)
+           'comprobanteAnalisisIds': List.unmodifiable(comprobanteAnalisisIds)
+         else if (comprobanteAnalisisId != null)
+           'comprobanteAnalisisId': comprobanteAnalisisId,
+         if (comprobanteAnalisisId == null &&
+             (comprobanteAnalisisIds == null ||
+                 comprobanteAnalisisIds.isEmpty)) ...{
+           'comprobante': ?comprobante,
+           'codigoOperacion': ?codigoOperacion,
+         },
          'recargoMonto': ?recargoMonto,
          'recargoMotivo': ?recargoMotivo,
          'cuentaId': ?cuentaId,
          'cuentaMonto': ?cuentaMonto,
+         'metodoPagoPendiente': ?metodoPagoPendiente,
+         if (pagoRestoEfectivo == true) 'pagoRestoEfectivo': true,
+         if (precioAuthTokens != null && precioAuthTokens.isNotEmpty)
+           'precioAuthTokens': List.unmodifiable(precioAuthTokens),
        });
 
   String get idempotencyKey => json['idempotencyKey'] as String;

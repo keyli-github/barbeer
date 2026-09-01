@@ -112,6 +112,7 @@ class ApiConstants {
 
   // ── Ventas (NUEVO - Fase 2B) ────────────────────────────────────────────
   static const String ventas = '/ventas';
+  static const String autorizarPrecio = '/ventas/autorizar-precio';
   static const String analizarComprobante = '/ventas/comprobantes/analizar';
   static String comprobanteAnalisis(String id) => '/ventas/comprobantes/$id';
   static const String misVentas = '/ventas/mias';

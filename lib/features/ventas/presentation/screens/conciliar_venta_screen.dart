@@ -42,6 +42,10 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
   bool _analizandoComprobante = false;
   int _voucherRequestToken = 0;
   late final VentasRepository _repository;
+  // Comprobantes adicionales ya confirmados (APTO).
+  final List<ComprobanteAnalisis> _comprobantesAdicionales = [];
+  // Diferencia cubierta en efectivo.
+  bool _pagoRestoEfectivo = false;
 
   /// true cuando la venta YA está clasificada como BILLETERA.
   /// En ese caso no se puede volver a clasificar como billetera (solo → efectivo).
@@ -69,6 +73,9 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
   void dispose() {
     _voucherRequestToken++;
     _cancelAnalysis(_comprobanteAnalisis);
+    for (final a in _comprobantesAdicionales) {
+      _cancelAnalysis(a);
+    }
     super.dispose();
   }
 
@@ -199,18 +206,29 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       _error = null;
     });
     try {
+      // Collect all comprobante IDs (primary + additional confirmed ones).
+      final allAnalysisIds = [
+        if (_estado == 'BILLETERA' && _comprobanteAnalisis?.id != null)
+          _comprobanteAnalisis!.id,
+        ..._comprobantesAdicionales.map((a) => a.id),
+      ];
       await ref
           .read(ventasRepositoryProvider)
           .conciliarVenta(
             widget.venta.id,
             estado: _estado,
             etiquetaId: _estado == 'BILLETERA' ? _etiquetaId : null,
-            comprobanteAnalisisId: _estado == 'BILLETERA'
-                ? _comprobanteAnalisis?.id
+            comprobanteAnalisisIds: _estado == 'BILLETERA' &&
+                    allAnalysisIds.isNotEmpty
+                ? allAnalysisIds
+                : null,
+            pagoRestoEfectivo: _estado == 'BILLETERA' && _pagoRestoEfectivo
+                ? true
                 : null,
           );
       if (!mounted) return;
       _comprobanteAnalisis = null;
+      _comprobantesAdicionales.clear();
       widget.onDone();
       AppFeedback.success(
         context,
@@ -390,6 +408,111 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                     analysis: _comprobanteAnalisis,
                     bytes: _voucherBytes,
                     analyzing: _analizandoComprobante,
+                  ),
+                ],
+                // Comprobantes adicionales confirmados
+                if (_comprobantesAdicionales.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Column(
+                    children: _comprobantesAdicionales
+                        .asMap()
+                        .entries
+                        .map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: context.colors.successLight,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: context.colors.successBorder,
+                                ),
+                              ),
+                              child: ListTile(
+                                dense: true,
+                                leading: const Icon(
+                                  Icons.verified_rounded,
+                                  size: 18,
+                                  color: AppColors.success,
+                                ),
+                                title: Text(
+                                  entry.value.entidad ??
+                                      'Comprobante ${entry.key + 1}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  entry.value.monto != null
+                                      ? FormatUtils.currency(entry.value.monto!)
+                                      : 'Monto no identificado',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                  ),
+                                  onPressed: _saving
+                                      ? null
+                                      : () {
+                                          _cancelAnalysis(entry.value);
+                                          setState(
+                                            () => _comprobantesAdicionales
+                                                .removeAt(entry.key),
+                                          );
+                                        },
+                                  tooltip: 'Quitar comprobante',
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                // Botón para agregar otro comprobante
+                if (_comprobanteAnalisis?.esApto == true && !_saving) ...[
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                    label: const Text('Agregar otro comprobante'),
+                    onPressed: () {
+                      setState(() {
+                        _comprobantesAdicionales.add(_comprobanteAnalisis!);
+                        _comprobanteAnalisis = null;
+                        _voucherBytes = null;
+                        _voucherFilename = null;
+                      });
+                    },
+                  ),
+                ],
+                // Toggle pagoRestoEfectivo (vuelto)
+                if (_comprobantesAdicionales.isNotEmpty ||
+                    _comprobanteAnalisis?.monto != null) ...[
+                  const SizedBox(height: 8),
+                  CheckboxListTile.adaptive(
+                    key: const Key('pago-resto-efectivo-conciliar'),
+                    value: _pagoRestoEfectivo,
+                    onChanged: _saving
+                        ? null
+                        : (v) =>
+                              setState(() => _pagoRestoEfectivo = v ?? false),
+                    title: const Text(
+                      'La diferencia se cobra en efectivo',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'El resto no cubierto por comprobantes se registra como efectivo.',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ],
               ],

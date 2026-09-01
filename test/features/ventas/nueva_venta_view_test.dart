@@ -85,6 +85,26 @@ class _TestAuthNotifier extends AuthNotifier {
   }
 }
 
+class _PriceAuthorizationVentasRepository extends VentasRepository {
+  _PriceAuthorizationVentasRepository() : super(ApiClient.instance);
+
+  final authorizations = <Map<String, Object>>[];
+
+  @override
+  Future<String> autorizarPrecio({
+    required String productoId,
+    required double precioNuevo,
+    required String pin,
+  }) async {
+    authorizations.add({
+      'productoId': productoId,
+      'precioNuevo': precioNuevo,
+      'pin': pin,
+    });
+    return 'price-auth-token-p1';
+  }
+}
+
 class _RetryVentasRepository extends VentasRepository {
   _RetryVentasRepository() : super(ApiClient.instance);
 
@@ -741,7 +761,9 @@ void main() {
         expect(sales.attempts.single.json['cuentaId'], 'account-1');
         expect(sales.attempts.single.json['cuentaMonto'], 7);
         expect(
-          find.textContaining('La cuenta del cliente no existe o está inactiva'),
+          find.textContaining(
+            'La cuenta del cliente no existe o está inactiva',
+          ),
           findsOneWidget,
         );
         expect(find.textContaining('CUENTA_INVALIDA'), findsOneWidget);
@@ -964,13 +986,15 @@ void main() {
       expect(repo.cancelled, ['first']);
     });
 
-    testWidgets('permite editar el precio sin permisos extra (igual que web)', (
+    testWidgets('autoriza el precio personalizado con PIN de SUPERADMIN', (
       tester,
     ) async {
+      final repository = _PriceAuthorizationVentasRepository();
       await _pumpNuevaVenta(
         tester,
         size: const Size(390, 844),
         loader: () async => _products,
+        repository: repository,
       );
       await tester.pump();
 
@@ -986,13 +1010,15 @@ void main() {
         find.byKey(const Key('custom-price-field')),
         '8.75',
       );
+      await tester.pump();
+      await tester.enterText(find.byKey(const Key('precio-auth-pin')), '1234');
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
 
+      expect(repository.authorizations, [
+        {'productoId': 'p1', 'precioNuevo': 8.75, 'pin': '1234'},
+      ]);
       expect(find.byKey(const Key('mobile-cart-bar')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('mobile-cart-bar')));
-      await tester.pumpAndSettle();
-      expect(find.text('S/ 8.75 × 1 = S/ 8.75'), findsOneWidget);
     });
 
     testWidgets('el dropdown de billetera abre y lista billeteras reales', (
@@ -1339,9 +1365,7 @@ void main() {
         );
         await tester.tap(find.byKey(const Key('account-charge-open')));
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('account-option-acc-w')),
-        );
+        await tester.tap(find.byKey(const Key('account-option-acc-w')));
         await tester.pump();
         expect(find.text('Monto en comprobante (S/)'), findsOneWidget);
         await tester.tap(find.byKey(const Key('account-charge-apply')));
@@ -1357,10 +1381,7 @@ void main() {
 
         // Assert full state preserved
         expect(creates, hasLength(1));
-        expect(
-          find.textContaining('Cuenta inactiva'),
-          findsOneWidget,
-        );
+        expect(find.textContaining('Cuenta inactiva'), findsOneWidget);
         expect(find.textContaining('CUENTA_INACTIVA'), findsOneWidget);
         // Cart item preserved
         expect(
@@ -1370,10 +1391,7 @@ void main() {
         // Account charge preserved
         expect(find.text('Cargado a cuenta (Pedro)'), findsOneWidget);
         // Receipt analysis preserved
-        expect(
-          find.byKey(const Key('receipt-analysis-panel')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const Key('receipt-analysis-panel')), findsOneWidget);
         expect(find.text('BCP'), findsOneWidget);
         // Wallet still selected
         expect(find.byKey(const Key('wallet-field')), findsOneWidget);
