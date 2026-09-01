@@ -491,7 +491,7 @@ class _Actual extends StatelessWidget {
       color: AppColors.primary,
       onRefresh: onRefresh,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
         children: [
           Row(
             children: [
@@ -859,7 +859,7 @@ class _Historial extends StatelessWidget {
     onRefresh: onRefresh,
     child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
       children: [
         _FilterRow(
           selected: state.estadoFiltro,

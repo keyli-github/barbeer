@@ -59,7 +59,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         onRefresh: () => ref.read(dashboardProvider.notifier).load(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(bottom: desktop ? 32 : 120),
+          padding: EdgeInsets.only(bottom: desktop ? 32 : 24),
           children: [
             SizedBox(height: desktop ? 10 : 14),
             // ── Greeting ──

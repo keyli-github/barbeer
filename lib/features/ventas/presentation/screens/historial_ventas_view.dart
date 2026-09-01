@@ -89,7 +89,7 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                       desktop ? 20 : 15,
                       desktop ? 0 : 4,
                       desktop ? 20 : 15,
-                      120,
+                      24,
                     ),
                     itemCount:
                         state.ventas.length +

@@ -111,6 +111,8 @@ class SubPageAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -120,6 +122,8 @@ class SubPageAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 Text(
                   subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
                     color: context.colors.textSecondary,
@@ -130,6 +134,8 @@ class SubPageAppBar extends StatelessWidget implements PreferredSizeWidget {
             )
           : Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,

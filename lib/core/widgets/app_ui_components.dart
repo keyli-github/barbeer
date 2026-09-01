@@ -29,15 +29,28 @@ class AppPageHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: AppTextStyles.headlineLarge),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.headlineLarge,
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
-                Text(subtitle!, style: AppTextStyles.bodyMedium),
+                Text(
+                  subtitle!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyMedium,
+                ),
               ],
             ],
           ),
         ),
-        if (action != null) action!,
+        if (action != null) ...[
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(fit: FlexFit.loose, child: action!),
+        ],
       ],
     ),
   );
@@ -63,11 +76,14 @@ class AppPagination extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(
-            '$total resultado${total != 1 ? "s" : ""}',
-            style: AppTextStyles.bodySmall,
+          Expanded(
+            child: Text(
+              '$total resultado${total != 1 ? "s" : ""}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodySmall,
+            ),
           ),
-          const Spacer(),
           _PBtn(
             icon: Icons.chevron_left_rounded,
             enabled: page > 1,
@@ -100,8 +116,8 @@ class _PBtn extends StatelessWidget {
   const _PBtn({required this.icon, required this.enabled, required this.onTap});
   @override
   Widget build(BuildContext context) => Container(
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     decoration: BoxDecoration(
       color: enabled
           ? context.colors.primarySurface

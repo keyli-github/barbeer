@@ -58,7 +58,7 @@ class DSListTile extends StatelessWidget {
             ),
             if (trailing != null) ...[
               const SizedBox(width: AppSpacing.sm),
-              trailing!,
+              Flexible(fit: FlexFit.loose, child: trailing!),
             ],
           ],
         ),
