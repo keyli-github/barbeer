@@ -36,13 +36,13 @@ List<Map<String, dynamic>> assignableRoles(
   int currentLevel, {
   required bool isSuperAdmin,
 }) => roles
-        .where(
-          (role) =>
-              role['activo'] == true &&
-              role['nombre'] != 'SUPERADMIN' &&
-              (isSuperAdmin || (role['nivel'] as int? ?? 0) < currentLevel),
-        )
-        .toList();
+    .where(
+      (role) =>
+          role['activo'] == true &&
+          role['nombre'] != 'SUPERADMIN' &&
+          (isSuperAdmin || (role['nivel'] as int? ?? 0) < currentLevel),
+    )
+    .toList();
 
 List<Map<String, dynamic>> editableSedesForUser(
   List<Map<String, dynamic>> activeSedes,
@@ -84,15 +84,15 @@ class UsuariosState {
     List<Map<String, dynamic>>? roles,
     List<Map<String, dynamic>>? sedes,
   }) => UsuariosState(
-        isLoading: isLoading ?? this.isLoading,
-        error: error,
-        users: users ?? this.users,
-        total: total ?? this.total,
-        page: page ?? this.page,
-        totalPages: totalPages ?? this.totalPages,
-        roles: roles ?? this.roles,
-        sedes: sedes ?? this.sedes,
-      );
+    isLoading: isLoading ?? this.isLoading,
+    error: error,
+    users: users ?? this.users,
+    total: total ?? this.total,
+    page: page ?? this.page,
+    totalPages: totalPages ?? this.totalPages,
+    roles: roles ?? this.roles,
+    sedes: sedes ?? this.sedes,
+  );
 }
 
 class UsuariosNotifier extends StateNotifier<UsuariosState> {
@@ -307,16 +307,14 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                   icon: const Icon(Icons.shield_outlined, size: 16),
                   label: const Text('Claves PIN'),
                   style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange,
-                      side: const BorderSide(color: Colors.orange)),
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange),
+                  ),
                 ),
               ),
             const SizedBox(height: 8),
             AppCard(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -325,10 +323,7 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                       label: 'Rol',
                       initialValue: _roleFilter,
                       items: [
-                        const DropdownMenuItem(
-                          value: '',
-                          child: Text('Todos'),
-                        ),
+                        const DropdownMenuItem(value: '', child: Text('Todos')),
                         for (final role in state.roles)
                           DropdownMenuItem(
                             value: role['id'] as String? ?? '',
@@ -347,10 +342,7 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                       initialValue: _statusFilter,
                       items: const [
                         DropdownMenuItem(value: '', child: Text('Todos')),
-                        DropdownMenuItem(
-                          value: 'true',
-                          child: Text('Activos'),
-                        ),
+                        DropdownMenuItem(value: 'true', child: Text('Activos')),
                         DropdownMenuItem(
                           value: 'false',
                           child: Text('Inactivos'),
@@ -442,11 +434,8 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                   onReactivate: (user) => ref
                       .read(usuariosProvider.notifier)
                       .reactivateUser(user['id'] as String),
-                  onResetPassword: (user) => _resetPassword(
-                    context,
-                    ref,
-                    user['id'] as String,
-                  ),
+                  onResetPassword: (user) =>
+                      _resetPassword(context, ref, user['id'] as String),
                 )
               else
                 for (final user in filteredUsers)
@@ -467,11 +456,8 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                     onReactivate: () => ref
                         .read(usuariosProvider.notifier)
                         .reactivateUser(user['id'] as String),
-                    onResetPassword: () => _resetPassword(
-                      context,
-                      ref,
-                      user['id'] as String,
-                    ),
+                    onResetPassword: () =>
+                        _resetPassword(context, ref, user['id'] as String),
                   ),
               AppPagination(
                 page: state.page,
@@ -654,16 +640,16 @@ class _FilterDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
-        initialValue: initialValue,
-        isExpanded: true,
-        isDense: true,
-        decoration: InputDecoration(
-          labelText: label,
+    initialValue: initialValue,
+    isExpanded: true,
+    isDense: true,
+    decoration: InputDecoration(
+      labelText: label,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
-        items: items,
-        onChanged: onChanged,
-      );
+    ),
+    items: items,
+    onChanged: onChanged,
+  );
 }
 
 /// Desktop DataTable for users — matches web's table layout with columns:
@@ -722,9 +708,7 @@ class _UsersDesktopTable extends StatelessWidget {
                 DataColumn(label: Text('Acciones')),
               ],
               rows: users.map((user) {
-                final role = user['rol'] is Map
-                    ? user['rol'] as Map
-                    : const {};
+                final role = user['rol'] is Map ? user['rol'] as Map : const {};
                 final sede = user['sede'] is Map
                     ? user['sede'] as Map
                     : const {};
@@ -776,7 +760,8 @@ class _UsersDesktopTable extends StatelessWidget {
                       onTap: () => onTap(user),
                     ),
                     // Rol
-                    DataCell(Container(
+                    DataCell(
+                      Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 3,
@@ -794,18 +779,20 @@ class _UsersDesktopTable extends StatelessWidget {
                           ),
                         ),
                       ),
-                    )),
+                    ),
                     // Sede
-                    DataCell(Text(
+                    DataCell(
+                      Text(
                         sedeName,
                         style: TextStyle(
                           fontSize: 13,
                           color: context.colors.textSecondary,
                         ),
                       ),
-                    )),
+                    ),
                     // Estado
-                    DataCell(Container(
+                    DataCell(
+                      Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 3,
@@ -825,22 +812,27 @@ class _UsersDesktopTable extends StatelessWidget {
                           ),
                         ),
                       ),
-                    )),
+                    ),
                     // Alta (createdAt)
-                    DataCell(Text(
+                    DataCell(
+                      Text(
                         _formatDate(createdAt),
                         style: TextStyle(
                           fontSize: 12,
                           color: context.colors.textTertiary,
                         ),
                       ),
-                    )),
+                    ),
                     // Acciones
-                    DataCell(Row(
+                    DataCell(
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                          icon: const Icon(Icons.visibility_outlined, size: 18),
+                            icon: const Icon(
+                              Icons.visibility_outlined,
+                              size: 18,
+                            ),
                             tooltip: 'Detalle',
                             onPressed: () => onTap(user),
                             color: context.colors.textSecondary,
@@ -881,7 +873,7 @@ class _UsersDesktopTable extends StatelessWidget {
                             ),
                         ],
                       ),
-                    )),
+                    ),
                   ],
                 );
               }).toList(),
@@ -1340,16 +1332,16 @@ class _Badge extends StatelessWidget {
   const _Badge(this.text, this.color);
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          text,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      text,
       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
-        ),
-      );
+    ),
+  );
 }
 
 class _DetailRow extends StatelessWidget {
@@ -1358,31 +1350,31 @@ class _DetailRow extends StatelessWidget {
   const _DetailRow(this.label, this.value, {this.mono = false});
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
           style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
-            ),
-            Flexible(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: context.colors.textPrimary,
-                  fontFamily: mono ? 'monospace' : null,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
         ),
-      );
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: context.colors.textPrimary,
+              fontFamily: mono ? 'monospace' : null,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _UserDetail extends StatelessWidget {
@@ -1561,15 +1553,15 @@ class _UserFormState extends State<_UserForm> {
   }
 
   Widget _label(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          t,
-          style: AppTextStyles.bodySmall.copyWith(
-            fontWeight: FontWeight.w500,
-            color: context.colors.textSecondary,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      t,
+      style: AppTextStyles.bodySmall.copyWith(
+        fontWeight: FontWeight.w500,
+        color: context.colors.textSecondary,
+      ),
+    ),
+  );
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -1695,15 +1687,15 @@ class _UserEditFormState extends State<_UserEditForm> {
   }
 
   Widget _label(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          t,
-          style: AppTextStyles.bodySmall.copyWith(
-            fontWeight: FontWeight.w500,
-            color: context.colors.textSecondary,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      t,
+      style: AppTextStyles.bodySmall.copyWith(
+        fontWeight: FontWeight.w500,
+        color: context.colors.textSecondary,
+      ),
+    ),
+  );
 
   Future<void> _submit() async {
     setState(() => _loading = true);
@@ -1758,68 +1750,68 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        scrollable: true,
-        icon: const Icon(Icons.lock_reset_rounded, color: AppColors.primary),
-        title: const Text('Nueva contraseña'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Asigna una contraseña definitiva. Se cerrarán las sesiones activas del usuario.',
-            style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              key: const Key('reset-password-field'),
-              controller: _password,
-              obscureText: _obscure,
-              maxLength: 72,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Nueva contraseña',
-                counterText: '',
-                suffixIcon: IconButton(
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                  icon: Icon(
-                    _obscure
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('reset-password-confirmation-field'),
-              controller: _confirmation,
-              obscureText: _obscure,
-              maxLength: 72,
-              decoration: const InputDecoration(
-                labelText: 'Confirmar contraseña',
-                counterText: '',
-              ),
-              onSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: 8),
-            const Text(passwordPolicyHint, style: AppTextStyles.labelSmall),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
-              ),
-            ],
-          ],
+    scrollable: true,
+    icon: const Icon(Icons.lock_reset_rounded, color: AppColors.primary),
+    title: const Text('Nueva contraseña'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Asigna una contraseña definitiva. Se cerrarán las sesiones activas del usuario.',
+          style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
+        const SizedBox(height: 16),
+        TextField(
+          key: const Key('reset-password-field'),
+          controller: _password,
+          obscureText: _obscure,
+          maxLength: 72,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Nueva contraseña',
+            counterText: '',
+            suffixIcon: IconButton(
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
           ),
-          FilledButton(onPressed: _submit, child: const Text('Actualizar')),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('reset-password-confirmation-field'),
+          controller: _confirmation,
+          obscureText: _obscure,
+          maxLength: 72,
+          decoration: const InputDecoration(
+            labelText: 'Confirmar contraseña',
+            counterText: '',
+          ),
+          onSubmitted: (_) => _submit(),
+        ),
+        const SizedBox(height: 8),
+        const Text(passwordPolicyHint, style: AppTextStyles.labelSmall),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _error!,
+            style: const TextStyle(color: AppColors.error, fontSize: 12),
+          ),
         ],
-      );
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Actualizar')),
+    ],
+  );
 }
 
 class _StatChip extends StatelessWidget {
@@ -1832,35 +1824,35 @@ class _StatChip extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.09),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: color.withValues(alpha: 0.20)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                value,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                ),
-              ),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.09),
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: color.withValues(alpha: 0.20)),
+    ),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.labelSmall,
-            ),
-          ],
+          ),
         ),
-      );
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.labelSmall,
+        ),
+      ],
+    ),
+  );
 }
