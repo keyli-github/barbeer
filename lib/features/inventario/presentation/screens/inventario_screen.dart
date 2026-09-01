@@ -187,18 +187,21 @@ class InventarioScreen extends ConsumerWidget {
     final state = ref.watch(_invProvider);
     final notifier = ref.read(_invProvider.notifier);
     final catsAsync = ref.watch(_invCatsProvider);
-    final canEdit = auth.hasPermission('inventario:editar');
-    final canCreate =
-        auth.hasPermission('inventario:crear') &&
+    // Permisos alineados con el backend:
+    // inventario:configurar → configurar parámetros de stock (min/max/etc.)
+    // inventario:ajustar-stock → ajustar stock y registrar en kardex
+    final canConfigure =
+        auth.hasPermission('inventario:configurar') &&
         auth.hasPermission('productos:leer') &&
         (auth.user?.isSuperAdmin != true ||
             auth.hasPermission('establecimientos:leer'));
+    final canAjustarStock = auth.hasPermission('inventario:ajustar-stock');
     final selectedSedeId = ref.watch(globalSedeIdProvider);
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      floatingActionButton: canCreate && !desktop
+      floatingActionButton: canConfigure && !desktop
           ? FloatingActionButton.extended(
               heroTag: 'inventario_config_fab',
               backgroundColor: AppColors.brand,
@@ -221,10 +224,10 @@ class InventarioScreen extends ConsumerWidget {
               estadoFilter: state.estadoFilter,
               categoriaFilter: state.categoriaFilter,
               categories: catsAsync.valueOrNull ?? const [],
-              canCreate: canCreate,
-              canConfigure: canEdit,
+              canCreate: canConfigure,
+              canConfigure: canConfigure,
               canAdjust:
-                  canEdit &&
+                  canAjustarStock &&
                   (auth.user?.isSuperAdmin != true || selectedSedeId != null),
               onRefresh: () => notifier.load(),
               onRetry: () => notifier.load(),
@@ -240,7 +243,7 @@ class InventarioScreen extends ConsumerWidget {
               color: AppColors.primary,
               onRefresh: () => notifier.load(),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
                   _SearchBar(
                     onSearch: notifier.setSearch,
@@ -272,10 +275,10 @@ class InventarioScreen extends ConsumerWidget {
                     for (final item in state.items)
                       _InventarioTile(
                         item: item,
-                        canEdit: canEdit,
-                        canConfigure: canEdit,
+                        canEdit: canConfigure,
+                        canConfigure: canConfigure,
                         canAdjust:
-                            canEdit &&
+                            canAjustarStock &&
                             (auth.user?.isSuperAdmin != true ||
                                 selectedSedeId != null),
                         onConfigure: () =>
@@ -1166,24 +1169,40 @@ class _KpiRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 8, bottom: 4),
     child: LayoutBuilder(
-      builder: (_, constraints) => GridView.count(
-        crossAxisCount: constraints.maxWidth >= 720 ? 4 : 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: constraints.maxWidth >= 720 ? 2.5 : 2.2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _Chip('Total productos', '${resumen.totalItems}', AppColors.primary),
-          _Chip('Estado crítico', '${resumen.critico}', AppColors.error),
-          _Chip('En alerta', '${resumen.alerta}', AppColors.warning),
-          _Chip(
-            'Valor inventario',
-            'S/ ${resumen.valorTotal.toStringAsFixed(2)}',
-            AppColors.success,
-          ),
-        ],
-      ),
+      builder: (_, constraints) {
+        final compact = constraints.maxWidth < 360;
+        final columns = compact
+            ? 1
+            : constraints.maxWidth >= 720
+            ? 4
+            : 2;
+        return GridView.count(
+          crossAxisCount: columns,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: compact
+              ? 4.5
+              : constraints.maxWidth >= 720
+              ? 2.5
+              : 2.2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _Chip(
+              'Total productos',
+              '${resumen.totalItems}',
+              AppColors.primary,
+            ),
+            _Chip('Estado crítico', '${resumen.critico}', AppColors.error),
+            _Chip('En alerta', '${resumen.alerta}', AppColors.warning),
+            _Chip(
+              'Valor inventario',
+              'S/ ${resumen.valorTotal.toStringAsFixed(2)}',
+              AppColors.success,
+            ),
+          ],
+        );
+      },
     ),
   );
 }
@@ -1203,15 +1222,16 @@ class _Chip extends StatelessWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: color,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         Text(
           label,
