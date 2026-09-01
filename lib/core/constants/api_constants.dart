@@ -1,8 +1,6 @@
 class ApiConstants {
   ApiConstants._();
   static const String localBaseUrl = 'http://127.0.0.1:3001/api';
-  static const String productionBaseUrl =
-      'https://api-production-79856.up.railway.app/api';
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURACIÓN DE URL
@@ -13,7 +11,7 @@ class ApiConstants {
   //   3. Usa esta URL:
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: productionBaseUrl,
+    defaultValue: localBaseUrl,
   );
   //
   // OPCIÓN B — WiFi (ambos en la misma red):

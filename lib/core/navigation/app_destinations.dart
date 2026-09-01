@@ -60,14 +60,15 @@ const appDestinations = <AppDestination>[
   AppDestination(
     path: RoutePaths.dashboard,
     label: 'Dashboard',
-    title: 'Dashboard',
-    desktopLabel: 'Dashboard',
+    title: 'Panel principal',
+    desktopLabel: 'Panel principal',
     icon: Icons.home_outlined,
     activeIcon: Icons.home_rounded,
   ),
   AppDestination(
     path: RoutePaths.ventas,
     label: 'Ventas',
+    title: 'Registro de Ventas',
     icon: Icons.shopping_cart_outlined,
     activeIcon: Icons.shopping_cart_rounded,
     section: AppDestinationSection.operations,
@@ -221,6 +222,14 @@ const appDestinations = <AppDestination>[
     activeIcon: Icons.backup_rounded,
     section: AppDestinationSection.administration,
     permissions: ['respaldos:gestionar'],
+  ),
+  AppDestination(
+    path: RoutePaths.importaciones,
+    label: 'Importar Excel',
+    icon: Icons.upload_file_outlined,
+    activeIcon: Icons.upload_file_rounded,
+    section: AppDestinationSection.administration,
+    permissions: ['importaciones:ejecutar'],
   ),
   AppDestination(
     path: RoutePaths.perfil,

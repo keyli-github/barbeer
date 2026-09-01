@@ -25,4 +25,5 @@ class RoutePaths {
   static const String cuentas = '/cuentas';
   static const String reportes = '/reportes';
   static const String respaldos = '/respaldos';
+  static const String importaciones = '/importaciones';
 }

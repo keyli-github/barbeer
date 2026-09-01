@@ -26,6 +26,7 @@ import '../../features/categorias/presentation/screens/categorias_screen.dart';
 import '../../features/cuentas/presentation/screens/cuentas_screen.dart';
 import '../../features/reportes/presentation/screens/reportes_screen.dart';
 import '../../features/respaldos/presentation/screens/respaldos_screen.dart';
+import '../../features/importaciones/presentation/screens/importaciones_screen.dart';
 import '../navigation/route_access_policy.dart';
 import '../theme/app_colors.dart';
 import '../widgets/barbeer_wordmark.dart';
@@ -54,7 +55,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         AuthStatus.initial => AuthGateState.unresolved,
         AuthStatus.loading => AuthGateState.authenticating,
         AuthStatus.unauthenticated => AuthGateState.unauthenticated,
-        AuthStatus.mustChangePassword => AuthGateState.forcedPasswordChange,
         AuthStatus.authenticated => AuthGateState.authenticated,
       };
       if (gate != AuthGateState.authenticated &&
@@ -83,7 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.changePassword,
         builder: (_, state) {
-          final forced = state.uri.queryParameters['forced'] != 'false';
+          final forced = state.uri.queryParameters['forced'] == 'true';
           return ChangePasswordScreen(isForced: forced);
         },
       ),
@@ -179,6 +179,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: RoutePaths.respaldos,
             builder: (_, __) => const RespaldosScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.importaciones,
+            builder: (_, __) => const ImportacionesScreen(),
           ),
         ],
       ),

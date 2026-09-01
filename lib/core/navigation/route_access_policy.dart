@@ -51,6 +51,7 @@ class RouteAccessPolicy {
     ),
     RoutePaths.reportes: RouteAccessRule.role({'SUPERADMIN'}),
     RoutePaths.respaldos: RouteAccessRule.any({'respaldos:gestionar'}),
+    RoutePaths.importaciones: RouteAccessRule.any({'importaciones:ejecutar'}),
   };
 
   static const _entryPaths = {
@@ -88,7 +89,6 @@ enum AuthGateState {
   unresolved,
   authenticating,
   unauthenticated,
-  forcedPasswordChange,
   authenticated,
 }
 
@@ -106,10 +106,6 @@ String? routeGuardRedirect({
       return currentPath == RoutePaths.login ? null : RoutePaths.splash;
     case AuthGateState.unauthenticated:
       return currentPath == RoutePaths.login ? null : RoutePaths.login;
-    case AuthGateState.forcedPasswordChange:
-      return currentPath == RoutePaths.changePassword
-          ? null
-          : RoutePaths.changePassword;
     case AuthGateState.authenticated:
       if (currentPath == RoutePaths.noAutorizado) return null;
       final entering = RouteAccessPolicy._entryPaths.contains(currentPath);

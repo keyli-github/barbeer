@@ -57,6 +57,14 @@ void main() {
     expect(actionAllowed({}), isFalse);
     expect(_can(RoutePaths.productos, permissions: _adminPermissions), isTrue);
     expect(_can(RoutePaths.productos), isFalse);
+    expect(
+      _can(
+        RoutePaths.importaciones,
+        permissions: const {'importaciones:ejecutar'},
+      ),
+      isTrue,
+    );
+    expect(_can(RoutePaths.importaciones), isFalse);
     expect(_can('/unknown-protected', role: 'SUPERADMIN'), isFalse);
     expect(
       routeGuardRedirect(
@@ -77,7 +85,6 @@ void main() {
     final authenticated = AuthGateState.authenticated;
     final scenarios = <_Scenario>[
       (AuthGateState.unresolved, product, {}, 'SPLASH'),
-      (AuthGateState.forcedPasswordChange, product, {}, 'CHANGE PASSWORD'),
       (AuthGateState.unauthenticated, product, {}, 'LOGIN'),
       (authenticated, product, {'productos:leer'}, 'PROTECTED PRODUCTS'),
       (authenticated, product, {}, 'UNAUTHORIZED'),
@@ -100,7 +107,7 @@ void main() {
 
   test('403 refresh replaces auth metadata or preserves prior state', () async {
     const initial = AuthState(status: AuthStatus.authenticated);
-    const refreshed = AuthState(status: AuthStatus.mustChangePassword);
+    const refreshed = AuthState(status: AuthStatus.authenticated);
     final success = await preserveAuthorizationRefresh(
       initial,
       () async => refreshed,

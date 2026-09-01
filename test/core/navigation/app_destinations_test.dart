@@ -65,8 +65,12 @@ void main() {
       final superadmin = AuthState(
         status: AuthStatus.authenticated,
         user: UserProfile(
-          id: 'sa', username: 'sa', rol: 'SUPERADMIN',
-          nivel: 99, createdAt: '2026-01-01', permisos: [],
+          id: 'sa',
+          username: 'sa',
+          rol: 'SUPERADMIN',
+          nivel: 99,
+          createdAt: '2026-01-01',
+          permisos: [],
         ),
       );
       expect(superadmin.canAccess('/reportes'), isTrue);
@@ -75,8 +79,18 @@ void main() {
 
     test('respaldos requires respaldos:gestionar', () {
       expect(
-          _authWith(['respaldos:gestionar']).canAccess('/respaldos'), isTrue);
+        _authWith(['respaldos:gestionar']).canAccess('/respaldos'),
+        isTrue,
+      );
       expect(_authWith([]).canAccess('/respaldos'), isFalse);
+    });
+
+    test('importaciones requires importaciones:ejecutar', () {
+      expect(
+        _authWith(['importaciones:ejecutar']).canAccess('/importaciones'),
+        isTrue,
+      );
+      expect(_authWith([]).canAccess('/importaciones'), isFalse);
     });
   });
 }
