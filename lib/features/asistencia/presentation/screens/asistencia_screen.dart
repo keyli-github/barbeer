@@ -738,7 +738,12 @@ class _PlanillaView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(emp.username, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      emp.username,
+                      style: AppTextStyles.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     Text(
                       '${emp.rol}${emp.turno != null ? " · ${emp.turno}" : ""}',
                       style: AppTextStyles.bodySmall,
@@ -1126,7 +1131,7 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
-                          Icons.refresh_rounded,
+                          Icons.qr_code_2_rounded,
                           size: 16,
                           color: AppColors.primary,
                         ),
@@ -1165,7 +1170,7 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
                         const SizedBox(height: 16),
                         TextButton.icon(
                           onPressed: _loadQr,
-                          icon: const Icon(Icons.refresh_rounded),
+                          icon: const Icon(Icons.qr_code_2_rounded),
                           label: const Text('Reintentar'),
                         ),
                       ],
@@ -1456,7 +1461,12 @@ class _TodayArrivalsSectionState extends ConsumerState<_TodayArrivalsSection> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              Text(emp.rol, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(
+                                emp.rol,
+                                style: AppTextStyles.labelSmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
                         ),
@@ -1843,7 +1853,7 @@ class _ScannerErrorView extends StatelessWidget {
                               ? Icons.settings_outlined
                               : unsupported
                               ? Icons.arrow_back_rounded
-                              : Icons.refresh_rounded,
+                              : Icons.camera_alt_outlined,
                           size: 18,
                         ),
                         label: Text(

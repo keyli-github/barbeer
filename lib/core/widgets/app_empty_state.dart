@@ -90,11 +90,7 @@ class AppErrorState extends StatelessWidget {
           ),
           if (onRetry != null) ...[
             const SizedBox(height: 20),
-            AppButton(
-              label: 'Reintentar',
-              onPressed: onRetry,
-              icon: Icons.refresh_rounded,
-            ),
+            AppButton(label: 'Reintentar', onPressed: onRetry),
           ],
         ],
       ),

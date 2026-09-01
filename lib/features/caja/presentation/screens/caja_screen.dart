@@ -36,18 +36,24 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(cajaProvider);
     final auth = ref.watch(authProvider);
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1024;
+    final notifier = ref.read(cajaProvider.notifier);
 
-    // Selector de tabs en una barra debajo del header global
     return Scaffold(
       backgroundColor: context.colors.background,
       body: Column(
         children: [
-          // Tabs: Turno actual / Historial
-          _CajaTabs(
-            historial: _historial,
-            state: state,
-            onTab: (v) => setState(() => _historial = v),
-          ),
+          if (isDesktop)
+            CajaDesktopHeader(
+              historial: _historial,
+              onTab: (value) => setState(() => _historial = value),
+            )
+          else
+            _CajaTabs(
+              historial: _historial,
+              state: state,
+              onTab: (v) => setState(() => _historial = v),
+            ),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -56,22 +62,22 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                   : state.error != null &&
                         state.actual == null &&
                         state.historial.isEmpty
-                  ? AppErrorState(
+                  ? _RefreshableCajaState(
                       key: const ValueKey('error'),
-                      message: state.error!,
-                      onRetry: ref.read(cajaProvider.notifier).load,
+                      onRefresh: notifier.load,
+                      child: AppErrorState(
+                        message: state.error!,
+                        onRetry: notifier.load,
+                      ),
                     )
                   : _historial
                   ? _Historial(
                       key: const ValueKey('history'),
                       state: state,
-                      onFilter: ref
-                          .read(cajaProvider.notifier)
-                          .filtrarHistorial,
-                      onPage: ref
-                          .read(cajaProvider.notifier)
-                          .cambiarPaginaHistorial,
+                      onFilter: notifier.filtrarHistorial,
+                      onPage: notifier.cambiarPaginaHistorial,
                       onDetail: (id) => _showDetail(context, id),
+                      onRefresh: notifier.load,
                     )
                   : _Actual(
                       key: const ValueKey('current'),
@@ -95,19 +101,18 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                       onMove: (tipo) => _showMovement(context, tipo),
                       onMovementFilter: (tipo) {
                         if (state.actual != null) {
-                          ref
-                              .read(cajaProvider.notifier)
-                              .filtrarMovimientos(state.actual!.id, tipo);
+                          notifier.filtrarMovimientos(state.actual!.id, tipo);
                         }
                       },
                       onMovementPage: (page) {
                         if (state.actual != null) {
-                          ref
-                              .read(cajaProvider.notifier)
-                              .loadMovimientos(state.actual!.id, pagina: page);
+                          notifier.loadMovimientos(
+                            state.actual!.id,
+                            pagina: page,
+                          );
                         }
                       },
-                      onRefresh: ref.read(cajaProvider.notifier).load,
+                      onRefresh: notifier.load,
                     ),
             ),
           ),
@@ -252,6 +257,129 @@ class _Tab extends StatelessWidget {
   );
 }
 
+class CajaDesktopHeader extends StatelessWidget {
+  final bool historial;
+  final ValueChanged<bool> onTab;
+
+  const CajaDesktopHeader({
+    super.key,
+    required this.historial,
+    required this.onTab,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(20, 17, 20, 14),
+    decoration: BoxDecoration(
+      border: Border(bottom: BorderSide(color: context.colors.border)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Control de Caja',
+                style: AppTextStyles.headlineLarge.copyWith(
+                  color: context.colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Operación diaria, arqueos y trazabilidad · PEN',
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: context.colors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          height: 36,
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: context.colors.surfaceAlt,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: context.colors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DesktopCajaTab(
+                key: const Key('caja-desktop-current-tab'),
+                icon: Icons.account_balance_outlined,
+                label: 'Caja actual',
+                selected: !historial,
+                onTap: () => onTab(false),
+              ),
+              _DesktopCajaTab(
+                key: const Key('caja-desktop-history-tab'),
+                icon: Icons.history_rounded,
+                label: 'Historial',
+                selected: historial,
+                onTap: () => onTab(true),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DesktopCajaTab extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DesktopCajaTab({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(7),
+    child: Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 11),
+      decoration: BoxDecoration(
+        color: selected ? context.colors.surface : Colors.transparent,
+        borderRadius: BorderRadius.circular(7),
+        border: selected ? Border.all(color: context.colors.border) : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: selected ? AppColors.primary : context.colors.textTertiary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.labelLarge.copyWith(
+              color: selected
+                  ? context.colors.textPrimary
+                  : context.colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _Actual extends StatelessWidget {
   final CajaState state;
   final bool canOpen;
@@ -299,22 +427,28 @@ class _Actual extends StatelessWidget {
         final openSessions = state.historial
             .where((s) => s.estado == 'ABIERTA')
             .toList();
-        return _SuperAdminNoSedeView(
-          openSessions: openSessions,
-          canOpen: canOpen,
-          onOpen: onOpen,
+        return _RefreshableCajaState(
+          onRefresh: onRefresh,
+          child: _SuperAdminNoSedeView(
+            openSessions: openSessions,
+            canOpen: canOpen,
+            onOpen: onOpen,
+          ),
         );
       }
-      return AppEmptyState(
-        icon: Icons.lock_clock_outlined,
-        title: 'No hay una caja abierta',
-        description: !hasSedeScope
-            ? 'Selecciona una sede en el encabezado para consultar o abrir su caja.'
-            : canOpen
-            ? 'Registra el conteo de efectivo para iniciar el turno.'
-            : 'Un usuario autorizado debe abrir la caja de esta sede.',
-        actionLabel: canOpen ? 'Abrir caja' : null,
-        onAction: canOpen ? onOpen : null,
+      return _RefreshableCajaState(
+        onRefresh: onRefresh,
+        child: AppEmptyState(
+          icon: Icons.lock_clock_outlined,
+          title: 'No hay una caja abierta',
+          description: !hasSedeScope
+              ? 'Selecciona una sede en el encabezado para consultar o abrir su caja.'
+              : canOpen
+              ? 'Registra el conteo de efectivo para iniciar el turno.'
+              : 'Un usuario autorizado debe abrir la caja de esta sede.',
+          actionLabel: canOpen ? 'Abrir caja' : null,
+          onAction: canOpen ? onOpen : null,
+        ),
       );
     }
     final canInteract =
@@ -336,6 +470,23 @@ class _Actual extends StatelessWidget {
             cantidadAnuladas: 0,
           ),
         );
+    if (MediaQuery.sizeOf(context).width >= 1024) {
+      return CajaDesktopCurrentView(
+        state: state,
+        session: session,
+        summary: summary,
+        canInteract: canInteract,
+        canPrecuadre: canPrecuadre,
+        canClose: canClose,
+        canMove: canMove,
+        onEntry: () => onMove('ENTRADA'),
+        onExit: () => onMove('SALIDA'),
+        onPrecuadre: onPrecuadre,
+        onClose: onClose,
+        onMovementPage: onMovementPage,
+        onRefresh: onRefresh,
+      );
+    }
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: onRefresh,
@@ -564,11 +715,7 @@ class _SuperAdminNoSedeView extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 20,
-                color: AppColors.info,
-              ),
+              Icon(Icons.info_outline_rounded, size: 20, color: AppColors.info),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -696,6 +843,7 @@ class _Historial extends StatelessWidget {
   final ValueChanged<String?> onFilter;
   final ValueChanged<int> onPage;
   final ValueChanged<String> onDetail;
+  final Future<void> Function() onRefresh;
 
   const _Historial({
     super.key,
@@ -703,103 +851,130 @@ class _Historial extends StatelessWidget {
     required this.onFilter,
     required this.onPage,
     required this.onDetail,
+    required this.onRefresh,
   });
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
-    children: [
-      _FilterRow(
-        selected: state.estadoFiltro,
-        values: const [null, 'ABIERTA', 'CERRADA'],
-        labels: const ['Todas', 'Abiertas', 'Cerradas'],
-        onChanged: onFilter,
-      ),
-      const SizedBox(height: 12),
-      if (state.historial.isEmpty)
-        const Padding(
-          padding: EdgeInsets.only(top: 80),
-          child: AppEmptyState(
-            icon: Icons.history_rounded,
-            title: 'Sin sesiones de caja',
-            description: 'No hay resultados para el filtro seleccionado.',
-          ),
-        )
-      else
-        for (final session in state.historial)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              onTap: () => onDetail(session.id),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: session.estado == 'ABIERTA'
-                          ? context.colors.successLight
-                          : context.colors.backgroundAlt,
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(
-                      session.estado == 'ABIERTA'
-                          ? Icons.lock_open_rounded
-                          : Icons.lock_rounded,
-                      color: session.estado == 'ABIERTA'
-                          ? AppColors.success
-                          : context.colors.textSecondary,
-                      size: 19,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(session.sede, style: AppTextStyles.titleMedium),
-                        Text(
-                          '${_dateTime(session.abiertaAt)} · ${session.usuarioAperturaLabel}',
-                          style: AppTextStyles.labelSmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _StatusPill(
-                        label: session.estado,
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+      children: [
+        _FilterRow(
+          selected: state.estadoFiltro,
+          values: const [null, 'ABIERTA', 'CERRADA'],
+          labels: const ['Todas', 'Abiertas', 'Cerradas'],
+          onChanged: onFilter,
+        ),
+        const SizedBox(height: 12),
+        if (state.historial.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 80),
+            child: AppEmptyState(
+              icon: Icons.history_rounded,
+              title: 'Sin sesiones de caja',
+              description: 'No hay resultados para el filtro seleccionado.',
+            ),
+          )
+        else
+          for (final session in state.historial)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AppCard(
+                onTap: () => onDetail(session.id),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: session.estado == 'ABIERTA'
+                            ? context.colors.successLight
+                            : context.colors.backgroundAlt,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(
+                        session.estado == 'ABIERTA'
+                            ? Icons.lock_open_rounded
+                            : Icons.lock_rounded,
                         color: session.estado == 'ABIERTA'
                             ? AppColors.success
                             : context.colors.textSecondary,
+                        size: 19,
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        _money(
-                          session.saldoActual ??
-                              session.resumen?.efectivoEsperado ??
-                              session.montoApertura,
-                        ),
-                        style: AppTextStyles.labelLarge.copyWith(
-                          color: context.colors.textPrimary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(session.sede, style: AppTextStyles.titleMedium),
+                          Text(
+                            '${_dateTime(session.abiertaAt)} · ${session.usuarioAperturaLabel}',
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        _StatusPill(
+                          label: session.estado,
+                          color: session.estado == 'ABIERTA'
+                              ? AppColors.success
+                              : context.colors.textSecondary,
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _money(
+                            session.saldoActual ??
+                                session.resumen?.efectivoEsperado ??
+                                session.montoApertura,
+                          ),
+                          style: AppTextStyles.labelLarge.copyWith(
+                            color: context.colors.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      _Pager(
-        page: state.historialPagina,
-        pages: state.historialPaginas,
-        total: state.historialTotal,
-        onPage: onPage,
+        _Pager(
+          page: state.historialPagina,
+          pages: state.historialPaginas,
+          total: state.historialTotal,
+          onPage: onPage,
+        ),
+      ],
+    ),
+  );
+}
+
+class _RefreshableCajaState extends StatelessWidget {
+  final Widget child;
+  final Future<void> Function() onRefresh;
+
+  const _RefreshableCajaState({
+    super.key,
+    required this.child,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [SizedBox(height: constraints.maxHeight, child: child)],
       ),
-    ],
+    ),
   );
 }
 
@@ -859,8 +1034,9 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
             crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio:
-                MediaQuery.sizeOf(context).width < 380 ? 1.9 : 2.5,
+            childAspectRatio: MediaQuery.sizeOf(context).width < 380
+                ? 1.9
+                : 2.5,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
             children: [
@@ -946,7 +1122,12 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
     try {
       final response = await ApiClient.instance.get(
         ApiConstants.etiquetas,
-        queryParameters: {'pagina': 1, 'limite': 100, 'sedeId': sedeId, 'soloActivas': true},
+        queryParameters: {
+          'pagina': 1,
+          'limite': 100,
+          'sedeId': sedeId,
+          'soloActivas': true,
+        },
       );
       final data = Map<String, dynamic>.from(response.data as Map);
       final all = (data['data'] as List? ?? [])
@@ -972,7 +1153,11 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
       final list = (data['data'] as List? ?? [])
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
-          .where((e) => e['activo'] == true && (e['rol'] as Map?)?['nombre'] != 'SUPERADMIN')
+          .where(
+            (e) =>
+                e['activo'] == true &&
+                (e['rol'] as Map?)?['nombre'] != 'SUPERADMIN',
+          )
           .toList();
       if (mounted) setState(() => _personal = list);
     } catch (_) {
@@ -980,11 +1165,13 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
     }
   }
 
-  Etiqueta? get _selectedEtiqueta =>
-      _etiquetaId == null ? null : _etiquetas.where((e) => e.id == _etiquetaId).firstOrNull;
+  Etiqueta? get _selectedEtiqueta => _etiquetaId == null
+      ? null
+      : _etiquetas.where((e) => e.id == _etiquetaId).firstOrNull;
 
   bool get _requierePersonal =>
-      _selectedEtiqueta != null && cajaRequiresStaff(personalTipo: _selectedEtiqueta!.personalTipo);
+      _selectedEtiqueta != null &&
+      cajaRequiresStaff(personalTipo: _selectedEtiqueta!.personalTipo);
 
   List<Etiqueta> get _filteredEtiquetas => _etiquetas
       .where((e) => e.tipo == 'AMBOS' || e.tipo == widget.tipo)
@@ -1056,7 +1243,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   key: ValueKey('etiqueta-$_etiquetaId'),
-                  value: _etiquetaId,
+                  initialValue: _etiquetaId,
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Etiqueta (opcional)',
@@ -1094,7 +1281,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
                   key: ValueKey('personal-$_personalId'),
-                  value: _personalId,
+                  initialValue: _personalId,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Personal',
@@ -1105,8 +1292,8 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
                   ),
                   validator: (v) =>
                       _requierePersonal && (v == null || v.isEmpty)
-                          ? 'Selecciona el personal responsable'
-                          : null,
+                      ? 'Selecciona el personal responsable'
+                      : null,
                   items: _personal
                       .map(
                         (p) => DropdownMenuItem<String>(
@@ -1189,11 +1376,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
   String? _movTipo;
   String? _loadedId;
 
-  Future<void> _loadMovimientos(
-    String id, {
-    int? pagina,
-    String? tipo,
-  }) async {
+  Future<void> _loadMovimientos(String id, {int? pagina, String? tipo}) async {
     setState(() => _movLoading = true);
     try {
       final repo = ref.read(cajaRepositoryProvider);
@@ -1242,8 +1425,9 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
 
         final resumen = session.resumen;
         final v2 = resumen?.v2;
-        final canExportCaja =
-            ref.read(authProvider).canAccess(RoutePaths.reportes);
+        final canExportCaja = ref
+            .read(authProvider)
+            .canAccess(RoutePaths.reportes);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -1337,89 +1521,110 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
             const SizedBox(height: 14),
 
             // ── Sección Apertura ───────────────────────────────────────────
-            _SectionCard(title: 'Apertura', rows: [
-              _DetailRow(label: 'Sede', value: session.sede),
-              _DetailRow(label: 'Estado', value: session.estado),
-              _DetailRow(label: 'Fecha', value: _dateTime(session.abiertaAt)),
-              _DetailRow(label: 'Usuario', value: session.usuarioAperturaLabel),
-              _DetailRow(label: 'Monto', value: _money(session.montoApertura)),
-              if (session.createdAt != null)
-                _DetailRow(label: 'Creada', value: _dateTime(session.createdAt!)),
-              if (session.updatedAt != null)
-                _DetailRow(label: 'Actualizada', value: _dateTime(session.updatedAt!)),
-            ]),
+            _SectionCard(
+              title: 'Apertura',
+              rows: [
+                _DetailRow(label: 'Sede', value: session.sede),
+                _DetailRow(label: 'Estado', value: session.estado),
+                _DetailRow(label: 'Fecha', value: _dateTime(session.abiertaAt)),
+                _DetailRow(
+                  label: 'Usuario',
+                  value: session.usuarioAperturaLabel,
+                ),
+                _DetailRow(
+                  label: 'Monto',
+                  value: _money(session.montoApertura),
+                ),
+                if (session.createdAt != null)
+                  _DetailRow(
+                    label: 'Creada',
+                    value: _dateTime(session.createdAt!),
+                  ),
+                if (session.updatedAt != null)
+                  _DetailRow(
+                    label: 'Actualizada',
+                    value: _dateTime(session.updatedAt!),
+                  ),
+              ],
+            ),
             const SizedBox(height: 10),
 
             // ── Sección Precuadre ──────────────────────────────────────────
-            _SectionCard(title: 'Precuadre', rows: [
-              _DetailRow(
-                label: 'Fecha',
-                value: session.precuadreAt != null
-                    ? _dateTime(session.precuadreAt!)
-                    : 'No realizado',
-              ),
-              _DetailRow(
-                label: 'Usuario',
-                value: session.usuarioPrecuadre ?? 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Declarado',
-                value: session.montoDeclaradoPrecuadre != null
-                    ? _money(session.montoDeclaradoPrecuadre!)
-                    : 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Esperado',
-                value: session.saldoEsperadoPrecuadre != null
-                    ? _money(session.saldoEsperadoPrecuadre!)
-                    : 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Diferencia',
-                value: session.diferenciaPrecuadre != null
-                    ? _money(session.diferenciaPrecuadre!)
-                    : 'No registrado',
-              ),
-            ]),
+            _SectionCard(
+              title: 'Precuadre',
+              rows: [
+                _DetailRow(
+                  label: 'Fecha',
+                  value: session.precuadreAt != null
+                      ? _dateTime(session.precuadreAt!)
+                      : 'No realizado',
+                ),
+                _DetailRow(
+                  label: 'Usuario',
+                  value: session.usuarioPrecuadre ?? 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Declarado',
+                  value: session.montoDeclaradoPrecuadre != null
+                      ? _money(session.montoDeclaradoPrecuadre!)
+                      : 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Esperado',
+                  value: session.saldoEsperadoPrecuadre != null
+                      ? _money(session.saldoEsperadoPrecuadre!)
+                      : 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Diferencia',
+                  value: session.diferenciaPrecuadre != null
+                      ? _money(session.diferenciaPrecuadre!)
+                      : 'No registrado',
+                ),
+              ],
+            ),
             const SizedBox(height: 10),
 
             // ── Sección Cierre ─────────────────────────────────────────────
-            _SectionCard(title: 'Cierre', rows: [
-              _DetailRow(
-                label: 'Fecha',
-                value: session.cerradaAt != null
-                    ? _dateTime(session.cerradaAt!)
-                    : 'Caja aún abierta',
-              ),
-              _DetailRow(
-                label: 'Usuario',
-                value: session.usuarioCierre ?? 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Declarado',
-                value: session.montoDeclaradoCierre != null
-                    ? _money(session.montoDeclaradoCierre!)
-                    : 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Esperado',
-                value: session.saldoEsperadoCierre != null
-                    ? _money(session.saldoEsperadoCierre!)
-                    : 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Diferencia',
-                value: session.diferenciaCierre != null
-                    ? _money(session.diferenciaCierre!)
-                    : 'No registrado',
-              ),
-              _DetailRow(
-                label: 'Observaciones',
-                value: session.observacionesCierre?.isNotEmpty == true
-                    ? session.observacionesCierre!
-                    : 'Sin observaciones',
-              ),
-            ]),
+            _SectionCard(
+              title: 'Cierre',
+              rows: [
+                _DetailRow(
+                  label: 'Fecha',
+                  value: session.cerradaAt != null
+                      ? _dateTime(session.cerradaAt!)
+                      : 'Caja aún abierta',
+                ),
+                _DetailRow(
+                  label: 'Usuario',
+                  value: session.usuarioCierre ?? 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Declarado',
+                  value: session.montoDeclaradoCierre != null
+                      ? _money(session.montoDeclaradoCierre!)
+                      : 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Esperado',
+                  value: session.saldoEsperadoCierre != null
+                      ? _money(session.saldoEsperadoCierre!)
+                      : 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Diferencia',
+                  value: session.diferenciaCierre != null
+                      ? _money(session.diferenciaCierre!)
+                      : 'No registrado',
+                ),
+                _DetailRow(
+                  label: 'Observaciones',
+                  value: session.observacionesCierre?.isNotEmpty == true
+                      ? session.observacionesCierre!
+                      : 'Sin observaciones',
+                ),
+              ],
+            ),
             const SizedBox(height: 14),
 
             // ── Denominaciones de apertura (tabla) ─────────────────────────
@@ -1486,11 +1691,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
                           _movTipo = tipo;
                           _movPage = 1;
                         });
-                        _loadMovimientos(
-                          _loadedId!,
-                          tipo: tipo,
-                          pagina: 1,
-                        );
+                        _loadMovimientos(_loadedId!, tipo: tipo, pagina: 1);
                       },
                     ),
                   ),
@@ -1509,8 +1710,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
                       child: AppEmptyState(
                         icon: Icons.receipt_long_outlined,
                         title: 'Sin movimientos',
-                        description:
-                            'No hay movimientos para este filtro.',
+                        description: 'No hay movimientos para este filtro.',
                       ),
                     )
                   else
@@ -1750,6 +1950,310 @@ class _MovementTile extends StatelessWidget {
   }
 }
 
+class CajaDesktopCurrentView extends StatelessWidget {
+  final CajaState state;
+  final CajaSesion session;
+  final CajaResumen summary;
+  final bool canInteract;
+  final bool canPrecuadre;
+  final bool canClose;
+  final bool canMove;
+  final VoidCallback onEntry;
+  final VoidCallback onExit;
+  final VoidCallback onPrecuadre;
+  final VoidCallback onClose;
+  final ValueChanged<int> onMovementPage;
+  final Future<void> Function() onRefresh;
+
+  const CajaDesktopCurrentView({
+    super.key,
+    required this.state,
+    required this.session,
+    required this.summary,
+    required this.canInteract,
+    required this.canPrecuadre,
+    required this.canClose,
+    required this.canMove,
+    required this.onEntry,
+    required this.onExit,
+    required this.onPrecuadre,
+    required this.onClose,
+    required this.onMovementPage,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final v2 = summary.v2;
+    final entries = v2?.totalVentasNeto ?? summary.v1?.totalEntradas ?? 0;
+    final exits = v2?.otrosGastos ?? summary.v1?.totalSalidas ?? 0;
+    final expected = summary.efectivoEsperado;
+    final difference = session.diferenciaPrecuadre;
+
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.colors.border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: AppColors.success,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Caja abierta',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 9),
+                          Text(
+                            session.id.length > 8
+                                ? session.id.substring(0, 8)
+                                : session.id,
+                            style: TextStyle(
+                              color: context.colors.textTertiary,
+                              fontSize: 10,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${session.sede} · ${_dateTime(session.abiertaAt)} · ${session.usuarioAperturaLabel}',
+                        style: TextStyle(
+                          color: context.colors.textTertiary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (canMove) ...[
+                  _DesktopCajaAction(
+                    label: 'Entradas',
+                    icon: Icons.arrow_upward_rounded,
+                    color: AppColors.success,
+                    onPressed: canInteract ? onEntry : null,
+                  ),
+                  const SizedBox(width: 8),
+                  _DesktopCajaAction(
+                    label: 'Salidas',
+                    icon: Icons.arrow_downward_rounded,
+                    color: AppColors.error,
+                    onPressed: canInteract ? onExit : null,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                _DesktopCajaAction(
+                  label: 'Cuadre',
+                  icon: Icons.calculate_outlined,
+                  color: AppColors.primary,
+                  onPressed: !canInteract
+                      ? null
+                      : canClose
+                      ? onClose
+                      : canPrecuadre
+                      ? onPrecuadre
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _DesktopCajaMetric(
+                label: 'Apertura',
+                value: _money(session.montoApertura),
+                color: context.colors.textPrimary,
+              ),
+              _DesktopCajaMetric(
+                label: 'Total de entradas',
+                value: _money(entries),
+                color: AppColors.success,
+              ),
+              _DesktopCajaMetric(
+                label: 'Total de salidas',
+                value: _money(exits),
+                color: AppColors.error,
+              ),
+              _DesktopCajaMetric(
+                label: 'Diferencia de caja',
+                value: difference == null ? 'Sin conteo' : _money(difference),
+                color: difference == null
+                    ? context.colors.textTertiary
+                    : difference == 0
+                    ? AppColors.success
+                    : AppColors.error,
+              ),
+              _DesktopCajaMetric(
+                label: 'Efectivo esperado',
+                value: _money(expected),
+                color: AppColors.primary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.colors.border),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Movimientos del turno',
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${state.movimientosTotal} registros',
+                        style: TextStyle(
+                          color: context.colors.textTertiary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: context.colors.border),
+                if (state.movimientos.isEmpty)
+                  const SizedBox(
+                    height: 150,
+                    child: Center(child: Text('Sin movimientos del turno.')),
+                  )
+                else
+                  _MovementsDesktopTable(movements: state.movimientos),
+              ],
+            ),
+          ),
+          _Pager(
+            page: state.movimientosPagina,
+            pages: state.movimientosPaginas,
+            total: state.movimientosTotal,
+            onPage: onMovementPage,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopCajaMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _DesktopCajaMetric({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      height: 88,
+      margin: const EdgeInsets.only(right: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.colors.textTertiary,
+              fontSize: 10,
+              letterSpacing: .8,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _DesktopCajaAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onPressed;
+
+  const _DesktopCajaAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    onPressed: onPressed,
+    icon: Icon(icon, size: 15),
+    label: Text(label),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: color,
+      side: BorderSide(color: color.withValues(alpha: .35)),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    ),
+  );
+}
+
 /// Desktop DataTable for caja movements — matches web's table layout.
 class _MovementsDesktopTable extends StatelessWidget {
   final List<CajaMovimiento> movements;
@@ -1787,66 +2291,80 @@ class _MovementsDesktopTable extends StatelessWidget {
             rows: movements.map((m) {
               final incoming = m.tipo == 'ENTRADA';
               final color = incoming ? AppColors.success : AppColors.error;
-              return DataRow(cells: [
-                DataCell(Text(
-                  _dateTime(m.createdAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    color: context.colors.textSecondary,
-                  ),
-                )),
-                DataCell(Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    m.tipo,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: color,
+              return DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      _dateTime(m.createdAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: context.colors.textSecondary,
+                      ),
                     ),
                   ),
-                )),
-                DataCell(Text(
-                  m.concepto,
-                  style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
-                )),
-                DataCell(Text(
-                  [
-                    if (m.medioPago?.isNotEmpty ?? false) m.medioPago!,
-                    if (m.etiqueta?.isNotEmpty ?? false) m.etiqueta!,
-                    if (m.origen.isNotEmpty) m.origen,
-                  ].join(' · '),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.colors.textTertiary,
+                  DataCell(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        m.tipo,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
                   ),
-                )),
-                DataCell(Text(
-                  '${incoming ? '+' : '-'} ${_money(m.monto)}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    color: color,
+                  DataCell(
+                    Text(
+                      m.concepto,
+                      style: const TextStyle(fontSize: 13),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                )),
-                DataCell(Text(
-                  m.usuario ?? '',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.colors.textSecondary,
+                  DataCell(
+                    Text(
+                      [
+                        if (m.medioPago?.isNotEmpty ?? false) m.medioPago!,
+                        if (m.etiqueta?.isNotEmpty ?? false) m.etiqueta!,
+                        if (m.origen.isNotEmpty) m.origen,
+                      ].join(' · '),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textTertiary,
+                      ),
+                    ),
                   ),
-                )),
-              ]);
+                  DataCell(
+                    Text(
+                      '${incoming ? '+' : '-'} ${_money(m.monto)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                        color: color,
+                      ),
+                    ),
+                  ),
+                  DataCell(
+                    Text(
+                      m.usuario,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              );
             }).toList(),
           ),
         ),
@@ -2010,32 +2528,6 @@ class _TotalBand extends StatelessWidget {
   );
 }
 
-class _ReadOnlyChip extends StatelessWidget {
-  final String label;
-
-  const _ReadOnlyChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-    decoration: BoxDecoration(
-      color: context.colors.backgroundAlt,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: context.colors.border),
-    ),
-    child: Text(
-      label.replaceAll('_', ' '),
-      textAlign: TextAlign.center,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: AppTextStyles.labelSmall.copyWith(
-        color: context.colors.textSecondary,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  );
-}
-
 class _StatusPill extends StatelessWidget {
   final String label;
   final Color color;
@@ -2183,9 +2675,7 @@ class _SectionCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: context.colors.border),
-            ),
+            border: Border(bottom: BorderSide(color: context.colors.border)),
           ),
           child: Text(
             title.toUpperCase(),
@@ -2230,14 +2720,9 @@ class _DenominacionesTable extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: context.colors.border),
-            ),
+            border: Border(bottom: BorderSide(color: context.colors.border)),
           ),
-          child: Text(
-            title,
-            style: AppTextStyles.titleMedium,
-          ),
+          child: Text(title, style: AppTextStyles.titleMedium),
         ),
         // Cabecera de tabla
         Padding(
@@ -2248,14 +2733,20 @@ class _DenominacionesTable extends StatelessWidget {
                 flex: 3,
                 child: Text(
                   'DENOMINACIÓN',
-                  style: AppTextStyles.labelSmall.copyWith(fontSize: 9, letterSpacing: 0.6),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    fontSize: 9,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
               Expanded(
                 child: Text(
                   'CANT.',
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.labelSmall.copyWith(fontSize: 9, letterSpacing: 0.6),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    fontSize: 9,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
               Expanded(
@@ -2263,7 +2754,10 @@ class _DenominacionesTable extends StatelessWidget {
                 child: Text(
                   'SUBTOTAL',
                   textAlign: TextAlign.right,
-                  style: AppTextStyles.labelSmall.copyWith(fontSize: 9, letterSpacing: 0.6),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    fontSize: 9,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ],
@@ -2271,8 +2765,7 @@ class _DenominacionesTable extends StatelessWidget {
         ),
         Divider(height: 1, color: context.colors.border),
         // Filas
-        for (final item in items)
-          _buildRow(context, item),
+        for (final item in items) _buildRow(context, item),
         const SizedBox(height: 4),
       ],
     ),
@@ -2345,8 +2838,9 @@ class _ComprobanteBtn extends StatelessWidget {
   }
 
   void _show(BuildContext context) {
-    final normalised =
-        (url!.startsWith('http') || url!.startsWith('/')) ? url! : 'https://$url';
+    final normalised = (url!.startsWith('http') || url!.startsWith('/'))
+        ? url!
+        : 'https://$url';
     showModalBottomSheet(
       context: context,
       useRootNavigator: true,
@@ -2383,7 +2877,7 @@ class _ComprobanteBtn extends StatelessWidget {
                               color: AppColors.primary,
                             ),
                           ),
-                    errorBuilder: (_, __, ___) => const Center(
+                    errorBuilder: (context, error, stackTrace) => const Center(
                       child: Text('No se pudo cargar el comprobante'),
                     ),
                   ),

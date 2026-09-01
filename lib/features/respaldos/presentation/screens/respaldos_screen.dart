@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/async/operation_state.dart';
 import '../../../../core/files/android_file_artifact_service.dart';
 import '../../../../core/files/file_artifact.dart';
 import '../../../../core/files/file_artifact_service.dart';
@@ -15,7 +13,8 @@ import '../../../../core/network/api_client.dart';
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 final _repoProvider = Provider<RespaldosRepository>(
-    (_) => RespaldosRepository(ApiClient.instance));
+  (_) => RespaldosRepository(ApiClient.instance),
+);
 
 class _State {
   final BackupSchedule? schedule;
@@ -45,23 +44,20 @@ class _State {
     Object? downloadingFormat = _sentinel,
     Object? scheduleError = _sentinel,
     Object? runsError = _sentinel,
-  }) =>
-      _State(
-        schedule: schedule ?? this.schedule,
-        runs: runs ?? this.runs,
-        scheduleLoading: scheduleLoading ?? this.scheduleLoading,
-        runsLoading: runsLoading ?? this.runsLoading,
-        saveLoading: saveLoading ?? this.saveLoading,
-        downloadingFormat: downloadingFormat == _sentinel
-            ? this.downloadingFormat
-            : downloadingFormat as String?,
-        scheduleError: scheduleError == _sentinel
-            ? this.scheduleError
-            : scheduleError as String?,
-        runsError: runsError == _sentinel
-            ? this.runsError
-            : runsError as String?,
-      );
+  }) => _State(
+    schedule: schedule ?? this.schedule,
+    runs: runs ?? this.runs,
+    scheduleLoading: scheduleLoading ?? this.scheduleLoading,
+    runsLoading: runsLoading ?? this.runsLoading,
+    saveLoading: saveLoading ?? this.saveLoading,
+    downloadingFormat: downloadingFormat == _sentinel
+        ? this.downloadingFormat
+        : downloadingFormat as String?,
+    scheduleError: scheduleError == _sentinel
+        ? this.scheduleError
+        : scheduleError as String?,
+    runsError: runsError == _sentinel ? this.runsError : runsError as String?,
+  );
 }
 
 const _sentinel = Object();
@@ -72,13 +68,19 @@ class _Notifier extends StateNotifier<_State> {
 
   Future<void> loadAll() async {
     state = state.copyWith(
-        scheduleLoading: true, runsLoading: true,
-        scheduleError: null, runsError: null);
+      scheduleLoading: true,
+      runsLoading: true,
+      scheduleError: null,
+      runsError: null,
+    );
     try {
       final s = await _repo.getSchedule();
       state = state.copyWith(schedule: s, scheduleLoading: false);
     } catch (e) {
-      state = state.copyWith(scheduleLoading: false, scheduleError: e.toString());
+      state = state.copyWith(
+        scheduleLoading: false,
+        scheduleError: e.toString(),
+      );
     }
     try {
       final r = await _repo.listRuns(limit: 25);
@@ -111,11 +113,17 @@ class _Notifier extends StateNotifier<_State> {
   }
 
   Future<BackupDownloadResult?> downloadArtifact(
-      String runId, String format, String? sha256) async {
+    String runId,
+    String format,
+    String? sha256,
+  ) async {
     state = state.copyWith(downloadingFormat: format);
     try {
-      final result = await _repo.downloadArtifact(runId, format,
-          expectedSha256: sha256);
+      final result = await _repo.downloadArtifact(
+        runId,
+        format,
+        expectedSha256: sha256,
+      );
       state = state.copyWith(downloadingFormat: null);
       return result;
     } catch (e) {
@@ -125,8 +133,9 @@ class _Notifier extends StateNotifier<_State> {
   }
 }
 
-final _notifierProvider =
-    StateNotifierProvider<_Notifier, _State>((ref) => _Notifier(ref.read(_repoProvider)));
+final _notifierProvider = StateNotifierProvider<_Notifier, _State>(
+  (ref) => _Notifier(ref.read(_repoProvider)),
+);
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -167,17 +176,21 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
       formats: _formats.toList(),
       timezone: ref.read(_notifierProvider).schedule?.timezone ?? 'UTC',
     );
-    final err =
-        await ref.read(_notifierProvider.notifier).saveSchedule(draft);
+    final err = await ref.read(_notifierProvider.notifier).saveSchedule(draft);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(err == null ? 'Programación guardada.' : 'Error: $err'),
-      backgroundColor: err == null ? Colors.green : Colors.red,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(err == null ? 'Programación guardada.' : 'Error: $err'),
+        backgroundColor: err == null ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   Future<void> _download(
-      BuildContext ctx, BackupRun run, BackupArtifact artifact) async {
+    BuildContext ctx,
+    BackupRun run,
+    BackupArtifact artifact,
+  ) async {
     BackupDownloadResult? result;
     try {
       result = await ref
@@ -185,16 +198,18 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
           .downloadArtifact(run.id, artifact.format, artifact.sha256);
     } catch (e) {
       if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-          content: Text('Error: $e'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
       return;
     }
     if (result == null || !ctx.mounted) return;
     final fa = FileArtifact(
-        bytes: result.bytes,
-        filename: result.filename,
-        contentType: result.contentType,
-        expectedLength: result.bytes.length);
+      bytes: result.bytes,
+      filename: result.filename,
+      contentType: result.contentType,
+      expectedLength: result.bytes.length,
+    );
     FileArtifactService svc;
     if (Platform.isAndroid) {
       svc = AndroidFileArtifactService();
@@ -202,17 +217,28 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
       svc = WindowsFileArtifactService();
     } else {
       ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(content: Text('Descarga no disponible en esta plataforma.')));
+        const SnackBar(
+          content: Text('Descarga no disponible en esta plataforma.'),
+        ),
+      );
       return;
     }
     final saveResult = await svc.save(fa);
     if (!ctx.mounted) return;
     if (saveResult is FileArtifactSaved) {
       ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(content: Text('Descarga completada.'), backgroundColor: Colors.green));
+        const SnackBar(
+          content: Text('Descarga completada.'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } else if (saveResult is! FileArtifactCancelled) {
       ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(content: Text('Error al guardar: $saveResult'), backgroundColor: Colors.red));
+        SnackBar(
+          content: Text('Error al guardar: $saveResult'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -232,62 +258,79 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
     return Scaffold(
       body: SafeArea(
         child: canManage
-            ? SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Respaldos',
+            ? RefreshIndicator(
+                onRefresh: () => ref.read(_notifierProvider.notifier).loadAll(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Respaldos',
                         style: TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    _ScheduleCard(
-                      schedule: state.schedule,
-                      loading: state.scheduleLoading,
-                      saveLoading: state.saveLoading,
-                      enabled: _enabled,
-                      frequency: _frequency,
-                      formats: _formats,
-                      error: state.scheduleError,
-                      onEnabledChanged: (v) =>
-                          setState(() => _enabled = v),
-                      onFrequencyChanged: (v) =>
-                          setState(() => _frequency = v),
-                      onFormatToggled: (f) => setState(() =>
-                          _formats.contains(f)
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _ScheduleCard(
+                        schedule: state.schedule,
+                        loading: state.scheduleLoading,
+                        saveLoading: state.saveLoading,
+                        enabled: _enabled,
+                        frequency: _frequency,
+                        formats: _formats,
+                        error: state.scheduleError,
+                        onEnabledChanged: (v) => setState(() => _enabled = v),
+                        onFrequencyChanged: (v) =>
+                            setState(() => _frequency = v),
+                        onFormatToggled: (f) => setState(
+                          () => _formats.contains(f)
                               ? _formats.remove(f)
-                              : _formats.add(f)),
-                      onSave: _saveSchedule,
-                      onRetry: () =>
-                          ref.read(_notifierProvider.notifier).loadAll(),
-                    ),
-                    const SizedBox(height: 16),
-                    _HistoryCard(
-                      runs: state.runs,
-                      loading: state.runsLoading,
-                      downloadingFormat: state.downloadingFormat,
-                      error: state.runsError,
-                      onRefresh: () =>
-                          ref.read(_notifierProvider.notifier).refreshRuns(),
-                      onDownload: (run, artifact) =>
-                          _download(context, run, artifact),
-                    ),
-                  ],
+                              : _formats.add(f),
+                        ),
+                        onSave: _saveSchedule,
+                        onRetry: () =>
+                            ref.read(_notifierProvider.notifier).loadAll(),
+                      ),
+                      const SizedBox(height: 16),
+                      _HistoryCard(
+                        runs: state.runs,
+                        loading: state.runsLoading,
+                        downloadingFormat: state.downloadingFormat,
+                        error: state.runsError,
+                        onRefresh: () =>
+                            ref.read(_notifierProvider.notifier).refreshRuns(),
+                        onDownload: (run, artifact) =>
+                            _download(context, run, artifact),
+                      ),
+                    ],
+                  ),
                 ),
               )
             : const Center(
                 child: Padding(
                   padding: EdgeInsets.all(32),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.shield_outlined, size: 48, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('Acceso restringido',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.shield_outlined, size: 48, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'Acceso restringido',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 8),
-                    Text('Necesitás el permiso respaldos:gestionar.',
-                        textAlign: TextAlign.center),
-                  ]),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Necesitás el permiso respaldos:gestionar.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ),
       ),
@@ -328,109 +371,135 @@ class _ScheduleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading && schedule == null) {
       return const Card(
-          child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator())));
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
     }
     if (error != null && schedule == null) {
       return Card(
-          elevation: 2,
-          child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 32),
-                const SizedBox(height: 8),
-                Text(error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
-                    onPressed: onRetry),
-              ])));
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: onRetry,
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     return Card(
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Programación automática',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Activar respaldos programados'),
-            value: enabled,
-            onChanged: onEnabledChanged,
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            decoration: const InputDecoration(
-                labelText: 'Frecuencia', border: OutlineInputBorder()),
-            value: frequency,
-            items: const [
-              DropdownMenuItem(value: 'DAILY', child: Text('Diaria')),
-              DropdownMenuItem(value: 'WEEKLY', child: Text('Semanal')),
-              DropdownMenuItem(value: 'MONTHLY', child: Text('Mensual')),
-            ],
-            onChanged: (v) => onFrequencyChanged(v!),
-          ),
-          const SizedBox(height: 8),
-          const Text('Formatos de artefacto',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          ...[
-            ('XLSX', 'Excel (.xlsx)'),
-            ('JSON', 'JSON (.json)'),
-            ('TXT', 'Texto (.txt)'),
-          ].map((f) => CheckboxListTile(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Programación automática',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Activar respaldos programados'),
+              value: enabled,
+              onChanged: onEnabledChanged,
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Frecuencia',
+                border: OutlineInputBorder(),
+              ),
+              value: frequency,
+              items: const [
+                DropdownMenuItem(value: 'DAILY', child: Text('Diaria')),
+                DropdownMenuItem(value: 'WEEKLY', child: Text('Semanal')),
+                DropdownMenuItem(value: 'MONTHLY', child: Text('Mensual')),
+              ],
+              onChanged: (v) => onFrequencyChanged(v!),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Formatos de artefacto',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            ...[
+              ('XLSX', 'Excel (.xlsx)'),
+              ('JSON', 'JSON (.json)'),
+              ('TXT', 'Texto (.txt)'),
+            ].map(
+              (f) => CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(f.$2),
                 value: formats.contains(f.$1),
                 onChanged: (_) => onFormatToggled(f.$1),
-              )),
-          if (formats.isEmpty)
-            const Text('Seleccioná al menos un formato.',
-                style: TextStyle(color: Colors.red, fontSize: 12)),
-          if (schedule != null) ...[
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text('Timezone'),
-              trailing: Text(schedule!.timezone),
+              ),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text('Próxima ejecución'),
-              trailing: Text(schedule!.nextRunAt ?? '—'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text('Última ejecución'),
-              trailing: Text(schedule!.lastRunAt ?? '—'),
+            if (formats.isEmpty)
+              const Text(
+                'Seleccioná al menos un formato.',
+                style: TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            if (schedule != null) ...[
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Timezone'),
+                trailing: Text(schedule!.timezone),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Próxima ejecución'),
+                trailing: Text(schedule!.nextRunAt ?? '—'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Última ejecución'),
+                trailing: Text(schedule!.lastRunAt ?? '—'),
+              ),
+            ],
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: formats.isEmpty || saveLoading ? null : onSave,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+                child: saveLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Guardar programación'),
+              ),
             ),
           ],
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: formats.isEmpty || saveLoading ? null : onSave,
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white),
-              child: saveLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Text('Guardar programación'),
-            ),
-          ),
-        ]),
+        ),
       ),
     );
   }
@@ -455,10 +524,10 @@ class _HistoryCard extends StatelessWidget {
   });
 
   Color _statusColor(String status) => switch (status) {
-        'SUCCEEDED' => Colors.green,
-        'FAILED' => Colors.red,
-        _ => Colors.orange,
-      };
+    'SUCCEEDED' => Colors.green,
+    'FAILED' => Colors.red,
+    _ => Colors.orange,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -469,45 +538,53 @@ class _HistoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              const Expanded(
-                  child: Text('Historial de ejecuciones',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold))),
-              IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: loading ? null : onRefresh),
-            ]),
+            const Text(
+              'Historial de ejecuciones',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
             if (loading)
               const Center(
-                  child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: CircularProgressIndicator()))
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(),
+                ),
+              )
             else if (error != null && (runs == null || runs!.data.isEmpty))
               Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text('Error: $error',
-                        style:
-                            const TextStyle(color: Colors.red, fontSize: 13),
-                        textAlign: TextAlign.center),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Error: $error',
+                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reintentar'),
-                        onPressed: onRefresh),
-                  ]))
+                    OutlinedButton(
+                      onPressed: onRefresh,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              )
             else if (runs == null || runs!.data.isEmpty)
               const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('Sin ejecuciones registradas.',
-                      style: TextStyle(color: Colors.grey)))
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Sin ejecuciones registradas.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              )
             else
-              ...runs!.data.map((run) => _RunTile(
+              ...runs!.data.map(
+                (run) => _RunTile(
                   run: run,
                   downloadingFormat: downloadingFormat,
                   onDownload: onDownload,
-                  statusColor: _statusColor(run.status))),
+                  statusColor: _statusColor(run.status),
+                ),
+              ),
           ],
         ),
       ),
@@ -520,11 +597,12 @@ class _RunTile extends StatelessWidget {
   final String? downloadingFormat;
   final void Function(BackupRun, BackupArtifact) onDownload;
   final Color statusColor;
-  const _RunTile(
-      {required this.run,
-      required this.downloadingFormat,
-      required this.onDownload,
-      required this.statusColor});
+  const _RunTile({
+    required this.run,
+    required this.downloadingFormat,
+    required this.onDownload,
+    required this.statusColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -534,62 +612,87 @@ class _RunTile extends StatelessWidget {
       color: Colors.grey.shade50,
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: statusColor)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (run.status == 'RUNNING')
-                  const SizedBox(
-                      width: 10,
-                      height: 10,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                if (run.status == 'RUNNING') const SizedBox(width: 4),
-                Text(run.status,
-                    style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              ]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: statusColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (run.status == 'RUNNING')
+                        const SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      if (run.status == 'RUNNING') const SizedBox(width: 4),
+                      Text(
+                        run.status,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${run.attempts} intento(s)',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
             ),
-            const Spacer(),
-            Text('${run.attempts} intento(s)',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ]),
-          if (run.startedAt != null) ...[
-            const SizedBox(height: 4),
-            Text(run.startedAt!,
-                style:
-                    const TextStyle(fontSize: 12, color: Colors.grey)),
+            if (run.startedAt != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                run.startedAt!,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+            if (run.lastError != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Error: ${run.lastError}',
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ],
+            if (run.artifacts.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: run.artifacts.map((a) {
+                  final isThis = downloadingFormat == a.format;
+                  return OutlinedButton.icon(
+                    onPressed: downloadingFormat != null
+                        ? null
+                        : () => onDownload(run, a),
+                    icon: isThis
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.download, size: 14),
+                    label: Text(a.format, style: const TextStyle(fontSize: 12)),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
-          if (run.lastError != null) ...[
-            const SizedBox(height: 4),
-            Text('Error: ${run.lastError}',
-                style: const TextStyle(
-                    color: Colors.red, fontSize: 12)),
-          ],
-          if (run.artifacts.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, children: run.artifacts.map((a) {
-              final isThis = downloadingFormat == a.format;
-              return OutlinedButton.icon(
-                onPressed: downloadingFormat != null ? null : () => onDownload(run, a),
-                icon: isThis
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.download, size: 14),
-                label: Text(a.format, style: const TextStyle(fontSize: 12)),
-              );
-            }).toList()),
-          ],
-        ]),
+        ),
       ),
     );
   }

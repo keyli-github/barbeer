@@ -226,7 +226,7 @@ class _SessionsContentState extends ConsumerState<_SessionsContent> {
               Text('Medidas de protección', style: AppTextStyles.titleMedium),
               SizedBox(height: 10),
               _ProtectionRow(
-                icon: Icons.autorenew_rounded,
+                icon: Icons.shield_outlined,
                 text: 'Rotación segura de sesiones',
               ),
               _ProtectionRow(

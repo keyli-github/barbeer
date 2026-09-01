@@ -172,7 +172,10 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                       child: Text(
                         'Clasifica métodos de pago, ingresos y salidas. '
                         'Las etiquetas del sistema son de solo lectura.',
-                        style: TextStyle(fontSize: 11, color: AppColors.primary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                   )
@@ -196,10 +199,9 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
                         const SizedBox(height: 8),
                         Text(_error!, style: TextStyle(color: AppColors.error)),
                         const SizedBox(height: 12),
-                        TextButton.icon(
+                        TextButton(
                           onPressed: _load,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Reintentar'),
+                          child: const Text('Reintentar'),
                         ),
                       ],
                     ),

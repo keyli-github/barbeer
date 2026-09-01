@@ -149,13 +149,8 @@ class AppErrorState extends StatelessWidget {
             ],
             if (onActionPressed != null) ...[
               SizedBox(height: AppSpacing.xl),
-              ElevatedButton.icon(
+              ElevatedButton(
                 onPressed: onActionPressed,
-                icon: Icon(Icons.refresh_rounded, size: 20),
-                label: Text(
-                  actionText!,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.black,
@@ -166,6 +161,10 @@ class AppErrorState extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMD),
                   ),
+                ),
+                child: Text(
+                  actionText!,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
               ),
             ],

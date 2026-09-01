@@ -56,6 +56,7 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final state = ref.watch(ventasListProvider(_useMis));
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Column(
       children: [
@@ -66,20 +67,30 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                   child: DSSkeletonList(count: 6),
                 )
               : state.error != null && state.ventas.isEmpty
-              ? DSErrorState(message: state.error, onRetry: _refresh)
+              ? _RefreshableHistoryState(
+                  onRefresh: _refresh,
+                  child: DSErrorState(message: state.error, onRetry: _refresh),
+                )
               : state.ventas.isEmpty
-              ? DSEmptyState(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Sin ventas',
-                  message: 'No hay ventas registradas para este estado.',
-                  actionLabel: 'Actualizar',
-                  onAction: _refresh,
+              ? _RefreshableHistoryState(
+                  onRefresh: _refresh,
+                  child: const DSEmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Sin ventas',
+                    message: 'No hay ventas registradas para este estado.',
+                  ),
                 )
               : RefreshIndicator(
                   color: AppColors.brand,
                   onRefresh: _refresh,
                   child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(15, 4, 15, 120),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(
+                      desktop ? 20 : 15,
+                      desktop ? 0 : 4,
+                      desktop ? 20 : 15,
+                      120,
+                    ),
                     itemCount:
                         state.ventas.length +
                         1 +
@@ -92,7 +103,6 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
                           loading: state.loading,
                           onCreate: widget.onCreate,
                           onRecargoControl: widget.onRecargoControl,
-                          onRefresh: _refresh,
                           onFilter: (estado) => ref
                               .read(ventasListProvider(_useMis).notifier)
                               .load(estado: estado),
@@ -136,103 +146,121 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
   }
 }
 
+class _RefreshableHistoryState extends StatelessWidget {
+  final Widget child;
+  final Future<void> Function() onRefresh;
+
+  const _RefreshableHistoryState({
+    required this.child,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    color: AppColors.brand,
+    onRefresh: onRefresh,
+    child: LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [SizedBox(height: constraints.maxHeight, child: child)],
+      ),
+    ),
+  );
+}
+
 class _FiltersBar extends StatelessWidget {
   final String? currentFilter;
   final int total;
   final bool loading;
   final VoidCallback? onCreate;
   final VoidCallback? onRecargoControl;
-  final Future<void> Function() onRefresh;
   final ValueChanged<String?> onFilter;
 
   const _FiltersBar({
     required this.currentFilter,
     required this.total,
     required this.loading,
-    required this.onRefresh,
     required this.onFilter,
     this.onCreate,
     this.onRecargoControl,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('ventas-filters'),
-    color: context.colors.background,
-    padding: const EdgeInsets.fromLTRB(15, 10, 15, 12),
-    child: Column(
-      children: [
-        DropdownButtonFormField<String>(
-          key: ValueKey(currentFilter ?? 'TODAS'),
-          initialValue: currentFilter ?? 'TODAS',
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          decoration: const InputDecoration(
-            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          ),
-          items: const [
-            DropdownMenuItem(value: 'TODAS', child: Text('Todos los estados')),
-            DropdownMenuItem(value: 'ACTIVA', child: Text('Activas')),
-            DropdownMenuItem(value: 'ANULADA', child: Text('Anuladas')),
-          ],
-          onChanged: loading
-              ? null
-              : (value) => onFilter(value == 'TODAS' ? null : value),
-        ),
-        const SizedBox(height: 9),
-        Row(
-          children: [
-            SizedBox(
-              width: 44,
-              height: 40,
-              child: OutlinedButton(
-                onPressed: loading ? null : onRefresh,
-                style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
-                child: AnimatedRotation(
-                  turns: loading ? 1 : 0,
-                  duration: const Duration(milliseconds: 350),
-                  child: const Icon(Icons.refresh_rounded, size: 18),
-                ),
+  Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
+    return Container(
+      key: const Key('ventas-filters'),
+      color: context.colors.background,
+      padding: EdgeInsets.fromLTRB(0, desktop ? 0 : 10, 0, 12),
+      child: Column(
+        children: [
+          DropdownButtonFormField<String>(
+            key: ValueKey(currentFilter ?? 'TODAS'),
+            initialValue: currentFilter ?? 'TODAS',
+            isExpanded: true,
+            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
               ),
             ),
-            const SizedBox(width: 10),
-            if (onRecargoControl != null) ...[
-              IconButton(
-                key: const Key('recargo-control-open'),
-                onPressed: onRecargoControl,
-                icon: const Icon(Icons.visibility_outlined),
+            items: const [
+              DropdownMenuItem(
+                value: 'TODAS',
+                child: Text('Todos los estados'),
               ),
-              const SizedBox(width: 4),
+              DropdownMenuItem(value: 'ACTIVA', child: Text('Activas')),
+              DropdownMenuItem(value: 'ANULADA', child: Text('Anuladas')),
             ],
-            Flexible(
-              child: Text(
-                '$total venta${total == 1 ? '' : 's'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: context.colors.textTertiary,
+            onChanged: loading
+                ? null
+                : (value) => onFilter(value == 'TODAS' ? null : value),
+          ),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              if (onRecargoControl != null) ...[
+                IconButton(
+                  key: const Key('recargo-control-open'),
+                  onPressed: onRecargoControl,
+                  icon: const Icon(Icons.visibility_outlined),
                 ),
-              ),
-            ),
-            const Spacer(),
-            if (onCreate != null)
-              SizedBox(
-                height: 40,
-                child: ElevatedButton.icon(
-                  onPressed: onCreate,
-                  icon: const Icon(Icons.shopping_cart_outlined, size: 17),
-                  label: const Text(
-                    'Nueva venta',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: Text(
+                  '$total venta${total == 1 ? '' : 's'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.colors.textTertiary,
                   ),
                 ),
               ),
-          ],
-        ),
-      ],
-    ),
-  );
+              const Spacer(),
+              if (onCreate != null)
+                SizedBox(
+                  height: desktop ? 36 : 40,
+                  child: ElevatedButton.icon(
+                    onPressed: onCreate,
+                    icon: const Icon(Icons.shopping_cart_outlined, size: 17),
+                    label: const Text(
+                      'Nueva venta',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class VentaHistoryCard extends StatefulWidget {
@@ -260,6 +288,7 @@ class _VentaCardState extends State<VentaHistoryCard> {
   Widget build(BuildContext context) {
     final venta = widget.venta;
     final date = DateTime.tryParse(venta.createdAt)?.toLocal();
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
@@ -273,23 +302,36 @@ class _VentaCardState extends State<VentaHistoryCard> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: desktop ? 16 : 14,
+                vertical: 12,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Row 1: code + total + anular + chevron  (exact web layout)
+                  // Row 1: code + payment state + total + actions.
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          venta.codigo,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: context.colors.textPrimary,
-                          ),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                venta.codigo,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: context.colors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (desktop) ...[
+                              const SizedBox(width: 8),
+                              _PaymentBadge(venta: venta),
+                            ],
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -318,6 +360,7 @@ class _VentaCardState extends State<VentaHistoryCard> {
                             ? Icons.keyboard_arrow_up_rounded
                             : Icons.keyboard_arrow_down_rounded,
                         color: context.colors.textTertiary,
+                        active: expanded,
                         onTap: () {
                           HapticFeedback.selectionClick();
                           setState(() => expanded = !expanded);
@@ -383,112 +426,275 @@ class _VentaCardState extends State<VentaHistoryCard> {
   }
 }
 
+class _PaymentBadge extends StatelessWidget {
+  final Venta venta;
+
+  const _PaymentBadge({required this.venta});
+
+  @override
+  Widget build(BuildContext context) {
+    final payment = venta.conciliacion;
+    final (label, color) = venta.isAnulada
+        ? ('Anulada', AppColors.error)
+        : payment == null
+        ? ('Sin clasificar', context.colors.textTertiary)
+        : payment.estado == EstadoConciliacion.efectivo
+        ? ('Efectivo', AppColors.success)
+        : payment.estado == EstadoConciliacion.billetera
+        ? (payment.etiquetaNombre ?? 'Billetera', AppColors.success)
+        : ('Pendiente', AppColors.warning);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: .35)),
+      ),
+      child: Text(
+        '✓  $label',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
 class _ExpandedSale extends StatelessWidget {
   final Venta venta;
 
   const _ExpandedSale({required this.venta});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-    decoration: BoxDecoration(
-      border: Border(top: BorderSide(color: context.colors.border)),
-    ),
-    child: Column(
-      children: [
-        for (final item in venta.items)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
+  Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        desktop ? 16 : 14,
+        12,
+        desktop ? 16 : 14,
+        14,
+      ),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.colors.border)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (desktop) ...[
+            const _DesktopSaleRow(
+              header: true,
+              product: 'Producto',
+              quantity: 'Cant.',
+              unitPrice: 'P.Unit',
+              subtotal: 'Subtotal',
+            ),
+            Divider(height: 1, color: context.colors.borderLight),
+          ],
+          for (final item in venta.items)
+            desktop
+                ? _DesktopSaleRow(
+                    product: item.productoNombre ?? item.productoId,
+                    quantity: '${item.cantidad}',
+                    unitPrice: FormatUtils.currency(item.precioUnitario),
+                    subtotal: FormatUtils.currency(item.subtotal),
+                  )
+                : _MobileSaleRow(item: item),
+          if (desktop) ...[
+            Divider(height: 1, color: context.colors.borderLight),
+            const SizedBox(height: 12),
+            Row(
               children: [
                 Expanded(
-                  child: Text(
-                    item.productoNombre ?? item.productoId,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.colors.textPrimary,
-                    ),
+                  child: _SaleMetadata(
+                    label: 'REGISTRADO POR',
+                    value: venta.registradaPorUsername ?? 'No disponible',
                   ),
                 ),
-                Flexible(
-                  child: Text(
-                    '${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: context.colors.textTertiary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      FormatUtils.currency(item.subtotal),
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: context.colors.textPrimary,
-                      ),
-                    ),
+                Expanded(
+                  child: _SaleMetadata(
+                    label: 'VENDIDO POR (VENDEDORA)',
+                    value: venta.vendedoraUsername ?? 'No disponible',
                   ),
                 ),
               ],
             ),
-          ),
-        if (venta.registradaPorUsername != null)
-          _PaymentLine('Registrado por: ${venta.registradaPorUsername}'),
-        for (final payment
-            in venta.conciliaciones.isNotEmpty
-                ? venta.conciliaciones
-                : [if (venta.conciliacion != null) venta.conciliacion!]) ...[
-          _PaymentLine(
-            payment.estado == EstadoConciliacion.pendiente
-                ? payment.metodoPagoPendiente == 'BILLETERA'
-                      ? 'Pendiente · Transferencia'
-                      : 'Pendiente · Efectivo'
-                : estadoConciliacionLabel(payment.estado),
-          ),
-          if (payment.monto != null)
-            _PaymentLine('Monto: ${FormatUtils.currency(payment.monto!)}'),
-          if (payment.comprobante != null)
-            _PaymentLine('Comprobante: ${payment.comprobante}'),
-          if (payment.pagoRestoEfectivo)
-            const _PaymentLine('Resto en efectivo'),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: context.colors.borderLight),
+            const SizedBox(height: 12),
+            Text(
+              'MÉTODOS DE PAGO Y COMPROBANTES',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: .8,
+                color: context.colors.textTertiary,
+              ),
+            ),
+          ] else if (venta.registradaPorUsername != null)
+            _PaymentLine('Registrado por: ${venta.registradaPorUsername}'),
+          for (final payment
+              in venta.conciliaciones.isNotEmpty
+                  ? venta.conciliaciones
+                  : [if (venta.conciliacion != null) venta.conciliacion!]) ...[
+            _PaymentLine(
+              payment.estado == EstadoConciliacion.pendiente
+                  ? payment.metodoPagoPendiente == 'BILLETERA'
+                        ? 'Pendiente · Transferencia'
+                        : 'Pendiente · Efectivo'
+                  : estadoConciliacionLabel(payment.estado),
+            ),
+            if (payment.monto != null)
+              _PaymentLine('Monto: ${FormatUtils.currency(payment.monto!)}'),
+            if (payment.comprobante != null)
+              _PaymentLine('Comprobante: ${payment.comprobante}'),
+            if (payment.pagoRestoEfectivo)
+              const _PaymentLine('Resto en efectivo'),
+          ],
+          if (venta.cuentaNombre != null && venta.cuentaMonto != null)
+            _PaymentLine(
+              'Cuenta: ${venta.cuentaNombre} · ${FormatUtils.currency(venta.cuentaMonto!)}',
+            ),
+          if (venta.conciliacion?.etiquetaNombre != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Billetera: ${venta.conciliacion!.etiquetaNombre}',
+                  style: const TextStyle(fontSize: 11, color: AppColors.info),
+                ),
+              ),
+            ),
+          if (venta.motivoAnulacion != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Anulación: ${venta.motivoAnulacion}',
+                  style: const TextStyle(fontSize: 11, color: AppColors.error),
+                ),
+              ),
+            ),
         ],
-        if (venta.cuentaNombre != null && venta.cuentaMonto != null)
-          _PaymentLine(
-            'Cuenta: ${venta.cuentaNombre} · ${FormatUtils.currency(venta.cuentaMonto!)}',
-          ),
-        if (venta.conciliacion?.etiquetaNombre != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Billetera: ${venta.conciliacion!.etiquetaNombre}',
-                style: const TextStyle(fontSize: 11, color: AppColors.info),
+      ),
+    );
+  }
+}
+
+class _DesktopSaleRow extends StatelessWidget {
+  final bool header;
+  final String product;
+  final String quantity;
+  final String unitPrice;
+  final String subtotal;
+
+  const _DesktopSaleRow({
+    this.header = false,
+    required this.product,
+    required this.quantity,
+    required this.unitPrice,
+    required this.subtotal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontSize: header ? 10 : 11,
+      fontWeight: header ? FontWeight.w600 : FontWeight.w500,
+      color: header ? context.colors.textTertiary : context.colors.textPrimary,
+    );
+    return SizedBox(
+      height: 36,
+      child: Row(
+        children: [
+          Expanded(flex: 3, child: Text(product, style: style)),
+          Expanded(child: Text(quantity, style: style)),
+          Expanded(child: Text(unitPrice, style: style)),
+          Expanded(
+            child: Text(
+              subtotal,
+              style: style.copyWith(
+                fontWeight: header ? FontWeight.w600 : FontWeight.w700,
               ),
             ),
           ),
-        if (venta.motivoAnulacion != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Anulación: ${venta.motivoAnulacion}',
-                style: const TextStyle(fontSize: 11, color: AppColors.error),
-              ),
-            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileSaleRow extends StatelessWidget {
+  final VentaItem item;
+
+  const _MobileSaleRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            item.productoNombre ?? item.productoId,
+            style: TextStyle(fontSize: 12, color: context.colors.textPrimary),
           ),
+        ),
+        Flexible(
+          child: Text(
+            '${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: context.colors.textTertiary),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          FormatUtils.currency(item.subtotal),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: context.colors.textPrimary,
+          ),
+        ),
       ],
     ),
+  );
+}
+
+class _SaleMetadata extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SaleMetadata({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          letterSpacing: .7,
+          color: context.colors.textTertiary,
+        ),
+      ),
+      const SizedBox(height: 5),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: context.colors.textPrimary,
+        ),
+      ),
+    ],
   );
 }
 
@@ -556,11 +762,13 @@ class _SquareAction extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final bool active;
 
   const _SquareAction({
     required this.icon,
     required this.color,
     required this.onTap,
+    this.active = false,
   });
 
   @override
@@ -572,7 +780,9 @@ class _SquareAction extends StatelessWidget {
       height: 38,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: active ? AppColors.primary : color.withValues(alpha: 0.35),
+        ),
       ),
       child: Icon(icon, size: 17, color: color),
     ),

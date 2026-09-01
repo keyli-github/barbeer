@@ -282,11 +282,10 @@ class DSErrorState extends StatelessWidget {
             ],
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.lg),
-              TextButton.icon(
+              TextButton(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Reintentar'),
                 style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                child: const Text('Reintentar'),
               ),
             ],
           ],

@@ -38,18 +38,18 @@ class BackupSchedule {
 
 class BackupArtifact {
   final String format;
-  final int sizeBytes;
+  final int bytes;
   final String? sha256;
 
   const BackupArtifact({
     required this.format,
-    required this.sizeBytes,
+    required this.bytes,
     this.sha256,
   });
 
   factory BackupArtifact.fromJson(Json j) => BackupArtifact(
         format: j['format'] as String,
-        sizeBytes: j['sizeBytes'] as int? ?? 0,
+        bytes: j['bytes'] as int? ?? 0,
         sha256: j['sha256'] as String?,
       );
 }
@@ -61,7 +61,7 @@ class BackupRun {
   final String? startedAt;
   final String? completedAt;
   final String? lastError;
-  final int totalArtifacts;
+  final int? totalBytes;
   final List<BackupArtifact> artifacts;
 
   const BackupRun({
@@ -71,7 +71,7 @@ class BackupRun {
     this.startedAt,
     this.completedAt,
     this.lastError,
-    required this.totalArtifacts,
+    this.totalBytes,
     required this.artifacts,
   });
 
@@ -82,7 +82,7 @@ class BackupRun {
         startedAt: j['startedAt'] as String?,
         completedAt: j['completedAt'] as String?,
         lastError: j['lastError'] as String?,
-        totalArtifacts: j['totalArtifacts'] as int? ?? 0,
+        totalBytes: j['totalBytes'] as int?,
         artifacts: (j['artifacts'] as List? ?? [])
             .map((e) => BackupArtifact.fromJson(e as Json))
             .toList(),

@@ -59,9 +59,9 @@ void main() {
         'startedAt': '2026-08-31T03:00:00Z',
         'completedAt': '2026-08-31T03:02:00Z',
         'lastError': null,
-        'totalArtifacts': 1,
+        'totalBytes': 2048,
         'artifacts': [
-          {'format': 'XLSX', 'sizeBytes': 2048, 'sha256': 'abc123'},
+          {'format': 'XLSX', 'bytes': 2048, 'sha256': 'abc123'},
         ],
       };
       final r = BackupRun.fromJson(j);
@@ -69,6 +69,8 @@ void main() {
       expect(r.status, 'SUCCEEDED');
       expect(r.artifacts.length, 1);
       expect(r.artifacts.first.format, 'XLSX');
+      expect(r.artifacts.first.bytes, 2048);
+      expect(r.totalBytes, 2048);
       expect(r.artifacts.first.sha256, 'abc123');
     });
 
@@ -80,7 +82,7 @@ void main() {
         'startedAt': '2026-08-30T03:00:00Z',
         'completedAt': '2026-08-30T03:01:00Z',
         'lastError': 'Storage unavailable',
-        'totalArtifacts': 0,
+        'totalBytes': null,
         'artifacts': [],
       };
       final r = BackupRun.fromJson(j);
@@ -94,7 +96,7 @@ void main() {
         'data': [
           {'id': 'run-1', 'status': 'SUCCEEDED', 'attempts': 1,
            'startedAt': 's', 'completedAt': 'c', 'lastError': null,
-           'totalArtifacts': 0, 'artifacts': []},
+           'totalBytes': 0, 'artifacts': []},
         ],
         'total': 1, 'page': 1, 'limit': 20, 'totalPages': 1,
       });
@@ -151,28 +153,28 @@ void main() {
     });
 
     test('downloadArtifact returns BackupDownloadResult with metadata', () async {
-      final fakeBytes = Uint8List.fromList([1, 2, 3, 4]);
-      final repo = RespaldosRepository(
-        null,
-        bytesRequest: (path) async => fakeBytes,
-      );
-      // sha256 of [1,2,3,4] is well-known; pass wrong hash → should throw
-      expect(
-        () => repo.downloadArtifact('run-1', 'XLSX', expectedSha256: 'wrong'),
-        throwsA(isA<BackupIntegrityException>()),
-      );
+        final fakeBytes = Uint8List.fromList([1, 2, 3, 4]);
+        final repo = RespaldosRepository(
+          null,
+          bytesRequest: (path) async => fakeBytes,
+        );
+        // sha256 of [1,2,3,4] is well-known; pass wrong hash → should throw
+        expect(
+          () => repo.downloadArtifact('run-1', 'XLSX', expectedSha256: 'wrong'),
+          throwsA(isA<BackupIntegrityException>()),
+        );
     });
 
     test('downloadArtifact returns result with filename and contentType', () async {
-      final fakeBytes = Uint8List.fromList([1, 2, 3]);
-      final repo = RespaldosRepository(
-        null,
-        bytesRequest: (path) async => fakeBytes,
-      );
-      final result = await repo.downloadArtifact('run-1', 'JSON');
-      expect(result.bytes, fakeBytes);
-      expect(result.filename, contains('run-1'));
-      expect(result.contentType, 'application/json');
+        final fakeBytes = Uint8List.fromList([1, 2, 3]);
+        final repo = RespaldosRepository(
+          null,
+          bytesRequest: (path) async => fakeBytes,
+        );
+        final result = await repo.downloadArtifact('run-1', 'JSON');
+        expect(result.bytes, fakeBytes);
+        expect(result.filename, contains('run-1'));
+        expect(result.contentType, 'application/json');
     });
 
     test('downloadArtifact xlsx gets correct MIME in result', () async {
