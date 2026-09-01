@@ -10,9 +10,12 @@ class Producto {
   final String id, codigo, nombre, categoriaId, unidad;
   final String categoria;
   final String? descripcion, presentacion, imagenUrl;
-  final double precioVenta, precioCosto;
+  final double precioVenta;
+  /// null cuando el backend omite el campo (usuario sin productos:ver-utilidad).
+  final double? precioCosto;
   final bool disponiblePos, activo;
-  final double margin;
+  /// null cuando el backend omite el campo (usuario sin productos:ver-utilidad).
+  final double? margin;
   final int? stockDisponible;
 
   const Producto({
@@ -26,10 +29,10 @@ class Producto {
     this.presentacion,
     this.imagenUrl,
     required this.precioVenta,
-    required this.precioCosto,
+    this.precioCosto,
     required this.disponiblePos,
     required this.activo,
-    required this.margin,
+    this.margin,
     this.stockDisponible,
   });
 
@@ -47,10 +50,15 @@ class Producto {
     presentacion: j['presentacion'] as String?,
     imagenUrl: j['imagenUrl'] as String?,
     precioVenta: (j['precioVenta'] as num?)?.toDouble() ?? 0,
-    precioCosto: (j['precioCosto'] as num?)?.toDouble() ?? 0,
+    // null cuando el backend omite el campo (sin permiso ver-utilidad)
+    precioCosto: j.containsKey('precioCosto')
+        ? (j['precioCosto'] as num?)?.toDouble() ?? 0.0
+        : null,
     disponiblePos: j['disponiblePos'] as bool? ?? false,
     activo: j['activo'] as bool? ?? true,
-    margin: (j['margin'] as num?)?.toDouble() ?? 0,
+    margin: j.containsKey('margin')
+        ? (j['margin'] as num?)?.toDouble() ?? 0.0
+        : null,
     stockDisponible: (j['stockDisponible'] as num?)?.toInt(),
   );
 
@@ -141,8 +149,6 @@ class ProductosRepository {
     required double precioCosto,
     String? descripcion,
     String? imagenUrl,
-    bool disponiblePos = false,
-    bool activo = true,
   }) async {
     final r = await _api.post(
       '/productos',
@@ -154,8 +160,9 @@ class ProductosRepository {
         if (descripcion?.trim().isNotEmpty ?? false)
           'descripcion': descripcion!.trim(),
         if (imagenUrl case final imagenUrl?) 'imagenUrl': imagenUrl.trim(),
-        'disponiblePos': disponiblePos,
-        'activo': activo,
+        // disponiblePos y activo NO se envían al crear:
+        // el backend los rechaza (no están en CreateProductoDto).
+        // Usá PATCH /productos/:id para cambiarlos después.
       },
     );
     return Producto.fromJson(Map<String, dynamic>.from(r.data as Map));

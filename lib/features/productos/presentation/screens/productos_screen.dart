@@ -324,69 +324,74 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                 ),
               ),
             ] else ...[
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  desktop ? 24 : AppSpacing.md,
-                  desktop ? 6 : AppSpacing.md,
-                  desktop ? 24 : AppSpacing.md,
-                  AppSpacing.md,
-                ),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: desktop
-                        ? (MediaQuery.sizeOf(context).width >= 1280 ? 5 : 4)
-                        : ((MediaQuery.sizeOf(context).width -
-                                      2 * AppSpacing.md) /
-                                  180)
-                              .floor()
-                              .clamp(1, 6),
-                    childAspectRatio: desktop ? 0.64 : 0.56,
-                    crossAxisSpacing: desktop ? 12 : AppSpacing.sm,
-                    mainAxisSpacing: desktop ? 12 : AppSpacing.sm,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _ProductCard(
-                      product: state.items[i],
-                      canEdit: canEdit,
-                      canDelete: canDelete,
-                      desktop: desktop,
-                      canAdjustStock: canAdjustStock,
-                      onOpen: () =>
-                          _showProductDetail(context, ref, state.items[i]),
-                      onEdit: () => _showForm(context, ref, state.items[i]),
-                      onToggleActivo: () =>
-                          notifier.toggleActivo(state.items[i]),
-                      onTogglePos: () => notifier.togglePos(state.items[i]),
-                      onIngreso: () => _showStockAdjustment(
-                        context,
-                        ref,
-                        state.items[i],
-                        'ENTRADA',
-                      ),
-                      onSalida: () => _showStockAdjustment(
-                        context,
-                        ref,
-                        state.items[i],
-                        'SALIDA',
-                      ),
-                      onDelete: () async {
-                        final ok = await ConfirmationDialog.show(
-                          context: context,
-                          title: 'Dar de baja producto',
-                          message:
-                              '¿Dar de baja "${state.items[i].nombre}"? Podrás reactivarlo después.',
-                          confirmText: 'Dar de baja',
-                          isDestructive: true,
-                          icon: Icons.delete_outline,
-                        );
-                        if (ok) {
-                          await notifier.delete(state.items[i].id);
-                        }
-                      },
+              SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  final gap = desktop ? 12.0 : AppSpacing.sm;
+                  final minCardWidth = desktop ? 210.0 : 180.0;
+                  final columns =
+                      ((constraints.crossAxisExtent + gap) /
+                              (minCardWidth + gap))
+                          .floor()
+                          .clamp(1, desktop ? 5 : 3);
+                  return SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      desktop ? 24 : AppSpacing.md,
+                      desktop ? 6 : AppSpacing.md,
+                      desktop ? 24 : AppSpacing.md,
+                      AppSpacing.md,
                     ),
-                    childCount: state.items.length,
-                  ),
-                ),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        childAspectRatio: desktop ? 0.64 : 0.56,
+                        crossAxisSpacing: gap,
+                        mainAxisSpacing: gap,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => _ProductCard(
+                          product: state.items[i],
+                          canEdit: canEdit,
+                          canDelete: canDelete,
+                          desktop: desktop,
+                          canAdjustStock: canAdjustStock,
+                          onOpen: () =>
+                              _showProductDetail(context, ref, state.items[i]),
+                          onEdit: () => _showForm(context, ref, state.items[i]),
+                          onToggleActivo: () =>
+                              notifier.toggleActivo(state.items[i]),
+                          onTogglePos: () => notifier.togglePos(state.items[i]),
+                          onIngreso: () => _showStockAdjustment(
+                            context,
+                            ref,
+                            state.items[i],
+                            'ENTRADA',
+                          ),
+                          onSalida: () => _showStockAdjustment(
+                            context,
+                            ref,
+                            state.items[i],
+                            'SALIDA',
+                          ),
+                          onDelete: () async {
+                            final ok = await ConfirmationDialog.show(
+                              context: context,
+                              title: 'Dar de baja producto',
+                              message:
+                                  '¿Dar de baja "${state.items[i].nombre}"? Podrás reactivarlo después.',
+                              confirmText: 'Dar de baja',
+                              isDestructive: true,
+                              icon: Icons.delete_outline,
+                            );
+                            if (ok) {
+                              await notifier.delete(state.items[i].id);
+                            }
+                          },
+                        ),
+                        childCount: state.items.length,
+                      ),
+                    ),
+                  );
+                },
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -846,7 +851,8 @@ class _ProductsTable extends StatelessWidget {
     required this.onDelete,
   });
 
-  Color _marginColor(double margin) {
+  Color _marginColor(double? margin) {
+    if (margin == null) return AppColors.brand; // sin datos de utilidad
     if (margin >= 40) return AppColors.success;
     if (margin >= 20) return AppColors.brand;
     return AppColors.error;
@@ -968,7 +974,9 @@ class _ProductsTable extends StatelessWidget {
                         // Costo
                         DataCell(
                           Text(
-                            FormatUtils.currency(p.precioCosto),
+                            p.precioCosto != null
+                                ? FormatUtils.currency(p.precioCosto!)
+                                : '—',
                             style: TextStyle(
                               fontSize: 13,
                               color: context.colors.textSecondary,
@@ -978,7 +986,9 @@ class _ProductsTable extends StatelessWidget {
                         // Margen
                         DataCell(
                           Text(
-                            '${p.margin.toStringAsFixed(0)}%',
+                            p.margin != null
+                                ? '${p.margin!.toStringAsFixed(0)}%'
+                                : '—',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 13,
@@ -1272,9 +1282,9 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final marginColor = product.margin >= 40
+    final marginColor = (product.margin ?? -1) >= 40
         ? AppColors.success
-        : product.margin >= 20
+        : (product.margin ?? -1) >= 20
         ? AppColors.warning
         : AppColors.error;
 
@@ -1423,7 +1433,9 @@ class _ProductCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${product.margin.toStringAsFixed(0)}%',
+                          product.margin != null
+                              ? '${product.margin!.toStringAsFixed(0)}%'
+                              : '—',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
@@ -1749,9 +1761,9 @@ class _ProductDetailScreenState extends ConsumerState<_ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final product = _product;
-    final marginColor = product.margin >= 40
+    final marginColor = (product.margin ?? -1) >= 40
         ? AppColors.success
-        : product.margin >= 20
+        : (product.margin ?? -1) >= 20
         ? AppColors.warning
         : AppColors.error;
 
@@ -1893,7 +1905,9 @@ class _ProductDetailScreenState extends ConsumerState<_ProductDetailScreen> {
                         ),
                       ),
                       Text(
-                        'Margen: ${product.margin.toStringAsFixed(1)}%',
+                        product.margin != null
+                            ? 'Margen: ${product.margin!.toStringAsFixed(1)}%'
+                            : 'Margen: —',
                         style: TextStyle(
                           fontSize: 12,
                           color: marginColor,
@@ -2001,7 +2015,9 @@ class _ProductDetailScreenState extends ConsumerState<_ProductDetailScreen> {
                 _InfoRow('Presentación', product.presentacion!),
               _InfoRow(
                 'Costo unitario',
-                'S/ ${product.precioCosto.toStringAsFixed(2)}',
+                product.precioCosto != null
+                    ? 'S/ ${product.precioCosto!.toStringAsFixed(2)}'
+                    : '—',
               ),
               _InfoRow(
                 'Stock disponible',
@@ -2151,7 +2167,7 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
       _nombreCtrl.text = p.nombre;
       _descCtrl.text = p.descripcion ?? '';
       _ventaCtrl.text = p.precioVenta.toString();
-      _costoCtrl.text = p.precioCosto.toString();
+      _costoCtrl.text = (p.precioCosto ?? 0).toString();
       _categoriaId = p.categoriaId;
       _posEnabled = p.disponiblePos;
       _activo = p.activo;
@@ -2202,8 +2218,6 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
             descripcion: _descCtrl.text.trim().isEmpty
                 ? null
                 : _descCtrl.text.trim(),
-            disponiblePos: _posEnabled,
-            activo: _activo,
           ),
           uploadImage: (id) async {
             if (_imageBytes == null) return;
@@ -2214,6 +2228,15 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
             );
           },
         );
+        // El backend crea con activo=false y disponiblePos=false por defecto.
+        // Si el formulario tiene valores distintos, se corrige con un PATCH.
+        final id = _creationSession.createdId;
+        if (id != null && (_activo != false || _posEnabled != false)) {
+          await widget.repo.update(id, {
+            if (_activo != false) 'activo': _activo,
+            if (_posEnabled != false) 'disponiblePos': _posEnabled,
+          });
+        }
       } else {
         await widget.repo.update(widget.product!.id, {
           'nombre': nombre,
