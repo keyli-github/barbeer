@@ -108,6 +108,9 @@ Map<String, dynamic> buildCompraCreateData({
     'proveedorId': normalizedProveedorId,
     'sedeId': normalizedSedeId,
     'items': items.map((item) => item.toJson()).toList(),
+    // PENDIENTE evita que el backend actualice stock y Kardex de inmediato.
+    // El usuario debe cambiar explícitamente a RECIBIDA cuando el pedido llegue.
+    'estado': 'PENDIENTE',
     if (eta?.trim().isNotEmpty ?? false) 'eta': eta!.trim(),
     if (notas?.trim().isNotEmpty ?? false) 'notas': notas!.trim(),
   };

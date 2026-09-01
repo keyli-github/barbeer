@@ -291,9 +291,19 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
     final auth = ref.watch(authProvider);
     final canCreate = auth.hasPermission('compras:crear');
     final canEdit = auth.hasPermission('compras:editar');
+    // Permisos de proveedores alineados con el backend
+    final canLeerProveedores = auth.hasPermission('proveedores:leer');
+    final canCrearProveedor = auth.hasPermission('proveedores:crear');
+    final canEditarProveedor = auth.hasPermission('proveedores:editar');
 
     if (usesComprasDesktopLayout(MediaQuery.sizeOf(context).width)) {
-      return _buildDesktop(context, canCreate: canCreate, canEdit: canEdit);
+      return _buildDesktop(
+        context,
+        canCreate: canCreate,
+        canEdit: canEdit,
+        canCrearProveedor: canCrearProveedor,
+        canEditarProveedor: canEditarProveedor,
+      );
     }
 
     return Scaffold(
@@ -323,8 +333,10 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
                   onDetail: (id) => _showDetalle(context, id),
                 ),
                 _ProvsTab(
-                  canEdit: canEdit,
-                  onEdit: (p) => _showEditProveedor(context, p),
+                  canEdit: canEditarProveedor,
+                  onEdit: canLeerProveedores
+                      ? (p) => _showEditProveedor(context, p)
+                      : null,
                 ),
               ],
             ),
@@ -332,20 +344,22 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
         ],
       ),
       // FAB dinámico según tab activo
-      floatingActionButton: canCreate
-          ? ListenableBuilder(
-              listenable: _tabs,
-              builder: (_, _) => FloatingActionButton(
-                heroTag: 'compras_fab',
-                backgroundColor: AppColors.brand,
-                foregroundColor: Colors.white,
-                onPressed: _tabs.index == 0
-                    ? () => _showNuevaOrden(context)
-                    : () => _showNuevoProveedor(context),
-                child: const Icon(Icons.add_rounded),
-              ),
-            )
-          : null,
+      floatingActionButton: ListenableBuilder(
+        listenable: _tabs,
+        builder: (_, _) {
+          final showFab = _tabs.index == 0 ? canCreate : canCrearProveedor;
+          if (!showFab) return const SizedBox.shrink();
+          return FloatingActionButton(
+            heroTag: 'compras_fab',
+            backgroundColor: AppColors.brand,
+            foregroundColor: Colors.white,
+            onPressed: _tabs.index == 0
+                ? () => _showNuevaOrden(context)
+                : () => _showNuevoProveedor(context),
+            child: const Icon(Icons.add_rounded),
+          );
+        },
+      ),
     );
   }
 
@@ -353,6 +367,8 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
     BuildContext context, {
     required bool canCreate,
     required bool canEdit,
+    required bool canCrearProveedor,
+    required bool canEditarProveedor,
   }) {
     final sections = <_DesktopComprasSection>[
       if (canCreate) _DesktopComprasSection.nueva,
@@ -387,9 +403,11 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
       case _DesktopComprasSection.proveedores:
         content = _ProvsTab(
           desktop: true,
-          canCreate: canCreate,
-          canEdit: canEdit,
-          onCreate: () => _showNuevoProveedor(context),
+          canCreate: canCrearProveedor,
+          canEdit: canEditarProveedor,
+          onCreate: canCrearProveedor
+              ? () => _showNuevoProveedor(context)
+              : null,
           onEdit: (p) => _showEditProveedor(context, p),
         );
     }
@@ -644,7 +662,7 @@ class _DesktopProveedoresView extends StatelessWidget {
   final bool canCreate;
   final bool canEdit;
   final VoidCallback? onCreate;
-  final ValueChanged<Proveedor> onEdit;
+  final ValueChanged<Proveedor>? onEdit;
   final ValueChanged<String> onSearch;
   final ValueChanged<String> onActivo;
   final Future<void> Function() onRefresh;
@@ -716,8 +734,8 @@ class _DesktopProveedoresView extends StatelessWidget {
           for (final provider in state.items)
             _ProvTile(
               prov: provider,
-              canEdit: canEdit,
-              onEdit: () => onEdit(provider),
+              canEdit: canEdit && onEdit != null,
+              onEdit: () => onEdit?.call(provider),
             ),
           AppPagination(
             page: state.page,
@@ -777,7 +795,7 @@ class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
       color: AppColors.primary,
       onRefresh: () => notifier.load(),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           // ─── Search field (matches web) ───────────────────
           Padding(
@@ -1042,10 +1060,10 @@ class _ProvsTab extends ConsumerWidget {
   final bool canCreate;
   final bool desktop;
   final VoidCallback? onCreate;
-  final ValueChanged<Proveedor> onEdit;
+  final ValueChanged<Proveedor>? onEdit;
   const _ProvsTab({
     required this.canEdit,
-    required this.onEdit,
+    this.onEdit,
     this.canCreate = false,
     this.desktop = false,
     this.onCreate,
@@ -1074,7 +1092,7 @@ class _ProvsTab extends ConsumerWidget {
       color: AppColors.primary,
       onRefresh: () => notifier.load(),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           LayoutBuilder(
             builder: (_, constraints) {
@@ -1128,8 +1146,8 @@ class _ProvsTab extends ConsumerWidget {
             for (final prov in state.items)
               _ProvTile(
                 prov: prov,
-                canEdit: canEdit,
-                onEdit: () => onEdit(prov),
+                canEdit: canEdit && onEdit != null,
+                onEdit: () => onEdit?.call(prov),
               ),
             AppPagination(
               page: state.page,
@@ -1948,7 +1966,7 @@ class _CompraDraftLine {
   _CompraDraftLine(this.producto)
     : cantidad = TextEditingController(text: '1'),
       costoUnit = TextEditingController(
-        text: producto.precioCosto.toStringAsFixed(2),
+        text: (producto.precioCosto ?? 0).toStringAsFixed(2),
       ),
       precioVenta = TextEditingController(
         text: producto.precioVenta.toStringAsFixed(2),
