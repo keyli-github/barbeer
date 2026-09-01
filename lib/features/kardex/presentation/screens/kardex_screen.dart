@@ -156,6 +156,10 @@ class KardexScreen extends ConsumerWidget {
     final state = ref.watch(_kardexProvider);
     final notifier = ref.read(_kardexProvider.notifier);
 
+    if (MediaQuery.sizeOf(context).width >= 1024) {
+      return _buildDesktop(context, state, notifier);
+    }
+
     return Scaffold(
       backgroundColor: context.colors.background,
       body: RefreshIndicator(
@@ -204,6 +208,363 @@ class KardexScreen extends ConsumerWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDesktop(
+    BuildContext context,
+    _KardexState state,
+    _KardexNotifier notifier,
+  ) => Scaffold(
+    backgroundColor: context.colors.background,
+    body: RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: notifier.load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 36),
+        children: [
+          Text(
+            'Kardex de Inventario',
+            style: TextStyle(
+              color: context.colors.textPrimary,
+              fontSize: 27,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'Historial de movimientos de stock',
+            style: TextStyle(color: context.colors.textTertiary, fontSize: 14),
+          ),
+          if (state.resumen != null && !state.loading) ...[
+            const SizedBox(height: 20),
+            _DesktopKardexMetrics(resumen: state.resumen!),
+          ],
+          const SizedBox(height: 20),
+          _DesktopKardexFilters(
+            tipo: state.tipoFilter,
+            desde: state.desde,
+            hasta: state.hasta,
+            onSearch: notifier.setSearch,
+            onTipo: notifier.setTipo,
+            onDesde: notifier.setDesde,
+            onHasta: notifier.setHasta,
+          ),
+          const SizedBox(height: 20),
+          _DesktopKardexTable(
+            state: state,
+            onRetry: notifier.load,
+            onPage: notifier.setPage,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _DesktopKardexMetrics extends StatelessWidget {
+  final KardexResumen resumen;
+  const _DesktopKardexMetrics({required this.resumen});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      _DesktopKardexMetric(
+        'Total movimientos',
+        '${resumen.totalMovimientos}',
+        context.colors.textPrimary,
+      ),
+      _DesktopKardexMetric(
+        'Entradas',
+        '${resumen.entradas}',
+        AppColors.success,
+      ),
+      _DesktopKardexMetric('Salidas', '${resumen.salidas}', AppColors.error),
+      _DesktopKardexMetric(
+        'Valor total',
+        'S/ ${resumen.valorTotal.toStringAsFixed(2)}',
+        AppColors.primary,
+      ),
+    ],
+  );
+}
+
+class _DesktopKardexMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _DesktopKardexMetric(this.label, this.value, this.color);
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      height: 92,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: context.colors.textTertiary,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .8,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _DesktopKardexFilters extends StatefulWidget {
+  final String tipo;
+  final String? desde;
+  final String? hasta;
+  final ValueChanged<String> onSearch;
+  final ValueChanged<String> onTipo;
+  final ValueChanged<String?> onDesde;
+  final ValueChanged<String?> onHasta;
+
+  const _DesktopKardexFilters({
+    required this.tipo,
+    required this.desde,
+    required this.hasta,
+    required this.onSearch,
+    required this.onTipo,
+    required this.onDesde,
+    required this.onHasta,
+  });
+
+  @override
+  State<_DesktopKardexFilters> createState() => _DesktopKardexFiltersState();
+}
+
+class _DesktopKardexFiltersState extends State<_DesktopKardexFilters> {
+  Future<void> _pick(bool from) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+    final value =
+        '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    from ? widget.onDesde(value) : widget.onHasta(value);
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      SizedBox(
+        width: 370,
+        child: TextField(
+          onChanged: widget.onSearch,
+          decoration: const InputDecoration(
+            hintText: 'Buscar producto, código o referencia...',
+            prefixIcon: Icon(Icons.search_rounded),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final type in const [
+                ('', 'Todos'),
+                ('ENTRADA', 'Entrada'),
+                ('SALIDA', 'Salida'),
+                ('AJUSTE', 'Ajuste'),
+                ('TRASLADO', 'Traslado'),
+                ('SALIDA_VENTA', 'Venta'),
+                ('ENTRADA_ANULACION', 'Anulación'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(type.$2),
+                    selected: widget.tipo == type.$1,
+                    showCheckmark: false,
+                    selectedColor: AppColors.primary,
+                    onSelected: (_) => widget.onTipo(type.$1),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      OutlinedButton.icon(
+        onPressed: () => _pick(true),
+        icon: const Icon(Icons.calendar_today_outlined, size: 15),
+        label: Text(widget.desde == null ? 'Desde' : widget.desde!),
+      ),
+      const SizedBox(width: 8),
+      OutlinedButton.icon(
+        onPressed: () => _pick(false),
+        icon: const Icon(Icons.calendar_today_outlined, size: 15),
+        label: Text(widget.hasta == null ? 'Hasta' : widget.hasta!),
+      ),
+    ],
+  );
+}
+
+class _DesktopKardexTable extends StatelessWidget {
+  final _KardexState state;
+  final Future<void> Function() onRetry;
+  final ValueChanged<int> onPage;
+
+  const _DesktopKardexTable({
+    required this.state,
+    required this.onRetry,
+    required this.onPage,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.colors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        const _DesktopKardexRow.header(),
+        if (state.loading)
+          const SizedBox(
+            height: 180,
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (state.error != null)
+          SizedBox(
+            height: 180,
+            child: AppErrorState(message: state.error!, onRetry: onRetry),
+          )
+        else if (state.items.isEmpty)
+          const SizedBox(
+            height: 180,
+            child: Center(child: Text('Sin movimientos.')),
+          )
+        else
+          for (final movement in state.items)
+            _DesktopKardexRow(movement: movement),
+        AppPagination(
+          page: state.page,
+          totalPages: state.totalPages,
+          total: state.total,
+          onPageChange: onPage,
+        ),
+      ],
+    ),
+  );
+}
+
+class _DesktopKardexRow extends StatelessWidget {
+  final KardexMovimiento? movement;
+  final bool header;
+  const _DesktopKardexRow({required this.movement}) : header = false;
+  const _DesktopKardexRow.header() : movement = null, header = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final movement = this.movement;
+    final color = movement == null
+        ? context.colors.textTertiary
+        : kardexIsEntrada(movement.tipo)
+        ? AppColors.success
+        : kardexIsSalida(movement.tipo)
+        ? AppColors.error
+        : AppColors.warning;
+    Widget cell(
+      String text,
+      int flex, {
+      Color? textColor,
+      bool strong = false,
+    }) => Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color:
+              textColor ??
+              (header
+                  ? context.colors.textTertiary
+                  : context.colors.textSecondary),
+          fontSize: header ? 10 : 12,
+          fontWeight: strong || header ? FontWeight.w700 : FontWeight.w500,
+          letterSpacing: header ? .5 : 0,
+        ),
+      ),
+    );
+    return Container(
+      constraints: BoxConstraints(minHeight: header ? 48 : 64),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: header ? context.colors.surfaceAlt : null,
+        border: Border(bottom: BorderSide(color: context.colors.divider)),
+      ),
+      child: Row(
+        children: header
+            ? [
+                cell('ID', 1),
+                cell('FECHA', 1),
+                cell('HORA', 1),
+                cell('PRODUCTO', 2),
+                cell('CÓDIGO', 1),
+                cell('TIPO', 1),
+                cell('CANT.', 1),
+                cell('STOCK ANT.', 1),
+                cell('STOCK NUEVO', 1),
+                cell('VALOR', 1),
+                cell('REFERENCIA', 2),
+                cell('USUARIO', 1),
+              ]
+            : [
+                cell(
+                  movement!.id.length > 8
+                      ? movement.id.substring(0, 8)
+                      : movement.id,
+                  1,
+                  textColor: AppColors.primary,
+                  strong: true,
+                ),
+                cell(movement.fecha, 1),
+                cell(movement.hora, 1),
+                cell(movement.producto, 2, strong: true),
+                cell(movement.codigo, 1),
+                cell(kardexTipoLabel(movement.tipo), 1, textColor: color),
+                cell('${movement.cantidad}', 1, textColor: color, strong: true),
+                cell('${movement.stockAnterior}', 1),
+                cell('${movement.stockNuevo}', 1, strong: true),
+                cell('S/ ${movement.valor.toStringAsFixed(2)}', 1),
+                cell(movement.referencia, 2),
+                cell(movement.usuario, 1),
+              ],
       ),
     );
   }
@@ -266,82 +627,82 @@ class _HeaderState extends State<_Header> {
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                for (final t in [
-                  ('', 'Todos'),
-                  ('ENTRADA', 'ENTRADA'),
-                  ('SALIDA', 'SALIDA'),
-                  ('AJUSTE', 'AJUSTE'),
-                  ('TRASLADO', 'TRASLADO'),
-                  ('SALIDA_VENTA', 'VENTA'),
-                  ('ENTRADA_ANULACION', 'ANULACIÓN'),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => widget.onTipo(t.$1),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
+          child: Row(
+            children: [
+              for (final t in [
+                ('', 'Todos'),
+                ('ENTRADA', 'ENTRADA'),
+                ('SALIDA', 'SALIDA'),
+                ('AJUSTE', 'AJUSTE'),
+                ('TRASLADO', 'TRASLADO'),
+                ('SALIDA_VENTA', 'VENTA'),
+                ('ENTRADA_ANULACION', 'ANULACIÓN'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => widget.onTipo(t.$1),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.tipoFilter == t.$1
+                            ? context.colors.primarySurface
+                            : context.colors.backgroundAlt,
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        border: Border.all(
                           color: widget.tipoFilter == t.$1
-                              ? context.colors.primarySurface
-                              : context.colors.backgroundAlt,
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                          border: Border.all(
-                            color: widget.tipoFilter == t.$1
-                                ? context.colors.primaryBorder
-                                : context.colors.border,
-                          ),
+                              ? context.colors.primaryBorder
+                              : context.colors.border,
                         ),
-                        child: Text(
-                          t.$2,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: widget.tipoFilter == t.$1
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: widget.tipoFilter == t.$1
-                                ? AppColors.primary
-                                : context.colors.textSecondary,
-                          ),
+                      ),
+                      child: Text(
+                        t.$2,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: widget.tipoFilter == t.$1
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: widget.tipoFilter == t.$1
+                              ? AppColors.primary
+                              : context.colors.textSecondary,
                         ),
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-          // ── Date range filters ──────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _DateChip(
-                    label: 'Desde',
-                    value: widget.desde,
-                    onPick: () => _pickDate(context, isDesde: true),
-                    onClear: () => widget.onDesde(null),
-                  ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _DateChip(
-                    label: 'Hasta',
-                    value: widget.hasta,
-                    onPick: () => _pickDate(context, isDesde: false),
-                    onClear: () => widget.onHasta(null),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
+        // ── Date range filters ──────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: _DateChip(
+                  label: 'Desde',
+                  value: widget.desde,
+                  onPick: () => _pickDate(context, isDesde: true),
+                  onClear: () => widget.onDesde(null),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _DateChip(
+                  label: 'Hasta',
+                  value: widget.hasta,
+                  onPick: () => _pickDate(context, isDesde: false),
+                  onClear: () => widget.onHasta(null),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -596,8 +957,8 @@ class _MovTile extends StatelessWidget {
             height: 44,
             child: Stack(
               children: [
-                  DSProductImageSquare(
-                    imageUrl: mov.imagenUrl,
+                DSProductImageSquare(
+                  imageUrl: mov.imagenUrl,
                   size: 44,
                   radius: 10,
                   productName: mov.producto,

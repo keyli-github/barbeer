@@ -194,10 +194,11 @@ class InventarioScreen extends ConsumerWidget {
         (auth.user?.isSuperAdmin != true ||
             auth.hasPermission('establecimientos:leer'));
     final selectedSedeId = ref.watch(globalSedeIdProvider);
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      floatingActionButton: canCreate
+      floatingActionButton: canCreate && !desktop
           ? FloatingActionButton.extended(
               heroTag: 'inventario_config_fab',
               backgroundColor: AppColors.brand,
@@ -208,62 +209,89 @@ class InventarioScreen extends ConsumerWidget {
               label: const Text('Configurar'),
             )
           : null,
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () => notifier.load(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-          children: [
-            _SearchBar(
-              onSearch: notifier.setSearch,
+      body: desktop
+          ? InventarioDesktopView(
+              resumen: state.resumen,
+              items: state.items,
+              loading: state.loading,
+              error: state.error,
+              page: state.page,
+              totalPages: state.totalPages,
+              total: state.total,
               estadoFilter: state.estadoFilter,
-              onEstado: notifier.setEstado,
               categoriaFilter: state.categoriaFilter,
+              categories: catsAsync.valueOrNull ?? const [],
+              canCreate: canCreate,
+              canConfigure: canEdit,
+              canAdjust:
+                  canEdit &&
+                  (auth.user?.isSuperAdmin != true || selectedSedeId != null),
+              onRefresh: () => notifier.load(),
+              onRetry: () => notifier.load(),
+              onSearch: notifier.setSearch,
+              onEstado: notifier.setEstado,
               onCategoria: notifier.setCategoria,
-              cats: catsAsync.valueOrNull ?? const [],
-            ),
-            if (state.resumen != null && !state.loading)
-              _KpiRow(resumen: state.resumen!),
-            const SizedBox(height: 4),
-            if (state.loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 60),
-                child: AppLoading(),
-              )
-            else if (state.error != null)
-              AppErrorState(
-                message: state.error!,
-                onRetry: () => notifier.load(),
-              )
-            else if (state.items.isEmpty)
-              const AppEmptyState(
-                icon: Icons.inventory_2_outlined,
-                title: 'Sin productos en inventario',
-              )
-            else ...[
-              for (final item in state.items)
-                _InventarioTile(
-                  item: item,
-                  canEdit: canEdit,
-                  canConfigure: canEdit,
-                  canAdjust:
-                      canEdit &&
-                      (auth.user?.isSuperAdmin != true ||
-                          selectedSedeId != null),
-                  onConfigure: () =>
-                      _showConfig(context, ref, item: item),
-                  onAdjust: () => _showAdjust(context, ref, item),
-                ),
-              AppPagination(
-                page: state.page,
-                totalPages: state.totalPages,
-                total: state.total,
-                onPageChange: notifier.setPage,
+              onPageChange: notifier.setPage,
+              onConfigureInventory: () => _showConfig(context, ref),
+              onConfigureItem: (item) => _showConfig(context, ref, item: item),
+              onAdjustItem: (item) => _showAdjust(context, ref, item),
+            )
+          : RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => notifier.load(),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                children: [
+                  _SearchBar(
+                    onSearch: notifier.setSearch,
+                    estadoFilter: state.estadoFilter,
+                    onEstado: notifier.setEstado,
+                    categoriaFilter: state.categoriaFilter,
+                    onCategoria: notifier.setCategoria,
+                    cats: catsAsync.valueOrNull ?? const [],
+                  ),
+                  if (state.resumen != null && !state.loading)
+                    _KpiRow(resumen: state.resumen!),
+                  const SizedBox(height: 4),
+                  if (state.loading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 60),
+                      child: AppLoading(),
+                    )
+                  else if (state.error != null)
+                    AppErrorState(
+                      message: state.error!,
+                      onRetry: () => notifier.load(),
+                    )
+                  else if (state.items.isEmpty)
+                    const AppEmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      title: 'Sin productos en inventario',
+                    )
+                  else ...[
+                    for (final item in state.items)
+                      _InventarioTile(
+                        item: item,
+                        canEdit: canEdit,
+                        canConfigure: canEdit,
+                        canAdjust:
+                            canEdit &&
+                            (auth.user?.isSuperAdmin != true ||
+                                selectedSedeId != null),
+                        onConfigure: () =>
+                            _showConfig(context, ref, item: item),
+                        onAdjust: () => _showAdjust(context, ref, item),
+                      ),
+                    AppPagination(
+                      page: state.page,
+                      totalPages: state.totalPages,
+                      total: state.total,
+                      onPageChange: notifier.setPage,
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ],
-        ),
-      ),
+            ),
     );
   }
 
@@ -295,6 +323,569 @@ class InventarioScreen extends ConsumerWidget {
         sedes: ref.read(sedeScopeOptionsProvider).valueOrNull ?? const [],
         repo: ref.read(_invRepoProvider),
         onSaved: () => ref.read(_invProvider.notifier).load(),
+      ),
+    );
+  }
+}
+
+class InventarioDesktopView extends StatelessWidget {
+  final InventarioResumen? resumen;
+  final List<InventarioItem> items;
+  final bool loading;
+  final String? error;
+  final int page, totalPages, total;
+  final String estadoFilter, categoriaFilter;
+  final List<Categoria> categories;
+  final bool canCreate, canConfigure, canAdjust;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onRetry, onConfigureInventory;
+  final ValueChanged<String> onSearch, onEstado, onCategoria;
+  final ValueChanged<int> onPageChange;
+  final ValueChanged<InventarioItem> onConfigureItem, onAdjustItem;
+
+  const InventarioDesktopView({
+    super.key,
+    required this.resumen,
+    required this.items,
+    required this.loading,
+    required this.error,
+    required this.page,
+    required this.totalPages,
+    required this.total,
+    required this.estadoFilter,
+    required this.categoriaFilter,
+    required this.categories,
+    required this.canCreate,
+    required this.canConfigure,
+    required this.canAdjust,
+    required this.onRefresh,
+    required this.onRetry,
+    required this.onConfigureInventory,
+    required this.onSearch,
+    required this.onEstado,
+    required this.onCategoria,
+    required this.onPageChange,
+    required this.onConfigureItem,
+    required this.onAdjustItem,
+  });
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    color: AppColors.primary,
+    onRefresh: onRefresh,
+    child: ListView(
+      key: const Key('inventario-desktop-view'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: resumen == null
+                  ? const SizedBox(height: 76)
+                  : _InventoryDesktopKpis(resumen: resumen!),
+            ),
+            if (canCreate) ...[
+              const SizedBox(width: 16),
+              SizedBox(
+                height: 42,
+                child: FilledButton.icon(
+                  key: const Key('inventario-configure-all'),
+                  onPressed: onConfigureInventory,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.brand,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.settings_outlined, size: 17),
+                  label: const Text(
+                    'Configurar inventario',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 18),
+        _InventoryDesktopFilters(
+          estadoFilter: estadoFilter,
+          categoriaFilter: categoriaFilter,
+          categories: categories,
+          onSearch: onSearch,
+          onEstado: onEstado,
+          onCategoria: onCategoria,
+        ),
+        const SizedBox(height: 16),
+        if (loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 80),
+            child: AppLoading(),
+          )
+        else if (error != null)
+          AppErrorState(message: error!, onRetry: onRetry)
+        else if (items.isEmpty)
+          const AppEmptyState(
+            icon: Icons.inventory_2_outlined,
+            title: 'Sin productos en inventario',
+          )
+        else ...[
+          _InventoryDesktopTable(
+            items: items,
+            canConfigure: canConfigure,
+            canAdjust: canAdjust,
+            onConfigure: onConfigureItem,
+            onAdjust: onAdjustItem,
+          ),
+          AppPagination(
+            page: page,
+            totalPages: totalPages,
+            total: total,
+            onPageChange: onPageChange,
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _InventoryDesktopKpis extends StatelessWidget {
+  final InventarioResumen resumen;
+
+  const _InventoryDesktopKpis({required this.resumen});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children:
+        [
+              _DesktopInventoryKpi(
+                'Total productos',
+                '${resumen.totalItems}',
+                null,
+              ),
+              const SizedBox(width: 10),
+              _DesktopInventoryKpi(
+                'Estado crítico',
+                '${resumen.critico}',
+                AppColors.error,
+              ),
+              const SizedBox(width: 10),
+              _DesktopInventoryKpi(
+                'En alerta',
+                '${resumen.alerta}',
+                AppColors.warning,
+              ),
+              const SizedBox(width: 10),
+              _DesktopInventoryKpi(
+                'Valor inventario',
+                'S/ ${resumen.valorTotal.toStringAsFixed(2)}',
+                AppColors.success,
+              ),
+            ]
+            .map((child) => child is SizedBox ? child : Expanded(child: child))
+            .toList(),
+  );
+}
+
+class _DesktopInventoryKpi extends StatelessWidget {
+  final String label, value;
+  final Color? color;
+
+  const _DesktopInventoryKpi(this.label, this.value, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: 76,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: context.colors.textTertiary,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.1,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color ?? context.colors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            fontFamily: 'monospace',
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _InventoryDesktopFilters extends StatefulWidget {
+  final String estadoFilter, categoriaFilter;
+  final List<Categoria> categories;
+  final ValueChanged<String> onSearch, onEstado, onCategoria;
+
+  const _InventoryDesktopFilters({
+    required this.estadoFilter,
+    required this.categoriaFilter,
+    required this.categories,
+    required this.onSearch,
+    required this.onEstado,
+    required this.onCategoria,
+  });
+
+  @override
+  State<_InventoryDesktopFilters> createState() =>
+      _InventoryDesktopFiltersState();
+}
+
+class _InventoryDesktopFiltersState extends State<_InventoryDesktopFilters> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      SizedBox(
+        width: 290,
+        height: 40,
+        child: TextField(
+          key: const Key('inventario-desktop-search'),
+          controller: _searchController,
+          onChanged: widget.onSearch,
+          decoration: InputDecoration(
+            hintText: 'Buscar por nombre o código...',
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              size: 18,
+              color: context.colors.textTertiary,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _CatChip(
+                label: 'Todos',
+                selected: widget.categoriaFilter.isEmpty,
+                onTap: () => widget.onCategoria(''),
+              ),
+              for (final category in widget.categories)
+                _CatChip(
+                  label: category.nombre,
+                  selected: widget.categoriaFilter == category.id,
+                  onTap: () => widget.onCategoria(category.id),
+                ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      SizedBox(
+        width: 126,
+        child: _FilterDropdown<String>(
+          key: const ValueKey('inventario-desktop-estado'),
+          value: widget.estadoFilter,
+          label: 'Estado',
+          items: const [
+            ('', 'Todos'),
+            ('OK', 'OK'),
+            ('ALERTA', 'Alerta'),
+            ('CRITICO', 'Crítico'),
+          ],
+          onChanged: widget.onEstado,
+        ),
+      ),
+    ],
+  );
+}
+
+class _InventoryDesktopTable extends StatelessWidget {
+  final List<InventarioItem> items;
+  final bool canConfigure, canAdjust;
+  final ValueChanged<InventarioItem> onConfigure, onAdjust;
+
+  const _InventoryDesktopTable({
+    required this.items,
+    required this.canConfigure,
+    required this.canAdjust,
+    required this.onConfigure,
+    required this.onAdjust,
+  });
+
+  Color _statusColor(InventarioItem item) => item.estado == 'CRITICO'
+      ? AppColors.error
+      : item.estado == 'ALERTA'
+      ? AppColors.warning
+      : AppColors.success;
+
+  String _number(double value) => value.toStringAsFixed(value % 1 == 0 ? 0 : 1);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: const Key('inventario-desktop-table'),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: MediaQuery.sizeOf(context).width - 320,
+          ),
+          child: DataTable(
+            headingRowHeight: 42,
+            dataRowMinHeight: 58,
+            dataRowMaxHeight: 58,
+            horizontalMargin: 14,
+            columnSpacing: 18,
+            headingRowColor: WidgetStatePropertyAll(
+              context.colors.backgroundAlt,
+            ),
+            columns: const [
+              DataColumn(label: Text('Producto')),
+              DataColumn(label: Text('Categoría')),
+              DataColumn(label: Text('Stock')),
+              DataColumn(label: Text('Min/Máx')),
+              DataColumn(label: Text('Estado')),
+              DataColumn(label: Text('Costo')),
+              DataColumn(label: Text('Ubicación')),
+              DataColumn(label: Text('Acciones')),
+            ],
+            rows: [
+              for (final item in items)
+                DataRow(
+                  cells: [
+                    DataCell(
+                      SizedBox(
+                        width: 190,
+                        child: Row(
+                          children: [
+                            DSProductImageSquare(
+                              imageUrl: item.imagenUrl,
+                              size: 34,
+                              radius: 8,
+                              productName: item.producto,
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.producto,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    item.codigo,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: context.colors.textTertiary,
+                                      fontSize: 10,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        item.categoria,
+                        style: TextStyle(
+                          color: context.colors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: 118,
+                        child: Row(
+                          children: [
+                            Text(
+                              _number(item.stock),
+                              style: TextStyle(
+                                color: _statusColor(item),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: item.max > 0
+                                      ? (item.stock / item.max).clamp(0.0, 1.0)
+                                      : 0,
+                                  minHeight: 5,
+                                  backgroundColor: context.colors.backgroundAlt,
+                                  valueColor: AlwaysStoppedAnimation(
+                                    _statusColor(item),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '${_number(item.min)}/${item.max > 0 ? _number(item.max) : 'Sin objetivo'}',
+                        style: TextStyle(
+                          color: context.colors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    DataCell(_InventoryStatusBadge(item: item)),
+                    DataCell(
+                      Text(
+                        'S/ ${item.costo.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 130),
+                        child: Text(
+                          item.ubicacion.isEmpty ? '—' : item.ubicacion,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (canConfigure)
+                            OutlinedButton(
+                              key: ValueKey('inventario-configure-${item.id}'),
+                              onPressed: () => onConfigure(item),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(0, 32),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                              ),
+                              child: const Text('Configurar'),
+                            ),
+                          if (canConfigure && canAdjust)
+                            const SizedBox(width: 7),
+                          if (canAdjust)
+                            OutlinedButton(
+                              key: ValueKey('inventario-adjust-${item.id}'),
+                              onPressed: () => onAdjust(item),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.brand,
+                                side: BorderSide(
+                                  color: AppColors.brand.withValues(alpha: .35),
+                                ),
+                                minimumSize: const Size(0, 32),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                              ),
+                              child: const Text('Ajustar'),
+                            ),
+                          if (!canConfigure && !canAdjust)
+                            Text(
+                              '—',
+                              style: TextStyle(
+                                color: context.colors.textTertiary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _InventoryStatusBadge extends StatelessWidget {
+  final InventarioItem item;
+
+  const _InventoryStatusBadge({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = item.estado == 'CRITICO'
+        ? AppColors.error
+        : item.estado == 'ALERTA'
+        ? AppColors.warning
+        : AppColors.success;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .11),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: .28)),
+      ),
+      child: Text(
+        item.estado,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -606,7 +1197,7 @@ class _Chip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(vertical: 8),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.09),
+      color: color.withValues(alpha: 0.09),
       borderRadius: BorderRadius.circular(AppRadius.sm),
     ),
     child: Column(
@@ -703,7 +1294,7 @@ class _InventarioTile extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.12),
+                    color: _statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

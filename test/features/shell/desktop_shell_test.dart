@@ -34,9 +34,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(preferences),
-        ],
+        overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
         child: MaterialApp(
           home: DesktopShell(
             currentPath: '/productos',
@@ -44,7 +42,7 @@ void main() {
             auth: auth,
             onNavigate: (_) {},
             onLogout: () {},
-            child: const ColoredBox(color: Colors.white),
+            child: const SizedBox.expand(key: Key('desktop-route-child')),
           ),
         ),
       ),
@@ -52,6 +50,10 @@ void main() {
 
     expect(tester.getSize(find.byKey(const Key('desktop-sidebar'))).width, 272);
     expect(tester.getSize(find.byKey(const Key('desktop-header'))).height, 56);
+    expect(
+      tester.getSize(find.byKey(const Key('desktop-route-child'))),
+      const Size(1127, 843),
+    );
     expect(find.text('Productos'), findsWidgets);
     expect(find.text('ADMINISTRACION'), findsOneWidget);
     await tester.tap(find.text('ADMINISTRACION'));
@@ -65,6 +67,11 @@ void main() {
 
     expect(tester.getSize(find.byKey(const Key('desktop-sidebar'))).width, 68);
     expect(tester.takeException(), isNull);
+  });
+
+  test('uses reference desktop route titles', () {
+    expect(appDestinationForPath('/dashboard')?.routeTitle, 'Panel principal');
+    expect(appDestinationForPath('/ventas')?.routeTitle, 'Registro de Ventas');
   });
 
   testWidgets('renders the desktop shell with dark theme tokens', (
@@ -89,9 +96,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(preferences),
-        ],
+        overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
         child: MaterialApp(
           theme: AppTheme.darkTheme,
           home: DesktopShell(

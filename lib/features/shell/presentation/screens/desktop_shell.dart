@@ -10,12 +10,17 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 /// Texto sobre pildora naranja — replica `--primary-foreground` de la web.
 const Color _onActive = Color(0xFF111118);
 
+// Web logical dimensions reproduce the references at Windows 125% scaling.
+const double _expandedSidebarWidth = 272;
+const double _collapsedSidebarWidth = 68;
+const double _desktopHeaderHeight = 56;
+
 /// Color naranja con contraste AA para acentos sobre el sidebar:
 /// replica `--primary-text` (#ea580c claro / #fb923c oscuro).
 Color _primaryText(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-        ? AppColors.primaryLight
-        : AppColors.primaryDark;
+    ? AppColors.primaryLight
+    : AppColors.primaryDark;
 
 class DesktopShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -56,14 +61,16 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final effectiveCollapsed = _collapsed || screenWidth < 800;
 
     return Scaffold(
-      backgroundColor: context.colors.backgroundAlt,
+      backgroundColor: context.colors.background,
       body: Row(
         children: [
           AnimatedContainer(
             key: const Key('desktop-sidebar'),
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            width: effectiveCollapsed ? 68 : 272,
+            width: effectiveCollapsed
+                ? _collapsedSidebarWidth
+                : _expandedSidebarWidth,
             color: context.colors.navBackground,
             child: _Sidebar(
               collapsed: effectiveCollapsed,
@@ -81,8 +88,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               children: [
                 Container(
                   key: const Key('desktop-header'),
-                  height: 56,
-                  color: context.colors.surface,
+                  height: _desktopHeaderHeight,
+                  color: context.colors.background,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
@@ -105,9 +112,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                       _ThemeToggleButton(
                         isDark: isDark,
                         onToggle: () {
-                          ref.read(themeModeProvider.notifier).setMode(
-                            isDark ? ThemeMode.light : ThemeMode.dark,
-                          );
+                          ref
+                              .read(themeModeProvider.notifier)
+                              .setMode(
+                                isDark ? ThemeMode.light : ThemeMode.dark,
+                              );
                         },
                       ),
                       const SizedBox(width: 8),
@@ -123,17 +132,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                 Expanded(
                   child: ColoredBox(
                     key: const Key('desktop-content'),
-                    color: context.colors.backgroundAlt,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1440),
-                          child: SizedBox.expand(child: widget.child),
-                        ),
-                      ),
-                    ),
+                    color: context.colors.background,
+                    child: SizedBox.expand(child: widget.child),
                   ),
                 ),
               ],
@@ -275,9 +275,8 @@ class _UserMenu extends StatelessWidget {
       builder: (context, controller, _) => Tooltip(
         message: 'Menú de usuario',
         child: InkWell(
-          onTap: () => controller.isOpen
-              ? controller.close()
-              : controller.open(),
+          onTap: () =>
+              controller.isOpen ? controller.close() : controller.open(),
           borderRadius: BorderRadius.circular(8),
           hoverColor: context.colors.surfaceAlt,
           child: Container(
@@ -655,9 +654,7 @@ class _AccordionSection extends StatelessWidget {
                 hoverColor: context.colors.surfaceAlt,
                 child: Container(
                   height: collapsed ? 40 : 36,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: collapsed ? 0 : 12,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: collapsed ? 0 : 12),
                   child: Row(
                     mainAxisAlignment: collapsed
                         ? MainAxisAlignment.center
@@ -758,16 +755,14 @@ class _SidebarItem extends StatelessWidget {
         message: collapsed ? destination.desktopNavigationLabel : '',
         child: Material(
           color: active ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(11),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(11),
             hoverColor: active ? Colors.transparent : context.colors.surfaceAlt,
             child: Container(
-              height: 40,
-              padding: EdgeInsets.symmetric(
-                horizontal: collapsed ? 0 : 12,
-              ),
+              height: collapsed ? 40 : 36,
+              padding: EdgeInsets.symmetric(horizontal: collapsed ? 0 : 12),
               alignment: collapsed ? Alignment.center : Alignment.centerLeft,
               child: Row(
                 mainAxisAlignment: collapsed
@@ -801,7 +796,9 @@ class _SidebarItem extends StatelessWidget {
                         style: TextStyle(
                           color: active ? _onActive : idle,
                           fontSize: 14,
-                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                     ),

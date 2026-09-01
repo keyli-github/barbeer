@@ -21,6 +21,16 @@ class MovimientosScreen extends ConsumerWidget {
       authProvider.select((auth) => auth.user?.isSuperAdmin ?? false),
     );
     final notifier = ref.read(movimientosProvider.notifier);
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
+
+    if (desktop) {
+      return _buildDesktop(
+        context,
+        state: state,
+        notifier: notifier,
+        isSuperAdmin: isSuperAdmin,
+      );
+    }
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -99,6 +109,238 @@ class MovimientosScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildDesktop(
+    BuildContext context, {
+    required MovimientosState state,
+    required MovimientosNotifier notifier,
+    required bool isSuperAdmin,
+  }) => Scaffold(
+    backgroundColor: context.colors.background,
+    body: RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: notifier.load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.receipt_long_outlined,
+                size: 25,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Movimientos',
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 27,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'Ventas, ingresos y egresos.',
+            style: TextStyle(color: context.colors.textTertiary, fontSize: 14),
+          ),
+          const SizedBox(height: 20),
+          if (state.sedeId == null)
+            AppCard(
+              child: Text(
+                isSuperAdmin
+                    ? 'Selecciona una sede en el encabezado para consultar sus movimientos.'
+                    : 'Tu usuario no tiene una sede asignada.',
+              ),
+            )
+          else ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 770,
+                child: _Filters(state: state, notifier: notifier),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _DesktopMovementsPanel(
+              state: state,
+              onRetry: notifier.load,
+              onPage: notifier.cambiarPagina,
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _DesktopMovementsPanel extends StatelessWidget {
+  final MovimientosState state;
+  final Future<void> Function() onRetry;
+  final ValueChanged<int> onPage;
+
+  const _DesktopMovementsPanel({
+    required this.state,
+    required this.onRetry,
+    required this.onPage,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.colors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: context.colors.surfaceAlt,
+            border: Border(bottom: BorderSide(color: context.colors.border)),
+          ),
+          child: const Row(
+            children: [
+              _DesktopMovementHeader('FECHA/HORA', 2),
+              _DesktopMovementHeader('TIPO', 1),
+              _DesktopMovementHeader('ETIQUETA', 2),
+              _DesktopMovementHeader('CONCEPTO', 2),
+              _DesktopMovementHeader('MONTO', 1),
+              _DesktopMovementHeader('COMPROBANTE', 2),
+              _DesktopMovementHeader('USUARIO', 1),
+            ],
+          ),
+        ),
+        if (state.isLoading)
+          const SizedBox(
+            height: 125,
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (state.error != null)
+          SizedBox(
+            height: 125,
+            child: AppErrorState(message: state.error!, onRetry: onRetry),
+          )
+        else if (state.movimientos.isEmpty)
+          SizedBox(
+            height: 125,
+            child: Center(
+              child: Text(
+                'No se encontraron movimientos para los filtros seleccionados.',
+                style: TextStyle(
+                  color: context.colors.textTertiary,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          )
+        else
+          for (final movement in state.movimientos)
+            _DesktopMovementRow(movement: movement),
+        Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: context.colors.border)),
+          ),
+          child: Row(
+            children: [
+              Text(
+                'Página ${state.pagina} de ${state.totalPaginas} · ${state.total} movimientos mostrados',
+                style: TextStyle(
+                  color: context.colors.textTertiary,
+                  fontSize: 13,
+                ),
+              ),
+              const Spacer(),
+              IconButton.outlined(
+                onPressed: state.pagina > 1 && !state.isLoading
+                    ? () => onPage(state.pagina - 1)
+                    : null,
+                icon: const Icon(Icons.chevron_left_rounded),
+              ),
+              const SizedBox(width: 8),
+              IconButton.outlined(
+                onPressed: state.pagina < state.totalPaginas && !state.isLoading
+                    ? () => onPage(state.pagina + 1)
+                    : null,
+                icon: const Icon(Icons.chevron_right_rounded),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DesktopMovementHeader extends StatelessWidget {
+  final String label;
+  final int flex;
+  const _DesktopMovementHeader(this.label, this.flex);
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    flex: flex,
+    child: Text(
+      label,
+      style: TextStyle(
+        color: context.colors.textTertiary,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        letterSpacing: .7,
+      ),
+    ),
+  );
+}
+
+class _DesktopMovementRow extends StatelessWidget {
+  final CajaMovimiento movement;
+  const _DesktopMovementRow({required this.movement});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 54),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    decoration: BoxDecoration(
+      border: Border(bottom: BorderSide(color: context.colors.divider)),
+    ),
+    child: Row(
+      children: [
+        Expanded(flex: 2, child: Text(_dateTime(movement.createdAt))),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _TypeChip(type: movement.tipo),
+          ),
+        ),
+        Expanded(flex: 2, child: Text(_label(movement))),
+        Expanded(
+          flex: 2,
+          child: Text(movement.concepto, overflow: TextOverflow.ellipsis),
+        ),
+        Expanded(
+          child: Text(
+            _money(movement.monto),
+            style: TextStyle(
+              color: movement.tipo == 'ENTRADA'
+                  ? AppColors.success
+                  : AppColors.error,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(flex: 2, child: _ComprobanteButton(url: movement.comprobante)),
+        Expanded(child: Text(_user(movement), overflow: TextOverflow.ellipsis)),
+      ],
+    ),
+  );
 }
 
 class _Filters extends StatelessWidget {
@@ -330,9 +572,7 @@ class _MovementCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                incoming
-                    ? Icons.south_west_rounded
-                    : Icons.north_east_rounded,
+                incoming ? Icons.south_west_rounded : Icons.north_east_rounded,
                 color: color,
                 size: 20,
               ),
@@ -519,7 +759,10 @@ class _ComprobanteButton extends StatelessWidget {
             children: [
               Text(
                 'Comprobante',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 12),
               ConstrainedBox(
@@ -534,7 +777,7 @@ class _ComprobanteButton extends StatelessWidget {
                     loadingBuilder: (_, child, chunk) => chunk == null
                         ? child
                         : const Center(child: CircularProgressIndicator()),
-                    errorBuilder: (_, __, ___) => Padding(
+                    errorBuilder: (context, error, stackTrace) => Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
                         'No se pudo cargar la imagen.\n$normalised',

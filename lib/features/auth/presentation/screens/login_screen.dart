@@ -62,7 +62,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _error = null;
     });
     try {
-      await ref.read(authProvider.notifier).login(
+      await ref
+          .read(authProvider.notifier)
+          .login(
             username: _userCtrl.text.trim(),
             password: _passCtrl.text,
             rememberMe: true,
@@ -127,45 +129,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   // DESKTOP LAYOUT (≥ 1024px) — Split 50/50 like web
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildDesktop(double pageHeight, BrandingState branding) => Row(
-        children: [
-          // ── Left: Hero image + content ──
-          Expanded(
-            child: _HeroPanel(
-              height: pageHeight,
-              desktop: true,
-              coverUrl: branding.coverUrl,
-            ),
-          ),
-          // ── Right: Login form panel ──
-          Expanded(
-            child: Container(
-              height: pageHeight,
-              color: _panelBg,
-              child: Center(
-                child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 500),
-                    child: FadeTransition(
-                      opacity: _fade,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Logo
-                          _Logo(url: branding.logoUrl, size: 100),
-                          const SizedBox(height: 24),
-                          _buildForm(desktop: true),
-                        ],
-                      ),
-                    ),
+    children: [
+      // ── Left: Hero image + content ──
+      Expanded(
+        child: _HeroPanel(
+          height: pageHeight,
+          desktop: true,
+          coverUrl: branding.coverUrl,
+        ),
+      ),
+      // ── Right: Login form panel ──
+      Expanded(
+        child: Container(
+          height: pageHeight,
+          color: _panelBg,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Logo
+                      _Logo(url: branding.logoUrl, size: 100),
+                      const SizedBox(height: 24),
+                      _buildForm(desktop: true),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      );
+        ),
+      ),
+    ],
+  );
 
   // ════════════════════════════════════════════════════════════════════════════
   // MOBILE LAYOUT (< 1024px) — Compact: fits any screen without scrolling.
@@ -180,11 +181,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   ) {
     final isNarrow = constraints.maxWidth < 360;
     // Show feature cards in the hero only when there is enough vertical room.
-    final showCards = pageHeight >= 640;
+    final showCards = pageHeight >= 760;
     // Hero height: just enough for its content; never dominates the screen.
-    final heroH = (pageHeight * 0.37)
-        .clamp(showCards ? 240.0 : 140.0, showCards ? 280.0 : 190.0)
-        .toDouble();
+    final heroH = showCards
+        ? (pageHeight * 0.42).clamp(320.0, 360.0).toDouble()
+        : (pageHeight * 0.26).clamp(140.0, 160.0).toDouble();
 
     return Center(
       child: SizedBox(
@@ -250,10 +251,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       isNarrow ? 20.0 : 24.0,
                                       12.0,
                                     ),
-                                    child: Center(
+                                    child: SingleChildScrollView(
+                                      physics: const ClampingScrollPhysics(),
                                       child: ConstrainedBox(
-                                        constraints:
-                                            const BoxConstraints(maxWidth: 400),
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 400,
+                                        ),
                                         child: _buildForm(
                                           desktop: false,
                                           narrow: isNarrow,
@@ -287,203 +290,208 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   // FORM (shared between desktop & mobile)
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildForm({bool desktop = false, bool narrow = false}) => Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Title
-            Text(
-              'Iniciar sesión',
-              style: TextStyle(
-                fontSize: desktop ? 30 : (narrow ? 21 : 23),
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Ingresa tus credenciales para acceder al sistema interno',
-              style: TextStyle(
-                fontSize: desktop ? 15 : (narrow ? 12 : 13),
-                color: Colors.white.withValues(alpha: 0.45),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: desktop ? 28 : 10),
+    key: _formKey,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Title
+        Text(
+          'Iniciar sesión',
+          style: TextStyle(
+            fontSize: desktop ? 30 : (narrow ? 21 : 23),
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Ingresa tus credenciales para acceder al sistema interno',
+          style: TextStyle(
+            fontSize: desktop ? 15 : (narrow ? 12 : 13),
+            color: Colors.white.withValues(alpha: 0.45),
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: desktop ? 28 : 10),
 
-            // Error
-            if (_error != null) ...[
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF481B1B),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0x4DEF4444)),
+        // Error
+        if (_error != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFF481B1B),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0x4DEF4444)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: AppColors.error,
+                  size: 16,
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Username
+        _buildInput(
+          controller: _userCtrl,
+          hint: 'Usuario',
+          icon: Icons.person_outline_rounded,
+          autofillHints: const [AutofillHints.username],
+          textInputAction: TextInputAction.next,
+          desktop: desktop,
+        ),
+        SizedBox(height: desktop ? 14 : 10),
+
+        // Password
+        _buildInput(
+          controller: _passCtrl,
+          hint: 'Contraseña',
+          icon: Icons.lock_outline_rounded,
+          autofillHints: const [AutofillHints.password],
+          obscureText: !_showPass,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _login(),
+          desktop: desktop,
+          trailing: IconButton(
+            tooltip: _showPass ? 'Ocultar contraseña' : 'Mostrar contraseña',
+            onPressed: () => setState(() => _showPass = !_showPass),
+            icon: Icon(
+              _showPass
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: _eyeIconColor,
+              size: 20,
+            ),
+          ),
+        ),
+        SizedBox(height: desktop ? 18 : 10),
+
+        // Button
+        SizedBox(
+          width: double.infinity,
+          height: desktop ? 52 : 46,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF97316), Color(0xFFF59E0B)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ElevatedButton(
+              onPressed: _loading ? null : _login,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.black,
+                disabledBackgroundColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Ingresar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        SizedBox(height: desktop ? 14 : 10),
+
+        // Forgot password
+        GestureDetector(
+          onTap: _showPasswordHelp,
+          child: Text(
+            '¿Olvidaste tu contraseña? Solicita a un administrador que la restablezca.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: desktop ? 14 : 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.brand,
+            ),
+          ),
+        ),
+        SizedBox(height: desktop ? 24 : 8),
+
+        // Footer divider
+        Row(
+          children: [
+            Expanded(
+              child: Divider(
+                color: Colors.white.withValues(alpha: 0.10),
+                height: 1,
+              ),
+            ),
+            Flexible(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: AppColors.error, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 11,
+                      color: Colors.white.withValues(alpha: 0.30),
+                    ),
+                    const SizedBox(width: 5),
+                    Flexible(
                       child: Text(
-                        _error!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.error,
+                        'SOLO PERSONAL AUTORIZADO',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 1.1,
                           fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.30),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-            ],
-
-            // Username
-            _buildInput(
-              controller: _userCtrl,
-              hint: 'Usuario',
-              icon: Icons.person_outline_rounded,
-              autofillHints: const [AutofillHints.username],
-              textInputAction: TextInputAction.next,
-              desktop: desktop,
             ),
-            SizedBox(height: desktop ? 14 : 10),
-
-            // Password
-            _buildInput(
-              controller: _passCtrl,
-              hint: 'Contraseña',
-              icon: Icons.lock_outline_rounded,
-              autofillHints: const [AutofillHints.password],
-              obscureText: !_showPass,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _login(),
-              desktop: desktop,
-              trailing: IconButton(
-                tooltip:
-                    _showPass ? 'Ocultar contraseña' : 'Mostrar contraseña',
-                onPressed: () => setState(() => _showPass = !_showPass),
-                icon: Icon(
-                  _showPass
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  color: _eyeIconColor,
-                  size: 20,
-                ),
+            Expanded(
+              child: Divider(
+                color: Colors.white.withValues(alpha: 0.10),
+                height: 1,
               ),
-            ),
-            SizedBox(height: desktop ? 18 : 10),
-
-            // Button
-            SizedBox(
-              width: double.infinity,
-              height: desktop ? 52 : 46,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF97316), Color(0xFFF59E0B)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    foregroundColor: Colors.black,
-                    disabledBackgroundColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.black,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : const Text(
-                          'Ingresar',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                ),
-              ),
-            ),
-            SizedBox(height: desktop ? 14 : 10),
-
-            // Forgot password
-            GestureDetector(
-              onTap: _showPasswordHelp,
-              child: Text(
-                '¿Olvidaste tu contraseña? Solicita a un administrador que la restablezca.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: desktop ? 14 : 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.brand,
-                ),
-              ),
-            ),
-            SizedBox(height: desktop ? 24 : 8),
-
-            // Footer divider
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                      color: Colors.white.withValues(alpha: 0.10), height: 1),
-                ),
-                Flexible(
-                  flex: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          size: 11,
-                          color: Colors.white.withValues(alpha: 0.30),
-                        ),
-                        const SizedBox(width: 5),
-                        Flexible(
-                          child: Text(
-                            'SOLO PERSONAL AUTORIZADO',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              letterSpacing: 1.1,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withValues(alpha: 0.30),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(
-                      color: Colors.white.withValues(alpha: 0.10), height: 1),
-                ),
-              ],
             ),
           ],
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _buildInput({
     required TextEditingController controller,
@@ -495,54 +503,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     void Function(String)? onSubmitted,
     Widget? trailing,
     bool desktop = false,
-  }) =>
-      TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        autofillHints: autofillHints,
-        textInputAction: textInputAction,
-        onFieldSubmitted: onSubmitted,
-        validator: (v) =>
-            v == null || v.trim().isEmpty ? 'Requerido' : null,
-        style: const TextStyle(fontSize: 15, color: Colors.white),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(
-            fontSize: 15,
-            color: _placeholderColor,
-            fontWeight: FontWeight.w400,
-          ),
-          prefixIcon: Icon(icon, color: _inputIconColor, size: 20),
-          suffixIcon: trailing,
-          suffixIconConstraints:
-              const BoxConstraints(minWidth: 48, minHeight: 48),
-          filled: true,
-          fillColor: _inputFill,
-          isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: _inputBorder),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: _inputBorder),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.error),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-          ),
-        ),
-      );
+  }) => TextFormField(
+    controller: controller,
+    obscureText: obscureText,
+    autofillHints: autofillHints,
+    textInputAction: textInputAction,
+    onFieldSubmitted: onSubmitted,
+    validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
+    style: const TextStyle(fontSize: 15, color: Colors.white),
+    decoration: InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+        fontSize: 15,
+        color: _placeholderColor,
+        fontWeight: FontWeight.w400,
+      ),
+      prefixIcon: Icon(icon, color: _inputIconColor, size: 20),
+      suffixIcon: trailing,
+      suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      filled: true,
+      fillColor: _inputFill,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _inputBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _inputBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+      ),
+    ),
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -563,188 +567,199 @@ class _HeroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: double.infinity,
-        height: height,
-        child: Stack(
-          clipBehavior: Clip.hardEdge,
-          children: [
-            // Background image
-            Positioned.fill(
-              child: coverUrl == null
-                  ? Image.asset(
-                      'assets/images/login.webp',
-                      fit: BoxFit.cover,
-                      alignment:
-                          desktop ? Alignment.center : Alignment.topCenter,
-                    )
-                  : Image.network(
-                      coverUrl!,
-                      fit: BoxFit.cover,
-                      alignment:
-                          desktop ? Alignment.center : Alignment.topCenter,
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/login.webp',
-                        fit: BoxFit.cover,
-                        alignment:
-                            desktop ? Alignment.center : Alignment.topCenter,
-                      ),
-                    ),
-            ),
-            // Gradient overlays
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Color(0xB3000000), Color(0x66000000), Color(0x1A000000)],
+    width: double.infinity,
+    height: height,
+    child: Stack(
+      clipBehavior: Clip.hardEdge,
+      children: [
+        // Background image
+        Positioned.fill(
+          child: coverUrl == null
+              ? Image.asset(
+                  'assets/images/login.webp',
+                  fit: BoxFit.cover,
+                  alignment: desktop ? Alignment.center : Alignment.topCenter,
+                )
+              : Image.network(
+                  coverUrl!,
+                  fit: BoxFit.cover,
+                  alignment: desktop ? Alignment.center : Alignment.topCenter,
+                  errorBuilder: (context, error, stackTrace) => Image.asset(
+                    'assets/images/login.webp',
+                    fit: BoxFit.cover,
+                    alignment: desktop ? Alignment.center : Alignment.topCenter,
                   ),
                 ),
-              ),
-            ),
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Color(0x40000000), Colors.transparent, Color(0x1A000000)],
-                  ),
-                ),
-              ),
-            ),
-            // Content
-            if (desktop) Positioned.fill(child: _desktopContent()) else _mobileContent(),
-          ],
         ),
-      );
+        // Gradient overlays
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Color(0xB3000000),
+                  Color(0x66000000),
+                  Color(0x1A000000),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Color(0x40000000),
+                  Colors.transparent,
+                  Color(0x1A000000),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Content
+        if (desktop)
+          Positioned.fill(child: _desktopContent())
+        else
+          _mobileContent(),
+      ],
+    ),
+  );
 
   Widget _desktopContent() => SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 32),
-          child: LayoutBuilder(
-            builder: (_, constraints) => Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Spacer(),
-                const Center(child: BarBeerWordmark(fontSize: 30)),
-                const SizedBox(height: 16),
-                const Text(
-                  'SISTEMA INTERNO',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.brand,
-                    letterSpacing: 2.2,
-                  ),
+    bottom: false,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 32),
+      child: LayoutBuilder(
+        builder: (_, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Spacer(),
+            const Center(child: BarBeerWordmark(fontSize: 30)),
+            const SizedBox(height: 16),
+            const Text(
+              'SISTEMA INTERNO',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.brand,
+                letterSpacing: 2.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+            RichText(
+              textAlign: TextAlign.center,
+              text: const TextSpan(
+                style: TextStyle(
+                  fontSize: 42,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -1,
                 ),
-                const SizedBox(height: 10),
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: const TextSpan(
-                    style: TextStyle(
-                      fontSize: 42,
-                      height: 1.05,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -1,
-                    ),
-                    children: [
-                      TextSpan(text: 'Sistema interno\nde '),
-                      TextSpan(
-                        text: 'gestión',
-                        style: TextStyle(color: AppColors.brand),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Accede de forma segura a la plataforma\nde administración de Yacare.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 14, color: Color(0xE6FFFFFF), height: 1.5),
-                ),
-                if (constraints.maxHeight > 500) ...[
-                  const SizedBox(height: 22),
-                  const _FeatureCard(
-                    icon: Icons.bar_chart_rounded,
-                    title: 'Ventas',
-                    desc: 'Consulta y analiza el rendimiento.',
-                  ),
-                  const SizedBox(height: 8),
-                  const _FeatureCard(
-                    icon: Icons.inventory_2_outlined,
-                    title: 'Inventario',
-                    desc: 'Controla stock y movimientos.',
-                  ),
-                  const SizedBox(height: 8),
-                  const _FeatureCard(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'Caja y reportes',
-                    desc: 'Cierres, reportes y conciliaciones.',
+                children: [
+                  TextSpan(text: 'Sistema interno\nde '),
+                  TextSpan(
+                    text: 'gestión',
+                    style: TextStyle(color: AppColors.brand),
                   ),
                 ],
-                const Spacer(),
-                const Center(
-                  child: Text(
-                    '© 2026 Yacare ERP. Todos los derechos reservados.',
-                    style: TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(height: 14),
+            const Text(
+              'Accede de forma segura a la plataforma\nde administración de Yacare.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xE6FFFFFF),
+                height: 1.5,
+              ),
+            ),
+            if (constraints.maxHeight > 500) ...[
+              const SizedBox(height: 22),
+              const _FeatureCard(
+                icon: Icons.bar_chart_rounded,
+                title: 'Ventas',
+                desc: 'Consulta y analiza el rendimiento.',
+              ),
+              const SizedBox(height: 8),
+              const _FeatureCard(
+                icon: Icons.inventory_2_outlined,
+                title: 'Inventario',
+                desc: 'Controla stock y movimientos.',
+              ),
+              const SizedBox(height: 8),
+              const _FeatureCard(
+                icon: Icons.receipt_long_outlined,
+                title: 'Caja y reportes',
+                desc: 'Cierres, reportes y conciliaciones.',
+              ),
+            ],
+            const Spacer(),
+            const Center(
+              child: Text(
+                '© 2026 Yacare ERP. Todos los derechos reservados.',
+                style: TextStyle(fontSize: 10, color: Color(0x66FFFFFF)),
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _mobileContent() => SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Center(child: BarBeerWordmark(fontSize: 26)),
-              const SizedBox(height: 5),
-              const Text(
-                'Accede de forma segura a la plataforma de administración de Yacare.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.0,
-                  color: Color(0xE6FFFFFF),
-                  height: 1.3,
-                ),
-              ),
-              if (showCards) ...[
-                const SizedBox(height: 8),
-                const _FeatureCard(
-                  icon: Icons.bar_chart_rounded,
-                  title: 'Ventas',
-                  desc: 'Consulta y analiza el rendimiento.',
-                ),
-                const SizedBox(height: 4),
-                const _FeatureCard(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Inventario',
-                  desc: 'Controla stock y movimientos.',
-                ),
-                const SizedBox(height: 4),
-                const _FeatureCard(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Caja y reportes',
-                  desc: 'Cierres, reportes y conciliaciones.',
-                ),
-              ],
-              // Buffer so the floating logo (-30px) doesn't overlap hero content
-              const SizedBox(height: 34),
-            ],
+    bottom: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Center(child: BarBeerWordmark(fontSize: 26)),
+          const SizedBox(height: 5),
+          const Text(
+            'Accede de forma segura a la plataforma de administración de Yacare.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.0,
+              color: Color(0xE6FFFFFF),
+              height: 1.3,
+            ),
           ),
-        ),
-      );
+          if (showCards) ...[
+            const SizedBox(height: 8),
+            const _FeatureCard(
+              icon: Icons.bar_chart_rounded,
+              title: 'Ventas',
+              desc: 'Consulta y analiza el rendimiento.',
+            ),
+            const SizedBox(height: 4),
+            const _FeatureCard(
+              icon: Icons.inventory_2_outlined,
+              title: 'Inventario',
+              desc: 'Controla stock y movimientos.',
+            ),
+            const SizedBox(height: 4),
+            const _FeatureCard(
+              icon: Icons.receipt_long_outlined,
+              title: 'Caja y reportes',
+              desc: 'Cierres, reportes y conciliaciones.',
+            ),
+          ],
+          // Buffer so the floating logo doesn't overlap hero content.
+          const SizedBox(height: 19),
+        ],
+      ),
+    ),
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -758,25 +773,25 @@ class _Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: size,
-        height: size,
-        child: url == null
-            ? Image.asset(
-                'assets/images/yacare.png',
-                fit: BoxFit.contain,
-                semanticLabel: 'Logo de Yacare',
-              )
-            : Image.network(
-                url!,
-                fit: BoxFit.contain,
-                semanticLabel: 'Logo de Yacare',
-                errorBuilder: (_, __, ___) => Image.asset(
-                  'assets/images/yacare.png',
-                  fit: BoxFit.contain,
-                  semanticLabel: 'Logo de Yacare',
-                ),
-              ),
-      );
+    width: size,
+    height: size,
+    child: url == null
+        ? Image.asset(
+            'assets/images/yacare.png',
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo de Yacare',
+          )
+        : Image.network(
+            url!,
+            fit: BoxFit.contain,
+            semanticLabel: 'Logo de Yacare',
+            errorBuilder: (context, error, stackTrace) => Image.asset(
+              'assets/images/yacare.png',
+              fit: BoxFit.contain,
+              semanticLabel: 'Logo de Yacare',
+            ),
+          ),
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -795,52 +810,52 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.40),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.40),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0x26F97316), // orange-500/15
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0x40F97316)), // ring
+          ),
+          child: Icon(icon, color: AppColors.brand, size: 18),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: const Color(0x26F97316), // orange-500/15
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0x40F97316)), // ring
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1.15,
+                ),
               ),
-              child: Icon(icon, color: AppColors.brand, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    desc,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xD9FFFFFF),
-                      height: 1.2,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 1),
+              Text(
+                desc,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xD9FFFFFF),
+                  height: 1.2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }

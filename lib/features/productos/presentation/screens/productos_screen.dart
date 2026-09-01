@@ -15,16 +15,21 @@ import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categorias/data/categorias_repository.dart';
+import '../../../inventario/data/inventario_repository.dart';
 import '../../data/productos_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-final _repoProvider = Provider<ProductosRepository>(
+final productosCatalogRepositoryProvider = Provider<ProductosRepository>(
   (ref) => ProductosRepository(ApiClient.instance),
 );
 
+final _productosInventarioRepositoryProvider = Provider<InventarioRepository>(
+  (ref) => InventarioRepository(ApiClient.instance),
+);
+
 final _categoriasProvider = FutureProvider<List<Categoria>>((ref) async {
-  return ref.watch(_repoProvider).categorias();
+  return ref.watch(productosCatalogRepositoryProvider).categorias();
 });
 
 class _ProductosState {
@@ -169,7 +174,7 @@ class _ProductosNotifier extends StateNotifier<_ProductosState> {
 final _productosNotifier =
     StateNotifierProvider<_ProductosNotifier, _ProductosState>(
       (ref) => _ProductosNotifier(
-        ref.watch(_repoProvider),
+        ref.watch(productosCatalogRepositoryProvider),
         ref.watch(globalSedeIdProvider),
       ),
     );
@@ -196,6 +201,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     final canCreate = auth.hasPermission('productos:crear');
     final canEdit = auth.hasPermission('productos:editar');
     final canDelete = auth.hasPermission('productos:eliminar');
+    final canAdjustStock = auth.user != null;
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
@@ -203,7 +209,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
           ? context.colors.backgroundAlt
           : context.colors.background,
       // FAB para crear producto
-      floatingActionButton: canCreate
+      floatingActionButton: canCreate && !desktop
           ? FloatingActionButton(
               heroTag: 'prod_fab',
               backgroundColor: AppColors.brand,
@@ -217,6 +223,15 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
         onRefresh: () => notifier.load(),
         child: CustomScrollView(
           slivers: [
+            if (desktop)
+              SliverToBoxAdapter(
+                child: _DesktopProductsHeader(
+                  total: state.total,
+                  loading: state.loading,
+                  canCreate: canCreate,
+                  onCreate: () => _showForm(context, ref, null),
+                ),
+              ),
             // ─── Filtros ────────────────────────────────────────
             SliverToBoxAdapter(
               child: _FiltersSection(
@@ -227,6 +242,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                 showViewToggle: desktop,
                 isTableView: _tableView,
                 onToggleView: () => setState(() => _tableView = !_tableView),
+                desktop: desktop,
               ),
             ),
             // ─── Categorías ─────────────────────────────────────
@@ -242,7 +258,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
               ),
             ),
             // ─── KPIs ───────────────────────────────────────────
-            if (state.resumen != null && !state.loading)
+            if (!desktop && state.resumen != null && !state.loading)
               SliverToBoxAdapter(child: _KpiRow(resumen: state.resumen!)),
             // ─── Contenido ──────────────────────────────────────
             if (state.loading)
@@ -309,32 +325,50 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
               ),
             ] else ...[
               SliverPadding(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: EdgeInsets.fromLTRB(
+                  desktop ? 24 : AppSpacing.md,
+                  desktop ? 6 : AppSpacing.md,
+                  desktop ? 24 : AppSpacing.md,
+                  AppSpacing.md,
+                ),
                 sliver: SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: ((MediaQuery.sizeOf(context).width - 2 * AppSpacing.md) / 180)
-                        .floor()
-                        .clamp(1, 6),
-                    childAspectRatio: desktop ? 0.68 : 0.56,
-                    crossAxisSpacing: AppSpacing.sm,
-                    mainAxisSpacing: AppSpacing.sm,
+                    crossAxisCount: desktop
+                        ? (MediaQuery.sizeOf(context).width >= 1280 ? 5 : 4)
+                        : ((MediaQuery.sizeOf(context).width -
+                                      2 * AppSpacing.md) /
+                                  180)
+                              .floor()
+                              .clamp(1, 6),
+                    childAspectRatio: desktop ? 0.64 : 0.56,
+                    crossAxisSpacing: desktop ? 12 : AppSpacing.sm,
+                    mainAxisSpacing: desktop ? 12 : AppSpacing.sm,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, i) => _ProductCard(
                       product: state.items[i],
                       canEdit: canEdit,
                       canDelete: canDelete,
-                      onOpen: () => _showProductDetail(
+                      desktop: desktop,
+                      canAdjustStock: canAdjustStock,
+                      onOpen: () =>
+                          _showProductDetail(context, ref, state.items[i]),
+                      onEdit: () => _showForm(context, ref, state.items[i]),
+                      onToggleActivo: () =>
+                          notifier.toggleActivo(state.items[i]),
+                      onTogglePos: () => notifier.togglePos(state.items[i]),
+                      onIngreso: () => _showStockAdjustment(
                         context,
                         ref,
                         state.items[i],
+                        'ENTRADA',
                       ),
-                      onEdit: () =>
-                          _showForm(context, ref, state.items[i]),
-                      onToggleActivo: () =>
-                          notifier.toggleActivo(state.items[i]),
-                      onTogglePos: () =>
-                          notifier.togglePos(state.items[i]),
+                      onSalida: () => _showStockAdjustment(
+                        context,
+                        ref,
+                        state.items[i],
+                        'SALIDA',
+                      ),
                       onDelete: () async {
                         final ok = await ConfirmationDialog.show(
                           context: context,
@@ -399,16 +433,18 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
             product: product,
             cats: ref.read(_categoriasProvider).value ?? [],
             onSaved: () => ref.read(_productosNotifier.notifier).load(),
-            repo: ref.read(_repoProvider),
+            repo: ref.read(productosCatalogRepositoryProvider),
             canManageImage: canEdit,
           ),
         ),
         onToggle: () async {
-          await ref.read(_repoProvider).toggle(product.id, !product.activo);
+          await ref
+              .read(productosCatalogRepositoryProvider)
+              .toggle(product.id, !product.activo);
           ref.read(_productosNotifier.notifier).load();
         },
         onDelete: () async {
-          await ref.read(_repoProvider).delete(product.id);
+          await ref.read(productosCatalogRepositoryProvider).delete(product.id);
           ref.read(_productosNotifier.notifier).load();
         },
       ),
@@ -423,13 +459,116 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
         product: product,
         cats: ref.read(_categoriasProvider).value ?? [],
         onSaved: () => ref.read(_productosNotifier.notifier).load(),
-        repo: ref.read(_repoProvider),
+        repo: ref.read(productosCatalogRepositoryProvider),
         canManageImage: ref
             .read(authProvider)
             .hasPermission('productos:editar'),
       ),
     );
   }
+
+  Future<void> _showStockAdjustment(
+    BuildContext context,
+    WidgetRef ref,
+    Producto product,
+    String type,
+  ) async {
+    final repository = ref.read(_productosInventarioRepositoryProvider);
+    final page = await repository.list(
+      limite: 1,
+      productoId: product.id,
+      sedeId: ref.read(globalSedeIdProvider),
+    );
+    if (!context.mounted) return;
+    if (page.data.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Configura este producto en Inventario antes de ajustar stock.',
+          ),
+        ),
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _StockAdjustmentDialog(
+        item: page.data.first,
+        initialType: type,
+        repository: repository,
+        onSaved: () => ref.read(_productosNotifier.notifier).load(),
+      ),
+    );
+  }
+}
+
+class _DesktopProductsHeader extends StatelessWidget {
+  final int total;
+  final bool loading;
+  final bool canCreate;
+  final VoidCallback onCreate;
+
+  const _DesktopProductsHeader({
+    required this.total,
+    required this.loading,
+    required this.canCreate,
+    required this.onCreate,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 22, 24, 14),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Catálogo de Productos',
+                style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (!loading) ...[
+                const SizedBox(height: 3),
+                Text(
+                  '$total ${total == 1 ? 'producto' : 'productos'}',
+                  style: TextStyle(
+                    color: context.colors.textTertiary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (canCreate)
+          FilledButton.icon(
+            key: const ValueKey('productos-create-desktop'),
+            onPressed: onCreate,
+            icon: const Icon(Icons.add_rounded, size: 17),
+            label: const Text('NUEVO PRODUCTO'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.brand,
+              foregroundColor: Colors.black,
+              minimumSize: const Size(0, 42),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .35,
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 // ─── Filters Section ──────────────────────────────────────────────────────────
@@ -442,6 +581,7 @@ class _FiltersSection extends StatefulWidget {
   final bool showViewToggle;
   final bool isTableView;
   final VoidCallback? onToggleView;
+  final bool desktop;
 
   const _FiltersSection({
     required this.search,
@@ -451,6 +591,7 @@ class _FiltersSection extends StatefulWidget {
     this.showViewToggle = false,
     this.isTableView = false,
     this.onToggleView,
+    this.desktop = false,
   });
 
   @override
@@ -744,201 +885,214 @@ class _ProductsTable extends StatelessWidget {
                 DataColumn(label: Text('Estado')),
                 DataColumn(label: Text('Acciones')),
               ],
-              rows: items.map((p) => DataRow(
-                cells: [
-                  // Producto (image + nombre + código)
-                  DataCell(
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DSProductImageSquare(
-                            imageUrl: p.imagenUrl,
-                            size: 36,
-                          ),
-                          const SizedBox(width: 10),
-                          Flexible(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
+              rows: items
+                  .map(
+                    (p) => DataRow(
+                      cells: [
+                        // Producto (image + nombre + código)
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 220),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  p.nombre,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                DSProductImageSquare(
+                                  imageUrl: p.imagenUrl,
+                                  size: 36,
                                 ),
-                                Text(
-                                  p.codigo,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.colors.textTertiary,
-                                    fontFamily: 'monospace',
+                                const SizedBox(width: 10),
+                                Flexible(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.nombre,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        p.codigo,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: context.colors.textTertiary,
+                                          fontFamily: 'monospace',
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Categoría
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.brand.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        p.categoria,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.brand,
                         ),
-                      ),
-                    ),
-                  ),
-                  // Precio venta
-                  DataCell(
-                    Text(
-                      FormatUtils.currency(p.precioVenta),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.brand,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  // Costo
-                  DataCell(
-                    Text(
-                      FormatUtils.currency(p.precioCosto),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: context.colors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  // Margen
-                  DataCell(
-                    Text(
-                      '${p.margin.toStringAsFixed(0)}%',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: _marginColor(p.margin),
-                      ),
-                    ),
-                  ),
-                  // Disponible POS
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.disponiblePos
-                            ? AppColors.success.withValues(alpha: 0.1)
-                            : context.colors.backgroundAlt,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        p.disponiblePos ? 'Sí' : 'No',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: p.disponiblePos
-                              ? AppColors.success
-                              : context.colors.textTertiary,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Estado
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.activo
-                            ? AppColors.success.withValues(alpha: 0.1)
-                            : AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        p.activo ? 'Activo' : 'Inactivo',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: p.activo ? AppColors.success : AppColors.error,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Acciones
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (canEdit) ...[
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            tooltip: 'Editar',
-                            onPressed: () => onEdit(p),
-                            color: context.colors.textSecondary,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              p.activo
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              size: 18,
+                        // Categoría
+                        DataCell(
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
                             ),
-                            tooltip: p.activo ? 'Desactivar' : 'Activar',
-                            onPressed: () => onToggleActivo(p),
-                            color: context.colors.textSecondary,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              p.disponiblePos
-                                  ? Icons.remove_shopping_cart_outlined
-                                  : Icons.shopping_cart_outlined,
-                              size: 18,
+                            decoration: BoxDecoration(
+                              color: AppColors.brand.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            tooltip: p.disponiblePos
-                                ? 'Quitar de venta'
-                                : 'Poner en venta',
-                            onPressed: () => onTogglePos(p),
-                            color: context.colors.textSecondary,
+                            child: Text(
+                              p.categoria,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.brand,
+                              ),
+                            ),
                           ),
-                        ],
-                        if (canDelete)
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            tooltip: 'Dar de baja',
-                            onPressed: () => onDelete(p),
-                            color: AppColors.error,
+                        ),
+                        // Precio venta
+                        DataCell(
+                          Text(
+                            FormatUtils.currency(p.precioVenta),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brand,
+                              fontSize: 13,
+                            ),
                           ),
+                        ),
+                        // Costo
+                        DataCell(
+                          Text(
+                            FormatUtils.currency(p.precioCosto),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: context.colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        // Margen
+                        DataCell(
+                          Text(
+                            '${p.margin.toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: _marginColor(p.margin),
+                            ),
+                          ),
+                        ),
+                        // Disponible POS
+                        DataCell(
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.disponiblePos
+                                  ? AppColors.success.withValues(alpha: 0.1)
+                                  : context.colors.backgroundAlt,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              p.disponiblePos ? 'Sí' : 'No',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: p.disponiblePos
+                                    ? AppColors.success
+                                    : context.colors.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Estado
+                        DataCell(
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.activo
+                                  ? AppColors.success.withValues(alpha: 0.1)
+                                  : AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              p.activo ? 'Activo' : 'Inactivo',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: p.activo
+                                    ? AppColors.success
+                                    : AppColors.error,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Acciones
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (canEdit) ...[
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 18,
+                                  ),
+                                  tooltip: 'Editar',
+                                  onPressed: () => onEdit(p),
+                                  color: context.colors.textSecondary,
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    p.activo
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    size: 18,
+                                  ),
+                                  tooltip: p.activo ? 'Desactivar' : 'Activar',
+                                  onPressed: () => onToggleActivo(p),
+                                  color: context.colors.textSecondary,
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    p.disponiblePos
+                                        ? Icons.remove_shopping_cart_outlined
+                                        : Icons.shopping_cart_outlined,
+                                    size: 18,
+                                  ),
+                                  tooltip: p.disponiblePos
+                                      ? 'Quitar de venta'
+                                      : 'Poner en venta',
+                                  onPressed: () => onTogglePos(p),
+                                  color: context.colors.textSecondary,
+                                ),
+                              ],
+                              if (canDelete)
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                  ),
+                                  tooltip: 'Dar de baja',
+                                  onPressed: () => onDelete(p),
+                                  color: AppColors.error,
+                                ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              )).toList(),
+                  )
+                  .toList(),
             ),
           ),
         ),
@@ -965,21 +1119,21 @@ class _CatStrip extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Row(
-          children: [
-            _Chip(
-              label: 'Todos',
-              selected: selected.isEmpty || selected == 'all',
-              onTap: () => onSelect('all'),
+        children: [
+          _Chip(
+            label: 'Todos',
+            selected: selected.isEmpty || selected == 'all',
+            onTap: () => onSelect('all'),
+          ),
+          ...cats.map(
+            (c) => _Chip(
+              label: c.nombre,
+              selected: selected == c.id,
+              onTap: () => onSelect(c.id),
             ),
-            ...cats.map(
-              (c) => _Chip(
-                label: c.nombre,
-                selected: selected == c.id,
-                onTap: () => onSelect(c.id),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1092,17 +1246,28 @@ class _KpiChip extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Producto product;
   final bool canEdit, canDelete;
-  final VoidCallback onOpen, onEdit, onToggleActivo, onTogglePos, onDelete;
+  final bool desktop, canAdjustStock;
+  final VoidCallback onOpen,
+      onEdit,
+      onToggleActivo,
+      onTogglePos,
+      onDelete,
+      onIngreso,
+      onSalida;
 
   const _ProductCard({
     required this.product,
     required this.canEdit,
     required this.canDelete,
+    this.desktop = false,
+    this.canAdjustStock = false,
     required this.onOpen,
     required this.onEdit,
     required this.onToggleActivo,
     required this.onTogglePos,
     required this.onDelete,
+    required this.onIngreso,
+    required this.onSalida,
   });
 
   @override
@@ -1322,48 +1487,217 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
           ),
-          // ─ Ver detalle: control único y claro para abrir el detalle
-          GestureDetector(
-            onTap: onOpen,
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: context.colors.borderLight),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          if (desktop && canAdjustStock)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.visibility_outlined,
-                    size: 14,
-                    color: context.colors.textSecondary,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'Ver detalle',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: context.colors.textSecondary,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: AppColors.success.withValues(alpha: .32),
+                      ),
+                    ),
+                    child: const Text(
+                      '✓ Activo',
+                      style: TextStyle(
+                        color: AppColors.success,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: context.colors.textTertiary,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onIngreso,
+                          icon: const Icon(
+                            Icons.arrow_circle_down_outlined,
+                            size: 16,
+                          ),
+                          label: const Text('Ingreso'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.success,
+                            side: BorderSide(
+                              color: AppColors.success.withValues(alpha: .35),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onSalida,
+                          icon: const Icon(
+                            Icons.arrow_circle_up_outlined,
+                            size: 16,
+                          ),
+                          label: const Text('Salida'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: BorderSide(
+                              color: AppColors.error.withValues(alpha: .35),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
+            )
+          else
+            GestureDetector(
+              onTap: onOpen,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: context.colors.borderLight),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.visibility_outlined,
+                      size: 14,
+                      color: context.colors.textSecondary,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Ver detalle',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: context.colors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
+}
+
+class _StockAdjustmentDialog extends StatefulWidget {
+  final InventarioItem item;
+  final String initialType;
+  final InventarioRepository repository;
+  final VoidCallback onSaved;
+
+  const _StockAdjustmentDialog({
+    required this.item,
+    required this.initialType,
+    required this.repository,
+    required this.onSaved,
+  });
+
+  @override
+  State<_StockAdjustmentDialog> createState() => _StockAdjustmentDialogState();
+}
+
+class _StockAdjustmentDialogState extends State<_StockAdjustmentDialog> {
+  final _quantity = TextEditingController();
+  final _reference = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _quantity.dispose();
+    _reference.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final amount = double.tryParse(_quantity.text.replaceAll(',', '.'));
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Ingresa una cantidad válida.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.repository.ajustar(
+        widget.item.id,
+        tipo: widget.initialType,
+        cantidad: amount,
+        referencia: _reference.text.trim().isEmpty
+            ? null
+            : _reference.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onSaved();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = error.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(
+      widget.initialType == 'ENTRADA' ? 'Ingreso de stock' : 'Salida de stock',
+    ),
+    content: SizedBox(
+      width: 420,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${widget.item.producto} · Stock ${widget.item.stock}'),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _quantity,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Cantidad'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _reference,
+            decoration: const InputDecoration(labelText: 'Referencia'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!, style: const TextStyle(color: AppColors.error)),
+          ],
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _saving ? null : () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(
+        onPressed: _saving ? null : _submit,
+        child: Text(_saving ? 'Guardando...' : 'Confirmar'),
+      ),
+    ],
+  );
 }
 
 // ─── Subpantalla: Detalle de Producto ────────────────────────────────────────
@@ -1404,7 +1738,7 @@ class _ProductDetailScreenState extends ConsumerState<_ProductDetailScreen> {
     final sedeId = ref.read(globalSedeIdProvider);
     try {
       final fresh = await ref
-          .read(_repoProvider)
+          .read(productosCatalogRepositoryProvider)
           .getById(widget.product.id, sedeId: sedeId);
       if (mounted) setState(() => _product = fresh);
     } catch (_) {
@@ -1582,7 +1916,8 @@ class _ProductDetailScreenState extends ConsumerState<_ProductDetailScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        widget.onEdit(); // fire-and-forget: abre el form desde la lista
+                        widget
+                            .onEdit(); // fire-and-forget: abre el form desde la lista
                       },
                       icon: const Icon(Icons.edit_outlined, size: 16),
                       label: const Text('Editar'),

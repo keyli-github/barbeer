@@ -13,13 +13,7 @@ final authRepositoryProvider = Provider<AuthRepository>(
   ),
 );
 
-enum AuthStatus {
-  initial,
-  authenticated,
-  unauthenticated,
-  mustChangePassword,
-  loading,
-}
+enum AuthStatus { initial, authenticated, unauthenticated, loading }
 
 class AuthState {
   final AuthStatus status;
@@ -47,7 +41,6 @@ class AuthState {
   );
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
-  bool get isMustChangePassword => status == AuthStatus.mustChangePassword;
   List<String> get permisos => user?.permisos ?? [];
   bool hasPermission(String p) => user?.hasPermission(p) ?? false;
   bool canAccess(String path) => RouteAccessPolicy.canAccess(
@@ -96,9 +89,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> bootstrap() async {
     // Evita re-ejecutar si ya hay sesión activa o si ya hay un bootstrap
     // en curso (puede ocurrir si el widget que llama a bootstrap se reconstruye).
-    if (state.isBootstrapping ||
-        state.status == AuthStatus.authenticated ||
-        state.status == AuthStatus.mustChangePassword) {
+    if (state.isBootstrapping || state.status == AuthStatus.authenticated) {
       return;
     }
     state = state.copyWith(isBootstrapping: true);
@@ -115,14 +106,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
       final payload = AuthRepository.decodeJwt(auth.accessToken);
       final permisos = (payload?['permisos'] as List?)?.cast<String>() ?? [];
-      final mustChange = payload?['mustChangePassword'] as bool? ?? false;
-      if (mustChange) {
-        state = AuthState(
-          status: AuthStatus.mustChangePassword,
-          user: _fromPayload(payload, permisos),
-        );
-        return;
-      }
       final profile = await _repo.getProfile();
       state = AuthState(
         status: AuthStatus.authenticated,
@@ -150,22 +133,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       final payload = AuthRepository.decodeJwt(auth.accessToken);
       final permisos = (payload?['permisos'] as List?)?.cast<String>() ?? [];
-      if (auth.mustChangePassword) {
-        state = AuthState(
-          status: AuthStatus.mustChangePassword,
-          user:
-              _fromPayload(payload, permisos) ??
-              UserProfile(
-                id: '',
-                username: username,
-                rol: '',
-                nivel: 0,
-                createdAt: '',
-                permisos: permisos,
-              ),
-        );
-        return;
-      }
       final profile = await _repo.getProfile();
       state = AuthState(
         status: AuthStatus.authenticated,
@@ -216,19 +183,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     await _repo.changePassword(currentPassword: current, newPassword: newPwd);
     state = const AuthState(status: AuthStatus.unauthenticated);
-  }
-
-  UserProfile? _fromPayload(Map<String, dynamic>? p, List<String> permisos) {
-    if (p == null) return null;
-    return UserProfile(
-      id: p['sub'] as String? ?? '',
-      username: p['username'] as String? ?? '',
-      rol: p['rol'] as String? ?? '',
-      nivel: (p['nivel'] as num?)?.toInt() ?? 0,
-      sedeId: p['sedeId'] as String?,
-      createdAt: '',
-      permisos: permisos,
-    );
   }
 
   UserProfile _merge(UserProfile profile, List<String> permisos) => UserProfile(

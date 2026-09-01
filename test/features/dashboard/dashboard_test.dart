@@ -41,18 +41,20 @@ void main() {
   });
 
   Future<void> pumpKpis(WidgetTester tester, {required bool loading}) =>
-      tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: DashboardKpis(
-            data: DashboardData(
-              selectedSedeId: 's1',
-              cajaActual: session,
-              loading: loading,
+      tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DashboardKpis(
+              data: DashboardData(
+                selectedSedeId: 's1',
+                cajaActual: session,
+                loading: loading,
+              ),
+              auth: auth,
             ),
-            auth: auth,
           ),
         ),
-      ));
+      );
 
   testWidgets('SUPERADMIN keeps seven financial labels while values load', (
     tester,
@@ -70,61 +72,73 @@ void main() {
     ]) {
       expect(find.text(label), findsOneWidget);
     }
-    expect(find.byKey(const Key('dashboard-kpi-value-skeleton')), findsNWidgets(7));
+    expect(
+      find.byKey(const Key('dashboard-kpi-value-skeleton')),
+      findsNWidgets(7),
+    );
     expect(find.text('PRODUCTOS'), findsNothing);
   });
 
   testWidgets('SUPERADMIN renders authoritative financial response values', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1400, 900);
+    addTearDown(tester.view.reset);
     await pumpKpis(tester, loading: false);
 
     expect(find.textContaining('150.50'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('53.5%'), findsOneWidget);
     expect(find.byKey(const Key('dashboard-kpi-value-skeleton')), findsNothing);
+    final firstRow = tester.getTopLeft(find.text('VENTAS TOTALES')).dy;
+    expect(tester.getTopLeft(find.text('UTILIDAD BRUTA')).dy, firstRow);
+    expect(
+      tester.getTopLeft(find.text('UNIDADES VENDIDAS')).dy,
+      greaterThan(firstRow),
+    );
+    expect(
+      tester.getTopLeft(find.text('MARGEN NETO')).dy,
+      greaterThan(tester.getTopLeft(find.text('UNIDADES VENDIDAS')).dy),
+    );
   });
 
   group('Blocker 8: Dashboard recent activity', () {
     List<Map<String, dynamic>> makeAudit(int count) => List.generate(
-          count,
-          (i) => {
-            'id': 'a$i',
-            'accion': 'CREAR_VENTA',
-            'usuario': {'username': 'user$i'},
-            'createdAt': '2026-08-29T1$i:00:00Z',
-          },
-        );
+      count,
+      (i) => {
+        'id': 'a$i',
+        'accion': 'CREAR_VENTA',
+        'usuario': {'username': 'user$i'},
+        'createdAt': '2026-08-29T1$i:00:00Z',
+      },
+    );
 
-    testWidgets('Ver todo link is visible with 6 audit items', (
-      tester,
-    ) async {
+    testWidgets('Ver todo link is visible with 6 audit items', (tester) async {
       final router = GoRouter(
         routes: [
-          GoRoute(path: '/', builder: (_, __) => const SizedBox()),
-          GoRoute(path: '/auditoria', builder: (_, __) => const SizedBox()),
+          GoRoute(path: '/', builder: (_, _) => const SizedBox()),
+          GoRoute(path: '/auditoria', builder: (_, _) => const SizedBox()),
         ],
       );
-      await tester.pumpWidget(MaterialApp.router(
-        routerConfig: router,
-      ));
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       // Now test the DashboardRecentActivity widget directly
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: DashboardRecentActivity(audit: makeAudit(6)),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: DashboardRecentActivity(audit: makeAudit(6))),
         ),
-      ));
+      );
       expect(find.text('Ver todo'), findsOneWidget);
     });
 
     testWidgets('Ver todo link is visible with exactly 1 audit item', (
       tester,
     ) async {
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: DashboardRecentActivity(audit: makeAudit(1)),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: DashboardRecentActivity(audit: makeAudit(1))),
         ),
-      ));
+      );
       expect(find.text('Ver todo'), findsOneWidget);
     });
 

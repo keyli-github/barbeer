@@ -28,6 +28,10 @@ class CategoriasScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final canCreate = auth.hasPermission('categorias:crear');
 
+    if (MediaQuery.sizeOf(context).width >= 1024) {
+      return _buildDesktop(context, ref, state, auth, canCreate);
+    }
+
     return Scaffold(
       backgroundColor: context.colors.backgroundAlt,
       floatingActionButton: canCreate
@@ -55,6 +59,69 @@ class CategoriasScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildDesktop(
+    BuildContext context,
+    WidgetRef ref,
+    CategoriasState state,
+    AuthState auth,
+    bool canCreate,
+  ) => Scaffold(
+    backgroundColor: context.colors.background,
+    body: RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: ref.read(categoriasProvider.notifier).load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.colors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: AppSearchBar(
+                    hint: 'Buscar categoría...',
+                    onChanged: ref.read(categoriasProvider.notifier).search,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: _CategoryFilters(state: state)),
+                if (canCreate) ...[
+                  const SizedBox(width: 20),
+                  SizedBox(
+                    height: 44,
+                    child: FilledButton.icon(
+                      onPressed: () => _showForm(context, ref),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('NUEVA CATEGORÍA'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _DesktopCategoriesTable(
+            state: state,
+            canEdit: auth.hasPermission('categorias:editar'),
+            canDelete: auth.hasPermission('categorias:eliminar'),
+            onEdit: (category) => _showForm(context, ref, categoria: category),
+            onToggle: (category) => _toggle(context, ref, category),
+            onDelete: (category) => _delete(context, ref, category),
+            onRetry: ref.read(categoriasProvider.notifier).load,
+            onPage: (page) =>
+                ref.read(categoriasProvider.notifier).load(pagina: page),
+          ),
+        ],
+      ),
+    ),
+  );
 
   List<Widget> _bodyContent(
     BuildContext context,
@@ -141,53 +208,53 @@ class CategoriasScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                    _ActivePill(active: categoria.activo),
-                    if (auth.hasPermission('categorias:editar') ||
-                        auth.hasPermission('categorias:eliminar'))
-                      PopupMenuButton<String>(
-                        icon: Icon(
-                          Icons.more_vert_rounded,
-                          size: 19,
-                          color: context.colors.textTertiary,
+                _ActivePill(active: categoria.activo),
+                if (auth.hasPermission('categorias:editar') ||
+                    auth.hasPermission('categorias:eliminar'))
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      size: 19,
+                      color: context.colors.textTertiary,
+                    ),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showForm(context, ref, categoria: categoria);
+                      } else if (value == 'toggle') {
+                        _toggle(context, ref, categoria);
+                      } else {
+                        _delete(context, ref, categoria);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      if (auth.hasPermission('categorias:editar'))
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Editar'),
                         ),
-                        onSelected: (value) {
-                          if (value == 'edit') {
-                            _showForm(context, ref, categoria: categoria);
-                          } else if (value == 'toggle') {
-                            _toggle(context, ref, categoria);
-                          } else {
-                            _delete(context, ref, categoria);
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          if (auth.hasPermission('categorias:editar'))
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Editar'),
-                            ),
-                          if (auth.hasPermission('categorias:editar'))
-                            PopupMenuItem(
-                              value: 'toggle',
-                              child: Text(
-                                categoria.activo ? 'Desactivar' : 'Activar',
-                              ),
-                            ),
-                          // 'delete' (baja lógica) es idéntico a desactivar:
-                          // se omite para evitar la opción duplicada.
-                        ],
-                      ),
-                  ],
-                ),
-              ),
+                      if (auth.hasPermission('categorias:editar'))
+                        PopupMenuItem(
+                          value: 'toggle',
+                          child: Text(
+                            categoria.activo ? 'Desactivar' : 'Activar',
+                          ),
+                        ),
+                      // 'delete' (baja lógica) es idéntico a desactivar:
+                      // se omite para evitar la opción duplicada.
+                    ],
+                  ),
+              ],
             ),
-          AppPagination(
-            page: state.pagina,
-            totalPages: state.totalPaginas,
-            total: state.total,
-            onPageChange: (page) =>
-                ref.read(categoriasProvider.notifier).load(pagina: page),
           ),
-        ];
+        ),
+      AppPagination(
+        page: state.pagina,
+        totalPages: state.totalPaginas,
+        total: state.total,
+        onPageChange: (page) =>
+            ref.read(categoriasProvider.notifier).load(pagina: page),
+      ),
+    ];
   }
 
   Future<void> _showDetail(
@@ -313,6 +380,211 @@ class CategoriasScreen extends ConsumerWidget {
       AppFeedback.success(context, text);
     }
   }
+}
+
+class _DesktopCategoriesTable extends StatelessWidget {
+  final CategoriasState state;
+  final bool canEdit;
+  final bool canDelete;
+  final ValueChanged<Categoria> onEdit;
+  final ValueChanged<Categoria> onToggle;
+  final ValueChanged<Categoria> onDelete;
+  final Future<void> Function() onRetry;
+  final ValueChanged<int> onPage;
+
+  const _DesktopCategoriesTable({
+    required this.state,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+    required this.onRetry,
+    required this.onPage,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.colors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        const _DesktopCategoryRow.header(),
+        if (state.isLoading && state.categorias.isEmpty)
+          const SizedBox(
+            height: 180,
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (state.error != null && state.categorias.isEmpty)
+          SizedBox(
+            height: 180,
+            child: AppErrorState(message: state.error!, onRetry: onRetry),
+          )
+        else if (state.categorias.isEmpty)
+          const SizedBox(
+            height: 180,
+            child: Center(child: Text('Sin categorías.')),
+          )
+        else
+          for (final category in state.categorias)
+            _DesktopCategoryRow(
+              category: category,
+              canEdit: canEdit,
+              canDelete: canDelete,
+              onEdit: () => onEdit(category),
+              onToggle: () => onToggle(category),
+              onDelete: () => onDelete(category),
+            ),
+        AppPagination(
+          page: state.pagina,
+          totalPages: state.totalPaginas,
+          total: state.total,
+          onPageChange: onPage,
+        ),
+      ],
+    ),
+  );
+}
+
+class _DesktopCategoryRow extends StatelessWidget {
+  final Categoria? category;
+  final bool header;
+  final bool canEdit;
+  final bool canDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onToggle;
+  final VoidCallback? onDelete;
+
+  const _DesktopCategoryRow({
+    required this.category,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  }) : header = false;
+
+  const _DesktopCategoryRow.header()
+    : category = null,
+      header = true,
+      canEdit = false,
+      canDelete = false,
+      onEdit = null,
+      onToggle = null,
+      onDelete = null;
+
+  @override
+  Widget build(BuildContext context) {
+    final category = this.category;
+    return Container(
+      constraints: BoxConstraints(minHeight: header ? 48 : 70),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: header ? context.colors.surfaceAlt : null,
+        border: Border(bottom: BorderSide(color: context.colors.divider)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: header
+                ? const _CategoryHeader('CATEGORÍA')
+                : Row(
+                    children: [
+                      const Icon(
+                        Icons.account_tree_outlined,
+                        size: 17,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          category!.nombre,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          Expanded(
+            flex: 2,
+            child: header
+                ? const _CategoryHeader('DESCRIPCIÓN')
+                : Text(
+                    category!.descripcion?.isNotEmpty == true
+                        ? category.descripcion!
+                        : '—',
+                  ),
+          ),
+          Expanded(
+            child: header
+                ? const _CategoryHeader('PRODUCTOS')
+                : Text('${category!.productosCount}'),
+          ),
+          Expanded(
+            child: header
+                ? const _CategoryHeader('ESTADO')
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: _ActivePill(active: category!.activo),
+                  ),
+          ),
+          Expanded(
+            flex: 2,
+            child: header
+                ? const _CategoryHeader('ACCIONES')
+                : Row(
+                    children: [
+                      if (canEdit)
+                        IconButton(
+                          onPressed: onEdit,
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                      if (canEdit)
+                        IconButton(
+                          onPressed: onToggle,
+                          icon: Icon(
+                            category!.activo
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                        ),
+                      if (canDelete)
+                        IconButton(
+                          onPressed: onDelete,
+                          color: AppColors.error,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryHeader extends StatelessWidget {
+  final String text;
+  const _CategoryHeader(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: TextStyle(
+      color: context.colors.textTertiary,
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+      letterSpacing: .8,
+    ),
+  );
 }
 
 // ─── Filtros ──────────────────────────────────────────────────────────────────

@@ -36,13 +36,13 @@ List<Map<String, dynamic>> assignableRoles(
   int currentLevel, {
   required bool isSuperAdmin,
 }) => roles
-    .where(
-      (role) =>
-          role['activo'] == true &&
-          role['nombre'] != 'SUPERADMIN' &&
-          (isSuperAdmin || (role['nivel'] as int? ?? 0) < currentLevel),
-    )
-    .toList();
+        .where(
+          (role) =>
+              role['activo'] == true &&
+              role['nombre'] != 'SUPERADMIN' &&
+              (isSuperAdmin || (role['nivel'] as int? ?? 0) < currentLevel),
+        )
+        .toList();
 
 List<Map<String, dynamic>> editableSedesForUser(
   List<Map<String, dynamic>> activeSedes,
@@ -84,15 +84,15 @@ class UsuariosState {
     List<Map<String, dynamic>>? roles,
     List<Map<String, dynamic>>? sedes,
   }) => UsuariosState(
-    isLoading: isLoading ?? this.isLoading,
-    error: error,
-    users: users ?? this.users,
-    total: total ?? this.total,
-    page: page ?? this.page,
-    totalPages: totalPages ?? this.totalPages,
-    roles: roles ?? this.roles,
-    sedes: sedes ?? this.sedes,
-  );
+        isLoading: isLoading ?? this.isLoading,
+        error: error,
+        users: users ?? this.users,
+        total: total ?? this.total,
+        page: page ?? this.page,
+        totalPages: totalPages ?? this.totalPages,
+        roles: roles ?? this.roles,
+        sedes: sedes ?? this.sedes,
+      );
 }
 
 class UsuariosNotifier extends StateNotifier<UsuariosState> {
@@ -528,8 +528,8 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
             .reactivateUser(user['id'] as String),
         onResetPassword: (uid) => _resetPassword(context, ref, uid),
         onEditPermissions: auth.user?.isSuperAdmin == true
-          ? (userId, username) => _showPermissions(context, userId, username)
-          : null,
+            ? (userId, username) => _showPermissions(context, userId, username)
+            : null,
       ),
     );
   }
@@ -654,16 +654,16 @@ class _FilterDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<T>(
-    initialValue: initialValue,
-    isExpanded: true,
-    isDense: true,
-    decoration: InputDecoration(
-      labelText: label,
+        initialValue: initialValue,
+        isExpanded: true,
+        isDense: true,
+        decoration: InputDecoration(
+          labelText: label,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    ),
-    items: items,
-    onChanged: onChanged,
-  );
+        ),
+        items: items,
+        onChanged: onChanged,
+      );
 }
 
 /// Desktop DataTable for users — matches web's table layout with columns:
@@ -777,105 +777,110 @@ class _UsersDesktopTable extends StatelessWidget {
                     ),
                     // Rol
                     DataCell(Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: roleColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        roleName,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: roleColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: roleColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          roleName,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: roleColor,
+                          ),
                         ),
                       ),
                     )),
                     // Sede
                     DataCell(Text(
-                      sedeName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: context.colors.textSecondary,
+                        sedeName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.colors.textSecondary,
+                        ),
                       ),
                     )),
                     // Estado
                     DataCell(Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: activo
-                            ? AppColors.success.withValues(alpha: 0.1)
-                            : AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        activo ? 'Activo' : 'Inactivo',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: activo ? AppColors.success : AppColors.error,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: activo
+                              ? AppColors.success.withValues(alpha: 0.1)
+                              : AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          activo ? 'Activo' : 'Inactivo',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: activo ? AppColors.success : AppColors.error,
+                          ),
                         ),
                       ),
                     )),
                     // Alta (createdAt)
                     DataCell(Text(
-                      _formatDate(createdAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.colors.textTertiary,
+                        _formatDate(createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: context.colors.textTertiary,
+                        ),
                       ),
                     )),
                     // Acciones
                     DataCell(Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
                           icon: const Icon(Icons.visibility_outlined, size: 18),
-                          tooltip: 'Detalle',
-                          onPressed: () => onTap(user),
-                          color: context.colors.textSecondary,
-                        ),
-                        if (canEdit)
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            tooltip: 'Editar',
-                            onPressed: () => onEdit(user),
+                            tooltip: 'Detalle',
+                            onPressed: () => onTap(user),
                             color: context.colors.textSecondary,
                           ),
-                        if (canReset)
-                          IconButton(
-                            icon: const Icon(Icons.key_outlined, size: 18),
-                            tooltip: 'Reset contraseña',
-                            onPressed: () => onResetPassword(user),
-                            color: context.colors.textSecondary,
-                          ),
-                        if (canDelete && activo && !isSuperadmin)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.person_off_outlined,
-                              size: 18,
+                          if (canEdit)
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              tooltip: 'Editar',
+                              onPressed: () => onEdit(user),
+                              color: context.colors.textSecondary,
                             ),
-                            tooltip: 'Desactivar',
-                            onPressed: () => onDeactivate(user),
-                            color: AppColors.error,
-                          ),
-                        if (canEdit && !activo)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.person_add_outlined,
-                              size: 18,
+                          if (canReset)
+                            IconButton(
+                              icon: const Icon(Icons.key_outlined, size: 18),
+                              tooltip: 'Reset contraseña',
+                              onPressed: () => onResetPassword(user),
+                              color: context.colors.textSecondary,
                             ),
-                            tooltip: 'Reactivar',
-                            onPressed: () => onReactivate(user),
-                            color: AppColors.success,
-                          ),
-                      ],
+                          if (canDelete && activo && !isSuperadmin)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.person_off_outlined,
+                                size: 18,
+                              ),
+                              tooltip: 'Desactivar',
+                              onPressed: () => onDeactivate(user),
+                              color: AppColors.error,
+                            ),
+                          if (canEdit && !activo)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.person_add_outlined,
+                                size: 18,
+                              ),
+                              tooltip: 'Reactivar',
+                              onPressed: () => onReactivate(user),
+                              color: AppColors.success,
+                            ),
+                        ],
+                      ),
                     )),
                   ],
                 );
@@ -918,7 +923,6 @@ class _UserTile extends StatelessWidget {
     final role = user['rol']?['nombre'] as String? ?? '';
     final sede = user['sede']?['nombre'] as String?;
     final activo = user['activo'] as bool? ?? false;
-    final mustChange = user['mustChangePassword'] as bool? ?? false;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -954,14 +958,6 @@ class _UserTile extends StatelessWidget {
                           style: AppTextStyles.titleMedium,
                         ),
                       ),
-                      if (mustChange) ...[
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.warning_amber_rounded,
-                          color: AppColors.warning,
-                          size: 14,
-                        ),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 3),
@@ -1132,7 +1128,6 @@ class _UserDetailScreen extends StatelessWidget {
     final sede = user['sede'] is Map
         ? user['sede']['nombre'] as String? ?? 'Sin sede'
         : user['sedeId'] as String? ?? 'Sin sede';
-    final mustChange = user['mustChangePassword'] as bool? ?? false;
     final protected = rol == 'SUPERADMIN';
 
     return Scaffold(
@@ -1237,11 +1232,6 @@ class _UserDetailScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _DetailRow('Sede', sede),
-                  Divider(height: 1, color: context.colors.surfaceAlt),
-                  _DetailRow(
-                    'Cambio de contraseña',
-                    mustChange ? 'Requerido' : 'No requerido',
-                  ),
                   Divider(height: 1, color: context.colors.surfaceAlt),
                   _DetailRow('ID', user['id'] as String? ?? '', mono: true),
                 ],
@@ -1350,16 +1340,16 @@ class _Badge extends StatelessWidget {
   const _Badge(this.text, this.color);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(
-      text,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          text,
       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
-    ),
-  );
+        ),
+      );
 }
 
 class _DetailRow extends StatelessWidget {
@@ -1368,31 +1358,31 @@ class _DetailRow extends StatelessWidget {
   const _DetailRow(this.label, this.value, {this.mono = false});
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
           style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: context.colors.textPrimary,
-              fontFamily: mono ? 'monospace' : null,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+            Flexible(
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: context.colors.textPrimary,
+                  fontFamily: mono ? 'monospace' : null,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 }
 
 class _UserDetail extends StatelessWidget {
@@ -1407,8 +1397,6 @@ class _UserDetail extends StatelessWidget {
       'Rol': user['rol']?['nombre'] as String? ?? '',
       'Sede': user['sede']?['nombre'] as String? ?? 'Sin sede',
       'Estado': (user['activo'] as bool? ?? false) ? 'Activo' : 'Inactivo',
-      'Cambio de contrasena requerido':
-          (user['mustChangePassword'] as bool? ?? false) ? 'Si' : 'No',
       'Creado': user['createdAt'] as String? ?? '',
     };
     return Column(
@@ -1573,15 +1561,15 @@ class _UserFormState extends State<_UserForm> {
   }
 
   Widget _label(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(
-      t,
-      style: AppTextStyles.bodySmall.copyWith(
-        fontWeight: FontWeight.w500,
-        color: context.colors.textSecondary,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(
+          t,
+          style: AppTextStyles.bodySmall.copyWith(
+            fontWeight: FontWeight.w500,
+            color: context.colors.textSecondary,
+          ),
+        ),
+      );
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -1707,15 +1695,15 @@ class _UserEditFormState extends State<_UserEditForm> {
   }
 
   Widget _label(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(
-      t,
-      style: AppTextStyles.bodySmall.copyWith(
-        fontWeight: FontWeight.w500,
-        color: context.colors.textSecondary,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(
+          t,
+          style: AppTextStyles.bodySmall.copyWith(
+            fontWeight: FontWeight.w500,
+            color: context.colors.textSecondary,
+          ),
+        ),
+      );
 
   Future<void> _submit() async {
     setState(() => _loading = true);
@@ -1770,68 +1758,68 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    scrollable: true,
-    icon: const Icon(Icons.lock_reset_rounded, color: AppColors.primary),
-    title: const Text('Nueva contraseña'),
-    content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Asigna una contraseña definitiva. Se cerrarán las sesiones activas del usuario.',
+        scrollable: true,
+        icon: const Icon(Icons.lock_reset_rounded, color: AppColors.primary),
+        title: const Text('Nueva contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Asigna una contraseña definitiva. Se cerrarán las sesiones activas del usuario.',
             style: TextStyle(fontSize: 13, color: context.colors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const Key('reset-password-field'),
-            controller: _password,
-            obscureText: _obscure,
-            maxLength: 72,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Nueva contraseña',
-              counterText: '',
-              suffixIcon: IconButton(
-                onPressed: () => setState(() => _obscure = !_obscure),
-                icon: Icon(
-                  _obscure
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: const Key('reset-password-field'),
+              controller: _password,
+              obscureText: _obscure,
+              maxLength: 72,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Nueva contraseña',
+                counterText: '',
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: const Key('reset-password-confirmation-field'),
-            controller: _confirmation,
-            obscureText: _obscure,
-            maxLength: 72,
-            decoration: const InputDecoration(
-              labelText: 'Confirmar contraseña',
-              counterText: '',
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('reset-password-confirmation-field'),
+              controller: _confirmation,
+              obscureText: _obscure,
+              maxLength: 72,
+              decoration: const InputDecoration(
+                labelText: 'Confirmar contraseña',
+                counterText: '',
+              ),
+              onSubmitted: (_) => _submit(),
             ),
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: 8),
-          const Text(passwordPolicyHint, style: AppTextStyles.labelSmall),
-          if (_error != null) ...[
             const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: const TextStyle(color: AppColors.error, fontSize: 12),
-            ),
+            const Text(passwordPolicyHint, style: AppTextStyles.labelSmall),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 12),
+              ),
+            ],
           ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(onPressed: _submit, child: const Text('Actualizar')),
         ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Cancelar'),
-      ),
-      FilledButton(onPressed: _submit, child: const Text('Actualizar')),
-    ],
-  );
+      );
 }
 
 class _StatChip extends StatelessWidget {
@@ -1844,35 +1832,35 @@ class _StatChip extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.09),
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      border: Border.all(color: color.withValues(alpha: 0.20)),
-    ),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: color,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.09),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: color.withValues(alpha: 0.20)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.labelSmall,
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.labelSmall,
-        ),
-      ],
-    ),
-  );
+      );
 }

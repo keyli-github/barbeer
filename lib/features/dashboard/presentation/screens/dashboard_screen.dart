@@ -50,6 +50,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final auth = ref.watch(authProvider);
     final data = ref.watch(dashboardProvider);
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
+    final horizontalPadding = desktop ? 24.0 : 20.0;
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -60,10 +61,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.only(bottom: desktop ? 32 : 120),
           children: [
-            const SizedBox(height: 14),
+            SizedBox(height: desktop ? 10 : 14),
             // ── Greeting ──
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: _Greeting(auth: auth),
             ),
             const SizedBox(height: 14),
@@ -71,7 +72,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             if (data.cajaConDiferencia != null &&
                 auth.hasPermission('caja:leer'))
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  0,
+                  horizontalPadding,
+                  14,
+                ),
                 child: _CashDifferenceAlert(session: data.cajaConDiferencia!),
               ),
             // ── Mi Asistencia (non-admin only) ──
@@ -79,25 +85,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 auth.user!.nivel < 100 &&
                 !auth.user!.isSuperAdmin)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  0,
+                  horizontalPadding,
+                  14,
+                ),
                 child: _MyAttendanceCard(auth: auth),
               ),
             // ── Errors ──
             if (data.errors.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  0,
+                  horizontalPadding,
+                  14,
+                ),
                 child: _DashboardErrors(errors: data.errors),
               ),
             // ── KPI cards grid ──
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: DashboardKpis(data: data, auth: auth),
             ),
             const SizedBox(height: 14),
             // ── Recent Activity (conditional, audit:leer) ──
             if (data.audit.isNotEmpty && auth.hasPermission('audit:leer'))
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                 child: DashboardRecentActivity(audit: data.audit),
               ),
           ],
@@ -120,16 +136,17 @@ class _Greeting extends StatelessWidget {
     final greeting = hour < 12
         ? 'Buenos días'
         : hour < 19
-            ? 'Buenas tardes'
-            : 'Buenas noches';
+        ? 'Buenas tardes'
+        : 'Buenas noches';
     final user = auth.user;
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '$greeting, ${user?.username ?? 'Usuario'}',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: desktop ? 24 : 22,
             height: 1.15,
             fontWeight: FontWeight.w800,
             color: context.colors.textPrimary,
@@ -137,7 +154,7 @@ class _Greeting extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: desktop ? 5 : 4),
         Text(
           '${FormatUtils.roleName(user?.rol ?? '')} · '
           '${user?.isSuperAdmin == true ? 'Acceso global' : user?.sedeName ?? 'Sin sede'}',
@@ -159,79 +176,78 @@ class _CashDifferenceAlert extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.brand.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.brand.withValues(alpha: 0.35)),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppColors.brand.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.brand.withValues(alpha: 0.35)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.warning_amber_rounded,
+          size: 20,
+          color: AppColors.brand,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              size: 20,
-              color: AppColors.brand,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Diferencia en caja detectada',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.textPrimary,
-                    ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Diferencia en caja detectada',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text.rich(
+                TextSpan(
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: context.colors.textTertiary,
                   ),
-                  const SizedBox(height: 4),
-                  Text.rich(
+                  children: [
+                    const TextSpan(text: 'La última sesión cerrada en '),
                     TextSpan(
+                      text: session.sede,
                       style: TextStyle(
-                        fontSize: 12,
-                        height: 1.45,
-                        color: context.colors.textTertiary,
+                        color: context.colors.textPrimary,
+                        fontWeight: FontWeight.w600,
                       ),
-                      children: [
-                        const TextSpan(text: 'La última sesión cerrada en '),
-                        TextSpan(
-                          text: session.sede,
-                          style: TextStyle(
-                            color: context.colors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const TextSpan(text: ' tiene una diferencia de '),
-                        TextSpan(
-                          text: FormatUtils.currency(
-                            (session.diferenciaCierre ?? 0).abs(),
-                          ),
-                          style: const TextStyle(
-                            color: AppColors.brand,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const TextSpan(text: '. Revisa el cierre.'),
-                      ],
                     ),
-                  ),
-                ],
+                    const TextSpan(text: ' tiene una diferencia de '),
+                    TextSpan(
+                      text: FormatUtils.currency(
+                        (session.diferenciaCierre ?? 0).abs(),
+                      ),
+                      style: const TextStyle(
+                        color: AppColors.brand,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const TextSpan(text: '. Revisa el cierre.'),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () => GoRouter.of(context).go('/caja'),
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-              ),
-              child: const Text('Ver caja', style: TextStyle(fontSize: 11)),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: () => GoRouter.of(context).go('/caja'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+          ),
+          child: const Text('Ver caja', style: TextStyle(fontSize: 11)),
+        ),
+      ],
+    ),
+  );
 }
 
 // ─── My Attendance Card ───────────────────────────────────────────────────────
@@ -337,18 +353,69 @@ class DashboardKpis extends StatelessWidget {
           : data.cajaActual == null
           ? 'Sin turno abierto'
           : 'Turno de caja actual';
-      String money(double? amount) => needsSede
-          ? 'Selecciona sede'
-          : FormatUtils.currency(amount ?? 0);
-      String number(num? amount) => needsSede ? 'Selecciona sede' : '${amount ?? 0}';
+      String money(double? amount) =>
+          needsSede ? 'Selecciona sede' : FormatUtils.currency(amount ?? 0);
+      String number(num? amount) =>
+          needsSede ? 'Selecciona sede' : '${amount ?? 0}';
       items.addAll([
-        _KD(icon: Icons.point_of_sale, label: 'Ventas totales', value: money(summary?.totalVentasNeto), detail: cashDetail, valueColor: AppColors.success, path: '/ventas'),
-        _KD(icon: Icons.inventory_2_outlined, label: 'Costo de productos vendidos', value: money(summary?.costoProductosVendidos), detail: cashDetail, valueColor: AppColors.warning, path: '/productos'),
-        _KD(icon: Icons.trending_up, label: 'Utilidad bruta', value: money(summary?.utilidadBruta), detail: 'Ventas menos costo de productos', valueColor: AppColors.success, path: '/ventas'),
-        _KD(icon: Icons.sell_outlined, label: 'Unidades vendidas', value: number(summary?.unidadesVendidas), detail: cashDetail, valueColor: context.colors.textPrimary, path: '/ventas'),
-        _KD(icon: Icons.trending_down, label: 'Otros gastos', value: money(summary?.otrosGastos), detail: 'Salidas manuales del cuadre de caja', valueColor: AppColors.error, path: '/movimientos'),
-        _KD(icon: Icons.account_balance, label: 'Utilidad neta', value: money(summary?.utilidadNeta), detail: 'Utilidad bruta menos otros gastos', valueColor: AppColors.success, path: '/caja'),
-        _KD(icon: Icons.percent, label: 'Margen neto', value: needsSede ? 'Selecciona sede' : '${(summary?.margenNeto ?? 0).toStringAsFixed(1)}%', detail: 'Utilidad neta sobre ventas totales', valueColor: AppColors.success, path: '/caja'),
+        _KD(
+          icon: Icons.point_of_sale,
+          label: 'Ventas totales',
+          value: money(summary?.totalVentasNeto),
+          detail: cashDetail,
+          valueColor: AppColors.success,
+          path: '/ventas',
+        ),
+        _KD(
+          icon: Icons.inventory_2_outlined,
+          label: 'Costo de productos vendidos',
+          value: money(summary?.costoProductosVendidos),
+          detail: cashDetail,
+          valueColor: AppColors.warning,
+          path: '/productos',
+        ),
+        _KD(
+          icon: Icons.trending_up,
+          label: 'Utilidad bruta',
+          value: money(summary?.utilidadBruta),
+          detail: 'Ventas menos costo de productos',
+          valueColor: AppColors.success,
+          path: '/ventas',
+        ),
+        _KD(
+          icon: Icons.sell_outlined,
+          label: 'Unidades vendidas',
+          value: number(summary?.unidadesVendidas),
+          detail: cashDetail,
+          valueColor: context.colors.textPrimary,
+          path: '/ventas',
+        ),
+        _KD(
+          icon: Icons.trending_down,
+          label: 'Otros gastos',
+          value: money(summary?.otrosGastos),
+          detail: 'Salidas manuales del cuadre de caja',
+          valueColor: AppColors.error,
+          path: '/movimientos',
+        ),
+        _KD(
+          icon: Icons.account_balance,
+          label: 'Utilidad neta',
+          value: money(summary?.utilidadNeta),
+          detail: 'Utilidad bruta menos otros gastos',
+          valueColor: AppColors.success,
+          path: '/caja',
+        ),
+        _KD(
+          icon: Icons.percent,
+          label: 'Margen neto',
+          value: needsSede
+              ? 'Selecciona sede'
+              : '${(summary?.margenNeto ?? 0).toStringAsFixed(1)}%',
+          detail: 'Utilidad neta sobre ventas totales',
+          valueColor: AppColors.success,
+          path: '/caja',
+        ),
       ]);
     }
 
@@ -366,18 +433,17 @@ class DashboardKpis extends StatelessWidget {
           value: data.hasError('caja')
               ? '—'
               : allSedes
-                  ? 'Selecciona sede'
-                  : caja?.isAbierta == true
-                      ? FormatUtils.currency(
-                          expectedCash ?? caja!.montoApertura)
-                      : 'Cerrada',
+              ? 'Selecciona sede'
+              : caja?.isAbierta == true
+              ? FormatUtils.currency(expectedCash ?? caja!.montoApertura)
+              : 'Cerrada',
           detail: detail(
             'caja',
             allSedes
                 ? 'Requiere una sede concreta'
                 : caja?.isAbierta == true
-                    ? 'Turno activo'
-                    : 'Sin turno abierto',
+                ? 'Turno activo'
+                : 'Sin turno abierto',
           ),
           valueColor: isOpen ? AppColors.success : context.colors.textTertiary,
           path: '/caja',
@@ -392,7 +458,10 @@ class DashboardKpis extends StatelessWidget {
           icon: Icons.liquor_rounded,
           label: 'Productos',
           value: value('productos', '${data.productos?.total ?? 0}'),
-          detail: detail('productos', '${data.productos?.activos ?? 0} activos'),
+          detail: detail(
+            'productos',
+            '${data.productos?.activos ?? 0} activos',
+          ),
           valueColor: AppColors.brand,
           path: '/productos',
         ),
@@ -406,7 +475,10 @@ class DashboardKpis extends StatelessWidget {
           icon: Icons.local_shipping_rounded,
           label: 'Compras',
           value: value('compras', '${data.comprasPendientes}'),
-          detail: detail('compras', FormatUtils.currency(data.comprasMontoTotal)),
+          detail: detail(
+            'compras',
+            FormatUtils.currency(data.comprasMontoTotal),
+          ),
           valueColor: AppColors.brand,
           path: '/compras',
         ),
@@ -464,8 +536,12 @@ class DashboardKpis extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final columns = width >= 1024 ? 3 : width >= 600 ? 2 : 1;
-        const gap = 10.0;
+        final columns = width >= 1024
+            ? 3
+            : width >= 600
+            ? 2
+            : 1;
+        final gap = width >= 1024 ? 14.0 : 10.0;
         final cardWidth =
             (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(
@@ -509,77 +585,89 @@ class _KpiCard extends StatelessWidget {
   const _KpiCard({required this.k, required this.loading});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          GoRouter.of(context).go(k.path);
-        },
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 11),
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.colors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      k.label.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w700,
-                        color: context.colors.textTertiary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1024;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        GoRouter.of(context).go(k.path);
+      },
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          desktop ? 16 : 14,
+          12,
+          desktop ? 16 : 14,
+          11,
+        ),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(desktop ? 14 : 12),
+          border: Border.all(color: context.colors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    k.label.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: desktop ? 10 : 9,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w700,
+                      color: context.colors.textTertiary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  Icon(k.icon, size: 12, color: context.colors.textTertiary),
-                ],
-              ),
-              const SizedBox(height: 6),
-              if (loading)
-                Container(
-                  key: const Key('dashboard-kpi-value-skeleton'),
-                  width: 88,
-                  height: 19,
-                  decoration: BoxDecoration(
-                    color: context.colors.backgroundAlt,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                )
-              else
-                Text(
-                  k.value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    fontFamily: 'monospace',
-                    color: k.valueColor,
-                    letterSpacing: -0.3,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              const SizedBox(height: 2),
-              Text(
-                k.detail,
-                style: TextStyle(
-                  fontSize: 10,
+                Icon(
+                  k.icon,
+                  size: desktop ? 14 : 12,
                   color: context.colors.textTertiary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (loading)
+              Container(
+                key: const Key('dashboard-kpi-value-skeleton'),
+                width: 88,
+                height: 19,
+                decoration: BoxDecoration(
+                  color: context.colors.backgroundAlt,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              )
+            else
+              Text(
+                k.value,
+                style: TextStyle(
+                  fontSize: desktop ? 17 : 16,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'monospace',
+                  color: k.valueColor,
+                  letterSpacing: -0.3,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
+            const SizedBox(height: 2),
+            Text(
+              k.detail,
+              style: TextStyle(
+                fontSize: desktop ? 11 : 10,
+                color: context.colors.textTertiary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 // ─── Dashboard Errors ─────────────────────────────────────────────────────────
@@ -591,46 +679,49 @@ class _DashboardErrors extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: context.colors.errorLight,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: context.colors.errorLight,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 17, color: AppColors.error),
-                const SizedBox(width: 7),
-                Flexible(
-                  child: Text(
-                    'Algunos datos no se pudieron actualizar',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.error,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 17,
+              color: AppColors.error,
             ),
-            const SizedBox(height: 5),
-            for (final error in errors.entries.take(3))
-              Text(
-                '${error.key}: ${error.value}',
-                maxLines: 2,
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                'Algunos datos no se pudieron actualizar',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.error,
+                ),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: AppColors.error),
               ),
+            ),
           ],
         ),
-      );
+        const SizedBox(height: 5),
+        for (final error in errors.entries.take(3))
+          Text(
+            '${error.key}: ${error.value}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: AppColors.error),
+          ),
+      ],
+    ),
+  );
 }
 
 // ─── Recent Activity — 8 items ────────────────────────────────────────────────
@@ -641,110 +732,122 @@ class DashboardRecentActivity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _DashboardSurface(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Actividad reciente',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.textPrimary,
-                    ),
-                  ),
+            Icon(
+              Icons.list_alt_outlined,
+              size: 15,
+              color: context.colors.textTertiary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Actividad reciente',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: context.colors.textPrimary,
                 ),
-                if (audit.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => GoRouter.of(context).go('/auditoria'),
-                    child: const Text(
+              ),
+            ),
+            if (audit.isNotEmpty)
+              InkWell(
+                onTap: () => GoRouter.of(context).go('/auditoria'),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
                       'Ver todo',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         color: AppColors.primary,
                       ),
                     ),
-                  ),
-              ],
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 13,
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...audit.take(8).map((log) {
+          final accion = log['accion'] as String? ?? '';
+          final usuario = log['usuario'];
+          final user = usuario is Map
+              ? usuario['username'] as String? ?? 'Sistema'
+              : log['username'] as String? ??
+                    (usuario is String ? usuario : 'Sistema');
+          final ts = log['createdAt'] as String?;
+          DateTime? dt;
+          try {
+            dt = ts != null ? DateTime.parse(ts) : null;
+          } catch (_) {}
+          final entity = log['entidad'] as String?;
+          final metadata = [
+            if (entity?.isNotEmpty == true) entity!,
+            user,
+            if (dt != null) FormatUtils.timeAgo(dt),
+          ].join(' · ');
+          final color = _color(accion);
+          return Container(
+            constraints: const BoxConstraints(minHeight: 47),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: context.colors.border)),
             ),
-            const SizedBox(height: 10),
-            ...audit.take(8).map((log) {
-              final accion = log['accion'] as String? ?? '';
-              final usuario = log['usuario'];
-              final user = usuario is Map
-                  ? usuario['username'] as String? ?? 'Sistema'
-                  : log['username'] as String? ??
-                      (usuario is String ? usuario : 'Sistema');
-              final ts = log['createdAt'] as String?;
-              DateTime? dt;
-              try {
-                dt = ts != null ? DateTime.parse(ts) : null;
-              } catch (_) {}
-              final c = _color(accion);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: c.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(_icon(accion), size: 16, color: c),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            accion,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: context.colors.textPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            user,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: context.colors.textTertiary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (dt != null)
+            child: Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        FormatUtils.timeAgo(dt),
+                        accion.replaceAll('_', ' ').toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        metadata,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 10,
                           color: context.colors.textTertiary,
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            }),
-          ],
-        ),
-      );
-
-  static IconData _icon(String a) {
-    if (a.contains('COMPRA')) return Icons.local_shipping_rounded;
-    if (a.contains('STOCK')) return Icons.warning_rounded;
-    if (a.contains('CAJA')) return Icons.account_balance_wallet_rounded;
-    if (a.contains('VENTA')) return Icons.shopping_cart_rounded;
-    return Icons.history_rounded;
-  }
+              ],
+            ),
+          );
+        }),
+      ],
+    ),
+  );
 
   static Color _color(String a) {
     if (a.contains('ELIMINAR')) return AppColors.error;
@@ -763,13 +866,13 @@ class _DashboardSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: context.colors.border),
-        ),
-        child: child,
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: child,
+  );
 }

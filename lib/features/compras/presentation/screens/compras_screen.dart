@@ -27,6 +27,13 @@ final _productosRepoProvider = Provider<ProductosRepository>(
   (ref) => ProductosRepository(ApiClient.instance),
 );
 
+const double comprasDesktopBreakpoint = 1024;
+
+bool usesComprasDesktopLayout(double width) =>
+    width >= comprasDesktopBreakpoint;
+
+enum _DesktopComprasSection { nueva, historial, proveedores }
+
 // ─── Ordenes state ────────────────────────────────────────────────────────────
 
 class _OrdenesState {
@@ -265,6 +272,7 @@ class ComprasScreen extends ConsumerStatefulWidget {
 class _ComprasScreenState extends ConsumerState<ComprasScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
+  _DesktopComprasSection _desktopSection = _DesktopComprasSection.nueva;
 
   @override
   void initState() {
@@ -283,6 +291,10 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
     final auth = ref.watch(authProvider);
     final canCreate = auth.hasPermission('compras:crear');
     final canEdit = auth.hasPermission('compras:editar');
+
+    if (usesComprasDesktopLayout(MediaQuery.sizeOf(context).width)) {
+      return _buildDesktop(context, canCreate: canCreate, canEdit: canEdit);
+    }
 
     return Scaffold(
       backgroundColor: context.colors.background,
@@ -337,6 +349,66 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
     );
   }
 
+  Widget _buildDesktop(
+    BuildContext context, {
+    required bool canCreate,
+    required bool canEdit,
+  }) {
+    final sections = <_DesktopComprasSection>[
+      if (canCreate) _DesktopComprasSection.nueva,
+      _DesktopComprasSection.historial,
+      _DesktopComprasSection.proveedores,
+    ];
+    final active = sections.contains(_desktopSection)
+        ? _desktopSection
+        : sections.first;
+
+    Widget content;
+    switch (active) {
+      case _DesktopComprasSection.nueva:
+        content = _NuevaOrdenScreen(
+          key: const ValueKey('compras-desktop-new-order'),
+          repo: ref.read(_comprasRepoProvider),
+          productosRepo: ref.read(_productosRepoProvider),
+          user: ref.read(authProvider).user!,
+          initialSedeId: ref.read(globalSedeIdProvider),
+          embedded: true,
+          onCreated: () {
+            ref.read(_ordenesProvider.notifier).load();
+            setState(() => _desktopSection = _DesktopComprasSection.historial);
+          },
+        );
+      case _DesktopComprasSection.historial:
+        content = _OrdenesTab(
+          desktop: true,
+          canEdit: canEdit,
+          onDetail: (id) => _showDetalle(context, id),
+        );
+      case _DesktopComprasSection.proveedores:
+        content = _ProvsTab(
+          desktop: true,
+          canCreate: canCreate,
+          canEdit: canEdit,
+          onCreate: () => _showNuevoProveedor(context),
+          onEdit: (p) => _showEditProveedor(context, p),
+        );
+    }
+
+    return Scaffold(
+      backgroundColor: context.colors.background,
+      body: Column(
+        children: [
+          _DesktopComprasTabs(
+            sections: sections,
+            active: active,
+            onSelected: (section) => setState(() => _desktopSection = section),
+          ),
+          Expanded(child: content),
+        ],
+      ),
+    );
+  }
+
   void _showNuevaOrden(BuildContext context) {
     AppNav.push(
       context,
@@ -384,12 +456,292 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 }
 
+class _DesktopComprasTabs extends StatelessWidget {
+  const _DesktopComprasTabs({
+    required this.sections,
+    required this.active,
+    required this.onSelected,
+  });
+
+  final List<_DesktopComprasSection> sections;
+  final _DesktopComprasSection active;
+  final ValueChanged<_DesktopComprasSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    const data = <_DesktopComprasSection, (IconData, String)>{
+      _DesktopComprasSection.nueva: (Icons.add_rounded, 'Nueva orden'),
+      _DesktopComprasSection.historial: (
+        Icons.assignment_outlined,
+        'Historial de órdenes',
+      ),
+      _DesktopComprasSection.proveedores: (
+        Icons.local_shipping_outlined,
+        'Proveedores',
+      ),
+    };
+
+    return Container(
+      key: const Key('compras-desktop-tabs'),
+      height: 49,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: context.colors.background,
+        border: Border(bottom: BorderSide(color: context.colors.border)),
+      ),
+      child: Row(
+        children: [
+          for (final section in sections)
+            _DesktopComprasTabButton(
+              icon: data[section]!.$1,
+              label: data[section]!.$2,
+              selected: section == active,
+              onTap: () => onSelected(section),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopComprasTabButton extends StatelessWidget {
+  const _DesktopComprasTabButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: selected ? AppColors.primary : context.colors.textTertiary,
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? AppColors.primary
+                  : context.colors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _DesktopOrdenesView extends StatelessWidget {
+  final _OrdenesState state;
+  final TextEditingController searchController;
+  final ValueChanged<String> onSearch;
+  final ValueChanged<String> onEstado;
+  final Future<void> Function() onRefresh;
+  final ValueChanged<int> onPageChange;
+  final ValueChanged<String> onDetail;
+
+  const _DesktopOrdenesView({
+    required this.state,
+    required this.searchController,
+    required this.onSearch,
+    required this.onEstado,
+    required this.onRefresh,
+    required this.onPageChange,
+    required this.onDetail,
+  });
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: searchController,
+                onChanged: onSearch,
+                decoration: const InputDecoration(
+                  hintText: 'Buscar por orden o proveedor...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: state.estadoFilter,
+                items: const [
+                  DropdownMenuItem(value: '', child: Text('Todos los estados')),
+                  DropdownMenuItem(
+                    value: 'PENDIENTE',
+                    child: Text('Pendientes'),
+                  ),
+                  DropdownMenuItem(value: 'RECIBIDA', child: Text('Recibidas')),
+                  DropdownMenuItem(
+                    value: 'CANCELADA',
+                    child: Text('Canceladas'),
+                  ),
+                ],
+                onChanged: (value) => onEstado(value ?? ''),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (state.loading)
+          const AppLoading()
+        else if (state.error != null)
+          AppErrorState(message: state.error!, onRetry: onRefresh)
+        else if (state.items.isEmpty)
+          const AppEmptyState(
+            icon: Icons.shopping_cart_outlined,
+            title: 'Sin órdenes',
+          )
+        else ...[
+          for (final order in state.items)
+            _OrdenTile(compra: order, onTap: () => onDetail(order.id)),
+          AppPagination(
+            page: state.page,
+            totalPages: state.totalPages,
+            total: state.total,
+            onPageChange: onPageChange,
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _DesktopProveedoresView extends StatelessWidget {
+  final _ProvsState state;
+  final bool canCreate;
+  final bool canEdit;
+  final VoidCallback? onCreate;
+  final ValueChanged<Proveedor> onEdit;
+  final ValueChanged<String> onSearch;
+  final ValueChanged<String> onActivo;
+  final Future<void> Function() onRefresh;
+  final ValueChanged<int> onPageChange;
+
+  const _DesktopProveedoresView({
+    required this.state,
+    required this.canCreate,
+    required this.canEdit,
+    required this.onCreate,
+    required this.onEdit,
+    required this.onSearch,
+    required this.onActivo,
+    required this.onRefresh,
+    required this.onPageChange,
+  });
+
+  @override
+  Widget build(BuildContext context) => RefreshIndicator(
+    onRefresh: onRefresh,
+    child: ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                onChanged: onSearch,
+                decoration: const InputDecoration(
+                  hintText: 'Buscar proveedor...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: state.activo,
+                items: const [
+                  DropdownMenuItem(value: '', child: Text('Todos')),
+                  DropdownMenuItem(value: 'true', child: Text('Activos')),
+                  DropdownMenuItem(value: 'false', child: Text('Inactivos')),
+                ],
+                onChanged: (value) => onActivo(value ?? ''),
+              ),
+            ),
+            if (canCreate) ...[
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Nuevo proveedor'),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (state.loading)
+          const AppLoading()
+        else if (state.error != null)
+          AppErrorState(message: state.error!, onRetry: onRefresh)
+        else if (state.items.isEmpty)
+          const AppEmptyState(
+            icon: Icons.local_shipping_outlined,
+            title: 'Sin proveedores',
+          )
+        else ...[
+          for (final provider in state.items)
+            _ProvTile(
+              prov: provider,
+              canEdit: canEdit,
+              onEdit: () => onEdit(provider),
+            ),
+          AppPagination(
+            page: state.page,
+            totalPages: state.totalPages,
+            total: state.total,
+            onPageChange: onPageChange,
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
 // ─── Órdenes Tab ──────────────────────────────────────────────────────────────
 
 class _OrdenesTab extends ConsumerStatefulWidget {
   final bool canEdit;
   final ValueChanged<String> onDetail;
-  const _OrdenesTab({required this.canEdit, required this.onDetail});
+  final bool desktop;
+  const _OrdenesTab({
+    required this.canEdit,
+    required this.onDetail,
+    this.desktop = false,
+  });
 
   @override
   ConsumerState<_OrdenesTab> createState() => _OrdenesTabState();
@@ -404,10 +756,22 @@ class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
     super.dispose();
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(_ordenesProvider);
     final notifier = ref.read(_ordenesProvider.notifier);
+
+    if (widget.desktop) {
+      return _DesktopOrdenesView(
+        state: state,
+        searchController: _searchCtrl,
+        onSearch: notifier.setSearch,
+        onEstado: notifier.setEstado,
+        onRefresh: notifier.load,
+        onPageChange: notifier.setPage,
+        onDetail: widget.onDetail,
+      );
+    }
 
     return RefreshIndicator(
       color: AppColors.primary,
@@ -532,10 +896,7 @@ class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
               child: AppLoading(),
             )
           else if (state.error != null)
-            AppErrorState(
-              message: state.error!,
-              onRetry: () => notifier.load(),
-            )
+            AppErrorState(message: state.error!, onRetry: () => notifier.load())
           else if (state.items.isEmpty)
             const AppEmptyState(
               icon: Icons.shopping_cart_outlined,
@@ -556,7 +917,7 @@ class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
           ],
         ],
       ),
-);
+    );
   }
 }
 
@@ -648,7 +1009,12 @@ class _OrdenTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text(compra.proveedor, style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  compra.proveedor,
+                  style: AppTextStyles.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text(
                   '${compra.fecha} · ${compra.articulos} items',
                   style: AppTextStyles.labelSmall,
@@ -673,13 +1039,36 @@ class _OrdenTile extends StatelessWidget {
 
 class _ProvsTab extends ConsumerWidget {
   final bool canEdit;
+  final bool canCreate;
+  final bool desktop;
+  final VoidCallback? onCreate;
   final ValueChanged<Proveedor> onEdit;
-  const _ProvsTab({required this.canEdit, required this.onEdit});
+  const _ProvsTab({
+    required this.canEdit,
+    required this.onEdit,
+    this.canCreate = false,
+    this.desktop = false,
+    this.onCreate,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(_provsProvider);
     final notifier = ref.read(_provsProvider.notifier);
+
+    if (desktop) {
+      return _DesktopProveedoresView(
+        state: state,
+        canCreate: canCreate,
+        canEdit: canEdit,
+        onCreate: onCreate,
+        onEdit: onEdit,
+        onSearch: notifier.setSearch,
+        onActivo: notifier.setActivo,
+        onRefresh: notifier.load,
+        onPageChange: notifier.setPage,
+      );
+    }
 
     return RefreshIndicator(
       color: AppColors.primary,
@@ -729,10 +1118,7 @@ class _ProvsTab extends ConsumerWidget {
               child: AppLoading(),
             )
           else if (state.error != null)
-            AppErrorState(
-              message: state.error!,
-              onRetry: () => notifier.load(),
-            )
+            AppErrorState(message: state.error!, onRetry: () => notifier.load())
           else if (state.items.isEmpty)
             const AppEmptyState(
               icon: Icons.local_shipping_outlined,
@@ -792,7 +1178,12 @@ class _ProvTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(prov.nombre, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  prov.nombre,
+                  style: AppTextStyles.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text(
                   prov.activo ? 'Activo' : 'Inactivo',
                   style: AppTextStyles.labelSmall.copyWith(
@@ -803,13 +1194,33 @@ class _ProvTile extends StatelessWidget {
                   ),
                 ),
                 if (prov.categoria != null)
-                  Text(prov.categoria!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    prov.categoria!,
+                    style: AppTextStyles.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 if (prov.contacto != null)
-                  Text(prov.contacto!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    prov.contacto!,
+                    style: AppTextStyles.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 if (prov.telefono != null)
-                  Text(prov.telefono!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    prov.telefono!,
+                    style: AppTextStyles.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 if (prov.email != null)
-                  Text(prov.email!, style: AppTextStyles.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    prov.email!,
+                    style: AppTextStyles.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
               ],
             ),
           ),
@@ -1179,12 +1590,15 @@ class _NuevaOrdenScreen extends StatefulWidget {
   final UserProfile user;
   final String? initialSedeId;
   final VoidCallback onCreated;
+  final bool embedded;
   const _NuevaOrdenScreen({
+    super.key,
     required this.repo,
     required this.productosRepo,
     required this.user,
     this.initialSedeId,
     required this.onCreated,
+    this.embedded = false,
   });
 
   @override
@@ -1796,8 +2210,9 @@ class _ProveedorScreenState extends State<_ProveedorScreen> {
             // Categoría: dropdown desde el API de categorías de productos
             // (mismo comportamiento que la web).
             DropdownButtonFormField<String?>(
-              initialValue:
-                  _catOptions.contains(_selectedCat) ? _selectedCat : null,
+              initialValue: _catOptions.contains(_selectedCat)
+                  ? _selectedCat
+                  : null,
               decoration: InputDecoration(
                 labelText: 'Categoría',
                 suffixIcon: _catsLoading
