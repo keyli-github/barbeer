@@ -215,7 +215,7 @@ class CajaNotifier extends StateNotifier<CajaState> {
 
   Future<void> cerrar(
     Map<double, int> cantidades, {
-    String? observaciones,
+    String? motivoDiferencia,
     bool forzarPendientes = false,
     String? motivoForzado,
   }) async {
@@ -225,7 +225,7 @@ class CajaNotifier extends StateNotifier<CajaState> {
       () => _repository.cerrar(
         id,
         cantidades,
-        observaciones: observaciones,
+        motivoDiferencia: motivoDiferencia,
         forzarPendientes: forzarPendientes,
         motivoForzado: motivoForzado,
       ),

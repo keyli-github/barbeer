@@ -162,7 +162,7 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
             : '',
       ),
   };
-  final _notesController = TextEditingController();
+  final _motivoDiferenciaController = TextEditingController();
   final _motivoController = TextEditingController();
   bool _forzar = false;
   bool _loading = false;
@@ -180,7 +180,7 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
     for (final controller in _controllers.values) {
       controller.dispose();
     }
-    _notesController.dispose();
+    _motivoDiferenciaController.dispose();
     _motivoController.dispose();
     super.dispose();
   }
@@ -211,9 +211,9 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
               _DifferenceRow(value: _declared - _expected),
               const SizedBox(height: 14),
               AppTextField(
-                label: 'Observaciones (opcional)',
-                hint: 'Detalle del arqueo',
-                controller: _notesController,
+                label: 'Motivo de diferencia',
+                hint: 'Explica la diferencia entre lo contado y lo esperado',
+                controller: _motivoDiferenciaController,
                 maxLength: 500,
                 maxLines: 3,
               ),
@@ -248,12 +248,12 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
     }
     setState(() => _loading = true);
     try {
-      final notes = _notesController.text;
+      final motDif = _motivoDiferenciaController.text.trim();
       await ref
           .read(cajaProvider.notifier)
           .cerrar(
             _counts,
-            observaciones: notes.isNotEmpty ? notes : null,
+            motivoDiferencia: motDif.isNotEmpty ? motDif : null,
             forzarPendientes: _forzar,
             motivoForzado: _forzar ? _motivoController.text.trim() : null,
           );

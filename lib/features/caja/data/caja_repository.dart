@@ -68,18 +68,18 @@ bool cajaRequiresStaff({String? personalTipo}) => personalTipo != null;
 
 Map<String, dynamic> cajaCierrePayload(
   Map<double, int> cantidades, {
-  String? observaciones,
+  String? motivoDiferencia,
   bool forzarPendientes = false,
   String? motivoForzado,
 }) {
-  final notas = observaciones?.trim();
-  final motivo = motivoForzado?.trim();
+  final motDif = motivoDiferencia?.trim();
+  final motForzado = motivoForzado?.trim();
   return {
     'denominaciones': cajaDenominacionesPayload(cantidades),
-    if (notas?.isNotEmpty ?? false) 'observaciones': notas,
+    if (motDif?.isNotEmpty ?? false) 'motivoDiferencia': motDif,
     if (forzarPendientes) 'forzarPendientes': true,
-    if (forzarPendientes && (motivo?.isNotEmpty ?? false))
-      'motivoForzado': motivo,
+    if (forzarPendientes && (motForzado?.isNotEmpty ?? false))
+      'motivoForzado': motForzado,
   };
 }
 
@@ -611,7 +611,7 @@ class CajaRepository {
   Future<CajaSesion> cerrar(
     String id,
     Map<double, int> cantidades, {
-    String? observaciones,
+    String? motivoDiferencia,
     bool forzarPendientes = false,
     String? motivoForzado,
   }) async {
@@ -619,7 +619,7 @@ class CajaRepository {
       '/caja/$id/cierre',
       data: cajaCierrePayload(
         cantidades,
-        observaciones: observaciones,
+        motivoDiferencia: motivoDiferencia,
         forzarPendientes: forzarPendientes,
         motivoForzado: motivoForzado,
       ),

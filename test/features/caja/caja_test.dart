@@ -274,11 +274,11 @@ void main() {
     test('11. Cierre normal no envía monto declarado ni forzado', () {
       final payload = cajaCierrePayload(
         cantidades,
-        observaciones: ' Cierre sin novedades ',
+        motivoDiferencia: ' Cierre sin novedades ',
       );
       expect(payload.containsKey('montoDeclarado'), isFalse);
       expect(payload.containsKey('forzarPendientes'), isFalse);
-      expect(payload['observaciones'], 'Cierre sin novedades');
+      expect(payload['motivoDiferencia'], 'Cierre sin novedades');
       expect(payload['denominaciones'], hasLength(11));
     });
 
