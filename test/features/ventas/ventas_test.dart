@@ -260,6 +260,49 @@ void main() {
       expect(find.textContaining('Cuenta: Cliente Uno'), findsOneWidget);
     });
 
+    testWidgets('desktop sale keeps actions and structured details', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1400, 900);
+      addTearDown(tester.view.reset);
+      var annulled = false;
+      final sale = Venta.fromJson({
+        ...json,
+        'items': [
+          {
+            'id': 'i1',
+            'productoId': 'p1',
+            'producto': {'nombre': 'Cerveza'},
+            'cantidad': 2,
+            'precioUnitario': 20,
+            'subtotal': 40,
+          },
+        ],
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: VentaHistoryCard(
+              venta: sale,
+              correction: false,
+              onAnular: () => annulled = true,
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.cancel_outlined));
+      expect(annulled, isTrue);
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+      await tester.pumpAndSettle();
+      for (final label in ['Producto', 'Cant.', 'P.Unit', 'Subtotal']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      expect(find.text('REGISTRADO POR'), findsOneWidget);
+      expect(find.text('VENDIDO POR (VENDEDORA)'), findsOneWidget);
+      expect(find.text('MÉTODOS DE PAGO Y COMPROBANTES'), findsOneWidget);
+    });
+
     testWidgets(
       'charged detail preserves account state across rejected and successful annulment',
       (tester) async {
@@ -541,19 +584,29 @@ void main() {
       const fixedKey = 'abc12345-0000-4abc-8abc-abcdef012345';
       final payload = CreateVentaPayload(
         idempotencyKey: fixedKey,
-        items: [{'productoId': 'p1', 'cantidad': 1}],
+        items: [
+          {'productoId': 'p1', 'cantidad': 1},
+        ],
         estadoConciliacion: EstadoConciliacion.efectivo,
       );
-      expect(payload.idempotencyKey, fixedKey,
-          reason: 'idempotencyKey in the payload must match the one used at creation');
+      expect(
+        payload.idempotencyKey,
+        fixedKey,
+        reason:
+            'idempotencyKey in the payload must match the one used at creation',
+      );
     });
 
     test('16. VentasRepository idempotencyKey follows UUID v4 format', () {
       final repo = VentasRepository(ApiClient.instance);
       final key = repo.generateIdempotencyKey();
       final keyAfter = repo.generateIdempotencyKey();
-      expect(keyAfter, isNot(equals(key)),
-          reason: 'successive keys must differ (simulating post-success rotation)');
+      expect(
+        keyAfter,
+        isNot(equals(key)),
+        reason:
+            'successive keys must differ (simulating post-success rotation)',
+      );
       // UUID v4: 8-4-4-4-12 hex chars with version digit 4
       final uuidV4Pattern = RegExp(
         r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
