@@ -44,6 +44,7 @@ class ApiConstants {
   static String resetUserPassword(String id) =>
       '/usuarios/$id/resetear-password';
   static String userPermissions(String id) => '/usuarios/$id/permisos';
+  static const String superadminPins = '/usuarios/superadmin-pins';
   static String superadminPin(String id) => '/usuarios/$id/superadmin-pin';
   static const String validatePin = '/usuarios/validate-pin';
   static String productStock(String id) => '/productos/$id/stock';

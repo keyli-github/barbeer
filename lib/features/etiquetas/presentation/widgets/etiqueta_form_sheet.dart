@@ -21,7 +21,6 @@ class EtiquetaFormSheet extends ConsumerStatefulWidget {
 class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
   late final TextEditingController _nombreCtrl;
   late bool _requiereComprobante;
-  late EtiquetaTipo _tipo;
   bool _saving = false;
   String? _error;
 
@@ -32,7 +31,6 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
     super.initState();
     _nombreCtrl = TextEditingController(text: widget.etiqueta?.nombre ?? '');
     _requiereComprobante = widget.etiqueta?.requiereComprobante ?? true;
-    _tipo = widget.etiqueta?.tipo ?? EtiquetaTipo.entrada;
   }
 
   @override
@@ -61,13 +59,11 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
           widget.etiqueta!.id,
           nombre: nombre,
           requiereComprobante: _requiereComprobante,
-          tipo: _tipo,
         );
       } else {
         await repo.create(
           nombre: nombre,
           requiereComprobante: _requiereComprobante,
-          tipo: _tipo,
         );
       }
       if (!mounted) return;
@@ -128,25 +124,6 @@ class _EtiquetaFormSheetState extends ConsumerState<EtiquetaFormSheet> {
                 ),
               ),
               textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<EtiquetaTipo>(
-              initialValue: _tipo,
-              decoration: InputDecoration(
-                labelText: 'Tipo *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              items: EtiquetaTipo.values
-                  .map(
-                    (tipo) => DropdownMenuItem(
-                      value: tipo,
-                      child: Text('${tipo.value} - ${tipo.label}'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (tipo) => setState(() => _tipo = tipo ?? _tipo),
             ),
             const SizedBox(height: 12),
             // RequiereComprobante — switch con diseño consistente con la app

@@ -76,8 +76,9 @@ class _AsistenciaState {
 
 class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
   final AsistenciaRepository _repo;
+  final String? _sedeId;
 
-  _AsistenciaNotifier(this._repo) : super(_AsistenciaState()) {
+  _AsistenciaNotifier(this._repo, this._sedeId) : super(_AsistenciaState()) {
     load();
   }
 
@@ -89,8 +90,8 @@ class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
     final p = state.page;
     try {
       final results = await Future.wait([
-        _repo.list(pagina: p, limite: 20, fecha: fecha),
-        _repo.resumen(fecha: fecha),
+        _repo.list(pagina: p, limite: 20, fecha: fecha, sedeId: _sedeId),
+        _repo.resumen(fecha: fecha, sedeId: _sedeId),
       ]);
       final page = results[0] as AsistenciaPage;
       final resumen = results[1] as AsistenciaResumen;
@@ -179,7 +180,10 @@ class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
 
 final _asistenciaProvider =
     StateNotifierProvider<_AsistenciaNotifier, _AsistenciaState>(
-      (ref) => _AsistenciaNotifier(ref.watch(_asistenciaRepoProvider)),
+      (ref) => _AsistenciaNotifier(
+        ref.watch(_asistenciaRepoProvider),
+        ref.watch(globalSedeIdProvider),
+      ),
     );
 
 // ─── Turnos state / notifier ──────────────────────────────────────────────────

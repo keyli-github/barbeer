@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/navigation/app_nav.dart';
@@ -225,7 +224,7 @@ class SucursalesScreen extends ConsumerWidget {
             .hasPermission('establecimientos:editar'),
         canDelete: ref
             .read(authProvider)
-            .hasPermission('establecimientos:eliminar'),
+            .hasPermission('establecimientos:editar'),
         onEdit: () => _showForm(context, ref, sede),
         onDelete: () => _deleteSede(context, ref, sede),
       ),
@@ -654,7 +653,7 @@ class _SedeForm extends StatefulWidget {
 
 class _SedeFormState extends State<_SedeForm> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameCtrl, _codigoCtrl, _dirCtrl, _telCtrl;
+  late final TextEditingController _nameCtrl, _dirCtrl, _telCtrl;
   bool _activo = true, _loading = false;
 
   int get _assignedUsers =>
@@ -665,9 +664,6 @@ class _SedeFormState extends State<_SedeForm> {
     super.initState();
     _nameCtrl = TextEditingController(
       text: widget.sede?['nombre'] as String? ?? '',
-    );
-    _codigoCtrl = TextEditingController(
-      text: widget.sede?['codigoSede'] as String? ?? '',
     );
     _dirCtrl = TextEditingController(
       text: widget.sede?['direccion'] as String? ?? '',
@@ -681,7 +677,6 @@ class _SedeFormState extends State<_SedeForm> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _codigoCtrl.dispose();
     _dirCtrl.dispose();
     _telCtrl.dispose();
     super.dispose();
@@ -708,24 +703,6 @@ class _SedeFormState extends State<_SedeForm> {
               textInputAction: TextInputAction.next,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Requerido' : null,
-            ),
-            const SizedBox(height: 14),
-            AppTextField(
-              label: 'Código de sede',
-              hint: 'Ej. CENT',
-              controller: _codigoCtrl,
-              prefixIcon: Icons.tag_rounded,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9]')),
-                LengthLimitingTextInputFormatter(5),
-              ],
-              validator: (value) {
-                if (value == null || value.isEmpty) return null;
-                return RegExp(r'^[A-Z0-9]{2,5}$').hasMatch(value)
-                    ? null
-                    : 'Usa entre 2 y 5 letras mayúsculas o números';
-              },
             ),
             const SizedBox(height: 14),
             AppTextField(
@@ -792,11 +769,13 @@ class _SedeFormState extends State<_SedeForm> {
     setState(() => _loading = true);
     try {
       final data = <String, dynamic>{'nombre': _nameCtrl.text.trim()};
-      if (_codigoCtrl.text.isNotEmpty) {
-        data['codigoSede'] = _codigoCtrl.text.trim();
+      if (widget.sede == null) {
+        if (_dirCtrl.text.isNotEmpty) data['direccion'] = _dirCtrl.text;
+        if (_telCtrl.text.isNotEmpty) data['telefono'] = _telCtrl.text;
+      } else {
+        data['direccion'] = _dirCtrl.text;
+        data['telefono'] = _telCtrl.text;
       }
-      if (_dirCtrl.text.isNotEmpty) data['direccion'] = _dirCtrl.text;
-      if (_telCtrl.text.isNotEmpty) data['telefono'] = _telCtrl.text;
       if (widget.sede != null) data['activo'] = _activo;
       await widget.onSave(data);
       if (mounted) {

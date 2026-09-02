@@ -7,6 +7,7 @@ import '../../../../core/files/android_file_artifact_service.dart';
 import '../../../../core/files/file_artifact.dart';
 import '../../../../core/files/file_artifact_service.dart';
 import '../../../../core/files/windows_file_artifact_service.dart';
+import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/reporte_models.dart';
@@ -147,6 +148,7 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
 
     final state = ref.watch(reportesProvider);
     final notifier = ref.read(reportesProvider.notifier);
+    final sedeId = ref.watch(globalSedeIdProvider);
 
     return SafeArea(
       child: Scaffold(
@@ -155,7 +157,7 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
             _TabToggle(tab: _tab, onTabChange: (t) => setState(() => _tab = t)),
             Expanded(
               child: _tab == 0
-                  ? _buildExportarTab(state, notifier)
+                  ? _buildExportarTab(state, notifier, sedeId)
                   : _buildCorreoTab(state, notifier),
             ),
           ],
@@ -166,8 +168,13 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
 
   // ── Exportar Tab ──────────────────────────────────────────────────────────
 
-  Widget _buildExportarTab(ReportesState state, ReportesNotifier notifier) {
-    final invalidDates = _desde.isAfter(_hasta);
+  Widget _buildExportarTab(
+    ReportesState state,
+    ReportesNotifier notifier,
+    String? sedeId,
+  ) {
+    final invalidDates =
+        _desde.isAfter(_hasta) || _hasta.difference(_desde).inDays >= 366;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
       children: [
@@ -248,8 +255,10 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
                 ),
                 if (invalidDates) ...[
                   const SizedBox(height: 8),
-                  const Text(
-                    'La fecha de inicio no puede ser posterior a la fecha de fin.',
+                  Text(
+                    _desde.isAfter(_hasta)
+                        ? 'La fecha de inicio no puede ser posterior a la fecha de fin.'
+                        : 'El rango máximo permitido es de 366 días.',
                     style: TextStyle(color: AppColors.error, fontSize: 12),
                   ),
                 ],
@@ -337,19 +346,20 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: state.exportBusy || invalidDates
                 ? null
-                : () => _doExport(notifier),
+                : () => _doExport(notifier, sedeId),
           ),
         ),
       ],
     );
   }
 
-  void _doExport(ReportesNotifier notifier) {
+  void _doExport(ReportesNotifier notifier, String? sedeId) {
     notifier.exportReport(
       _reportType,
       formato: _format,
       fechaInicio: _isoDate(_desde),
       fechaFin: _isoDate(_hasta),
+      sedeId: sedeId,
     );
   }
 

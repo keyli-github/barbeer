@@ -196,6 +196,7 @@ class AsistenciaRepository {
     int limite = 25,
     String? fecha,
     String? usuarioId,
+    String? sedeId,
   }) async {
     final r = await _api.get(
       '/asistencia',
@@ -204,6 +205,7 @@ class AsistenciaRepository {
         'limite': limite,
         if (fecha != null) 'fecha': fecha,
         if (usuarioId != null) 'usuarioId': usuarioId,
+        if (sedeId != null) 'sedeId': sedeId,
       },
     );
     final json = Map<String, dynamic>.from(r.data as Map);
@@ -221,10 +223,13 @@ class AsistenciaRepository {
     );
   }
 
-  Future<AsistenciaResumen> resumen({String? fecha}) async {
+  Future<AsistenciaResumen> resumen({String? fecha, String? sedeId}) async {
     final r = await _api.get(
       '/asistencia/resumen',
-      queryParameters: {if (fecha != null) 'fecha': fecha},
+      queryParameters: {
+        if (fecha != null) 'fecha': fecha,
+        if (sedeId != null) 'sedeId': sedeId,
+      },
     );
     return AsistenciaResumen.fromJson(Map<String, dynamic>.from(r.data as Map));
   }

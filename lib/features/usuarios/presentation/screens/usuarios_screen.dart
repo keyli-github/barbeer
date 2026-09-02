@@ -299,10 +299,7 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                 alignment: Alignment.centerRight,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    final users = state.users
-                        .map((u) => u as Map<String, dynamic>)
-                        .toList();
-                    showPinManagementSheet(context, users: users);
+                    showPinManagementSheet(context);
                   },
                   icon: const Icon(Icons.shield_outlined, size: 16),
                   label: const Text('Claves PIN'),
@@ -1702,7 +1699,7 @@ class _UserEditFormState extends State<_UserEditForm> {
     try {
       final data = <String, dynamic>{};
       if (_rolId != null) data['rolId'] = _rolId;
-      if (_sedeId != null) data['sedeId'] = _sedeId;
+      if (widget.isSuperAdmin) data['sedeId'] = _sedeId;
       await widget.onSave(data);
       if (mounted) {
         Navigator.of(context).pop();

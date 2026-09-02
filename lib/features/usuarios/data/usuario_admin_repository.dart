@@ -3,12 +3,12 @@ import '../../../core/network/api_client.dart';
 import 'models/usuario_permission_models.dart';
 
 typedef PermissionGetRequest = Future<Object?> Function(String path);
-typedef PermissionPutRequest = Future<Object?> Function(
-    String path, Map<String, dynamic> body);
-typedef PermissionPatchRequest = Future<Object?> Function(
-    String path, Map<String, dynamic> body);
-typedef PermissionPostRequest = Future<Object?> Function(
-    String path, Map<String, dynamic> body);
+typedef PermissionPutRequest =
+    Future<Object?> Function(String path, Map<String, dynamic> body);
+typedef PermissionPatchRequest =
+    Future<Object?> Function(String path, Map<String, dynamic> body);
+typedef PermissionPostRequest =
+    Future<Object?> Function(String path, Map<String, dynamic> body);
 
 class UsuarioAdminRepository {
   final ApiClient _api;
@@ -17,8 +17,13 @@ class UsuarioAdminRepository {
   final PermissionPatchRequest? patchRequest;
   final PermissionPostRequest? postRequest;
 
-  const UsuarioAdminRepository(this._api,
-      {this.getRequest, this.putRequest, this.patchRequest, this.postRequest});
+  const UsuarioAdminRepository(
+    this._api, {
+    this.getRequest,
+    this.putRequest,
+    this.patchRequest,
+    this.postRequest,
+  });
 
   Future<UsuarioPermisosResponse> getPermissions(String userId) async {
     final path = ApiConstants.userPermissions(userId);
@@ -51,6 +56,13 @@ class UsuarioAdminRepository {
     } else {
       await _api.patch(path, data: body);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> getSuperadminPins() async {
+    final data = getRequest != null
+        ? await getRequest!(ApiConstants.superadminPins)
+        : (await _api.get(ApiConstants.superadminPins)).data;
+    return List<Map<String, dynamic>>.from(data as List? ?? const []);
   }
 
   Future<PinValidationResult> validatePin(String pin) async {

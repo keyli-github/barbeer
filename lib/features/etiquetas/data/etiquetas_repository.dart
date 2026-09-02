@@ -10,7 +10,11 @@ class EtiquetasRepository {
   Future<List<Etiqueta>> list({String? sedeId}) async {
     final response = await _api.get(
       ApiConstants.etiquetas,
-      queryParameters: {'pagina': 1, 'limite': 50, 'sedeId': ?sedeId},
+      queryParameters: {
+        'pagina': 1,
+        'limite': 50,
+        if (sedeId != null) 'sedeId': sedeId,
+      },
     );
     final json = Map<String, dynamic>.from(response.data as Map);
     final etiquetas = (json['data'] as List? ?? const [])
@@ -29,14 +33,12 @@ class EtiquetasRepository {
   Future<Etiqueta> create({
     required String nombre,
     required bool requiereComprobante,
-    required EtiquetaTipo tipo,
   }) async {
     final response = await _api.post(
       ApiConstants.etiquetas,
       data: {
         'nombre': nombre.trim(),
         'requiereComprobante': requiereComprobante,
-        'tipo': tipo.value,
       },
     );
     return Etiqueta.fromJson(Map<String, dynamic>.from(response.data as Map));
@@ -46,14 +48,12 @@ class EtiquetasRepository {
     String id, {
     required String nombre,
     required bool requiereComprobante,
-    required EtiquetaTipo tipo,
   }) async {
     final response = await _api.patch(
       ApiConstants.etiqueta(id),
       data: {
         'nombre': nombre.trim(),
         'requiereComprobante': requiereComprobante,
-        'tipo': tipo.value,
       },
     );
     return Etiqueta.fromJson(Map<String, dynamic>.from(response.data as Map));
