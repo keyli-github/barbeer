@@ -11,9 +11,11 @@ class Producto {
   final String categoria;
   final String? descripcion, presentacion, imagenUrl;
   final double precioVenta;
+
   /// null cuando el backend omite el campo (usuario sin productos:ver-utilidad).
   final double? precioCosto;
   final bool disponiblePos, activo;
+
   /// null cuando el backend omite el campo (usuario sin productos:ver-utilidad).
   final double? margin;
   final int? stockDisponible;
@@ -145,8 +147,8 @@ class ProductosRepository {
   Future<Producto> create({
     required String nombre,
     required String categoriaId,
-    required double precioVenta,
-    required double precioCosto,
+    double? precioVenta,
+    double? precioCosto,
     String? descripcion,
     String? imagenUrl,
   }) async {
@@ -155,8 +157,8 @@ class ProductosRepository {
       data: {
         'nombre': nombre,
         'categoriaId': categoriaId,
-        'precioVenta': precioVenta,
-        'precioCosto': precioCosto,
+        'precioVenta': ?precioVenta,
+        'precioCosto': ?precioCosto,
         if (descripcion?.trim().isNotEmpty ?? false)
           'descripcion': descripcion!.trim(),
         if (imagenUrl case final imagenUrl?) 'imagenUrl': imagenUrl.trim(),

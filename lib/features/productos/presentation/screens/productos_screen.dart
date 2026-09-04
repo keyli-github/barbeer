@@ -328,9 +328,11 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                 builder: (context, constraints) {
                   final gap = desktop ? 12.0 : AppSpacing.sm;
                   final minCardWidth = desktop ? 210.0 : 180.0;
+                  final availableWidth = desktop
+                      ? constraints.crossAxisExtent - 48
+                      : constraints.crossAxisExtent - (AppSpacing.md * 2);
                   final columns =
-                      ((constraints.crossAxisExtent + gap) /
-                              (minCardWidth + gap))
+                      ((availableWidth + gap) / (minCardWidth + gap))
                           .floor()
                           .clamp(1, desktop ? 5 : 3);
                   return SliverPadding(
@@ -343,7 +345,8 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
-                        childAspectRatio: desktop ? 0.64 : 0.56,
+                        childAspectRatio: desktop ? 1 : 0.56,
+                        mainAxisExtent: desktop ? 390 : null,
                         crossAxisSpacing: gap,
                         mainAxisSpacing: gap,
                       ),
@@ -425,6 +428,9 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     final canDelete = ref
         .read(authProvider)
         .hasPermission('productos:eliminar');
+    final canViewCosts = ref
+        .read(authProvider)
+        .hasPermission('productos:ver-utilidad');
     // rootNavigator: true → se muestra ENCIMA del Shell (sin bottom nav)
     AppNav.push(
       context,
@@ -440,6 +446,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
             onSaved: () => ref.read(_productosNotifier.notifier).load(),
             repo: ref.read(productosCatalogRepositoryProvider),
             canManageImage: canEdit,
+            canViewCosts: canViewCosts,
           ),
         ),
         onToggle: () async {
@@ -457,19 +464,21 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
   }
 
   void _showForm(BuildContext context, WidgetRef ref, Producto? product) {
-    // Crear nuevo producto → subpantalla completa
-    AppNav.push(
-      context,
-      _ProductFormScreen(
-        product: product,
-        cats: ref.read(_categoriasProvider).value ?? [],
-        onSaved: () => ref.read(_productosNotifier.notifier).load(),
-        repo: ref.read(productosCatalogRepositoryProvider),
-        canManageImage: ref
-            .read(authProvider)
-            .hasPermission('productos:editar'),
-      ),
+    final auth = ref.read(authProvider);
+    final form = _ProductFormScreen(
+      product: product,
+      cats: ref.read(_categoriasProvider).value ?? [],
+      onSaved: () => ref.read(_productosNotifier.notifier).load(),
+      repo: ref.read(productosCatalogRepositoryProvider),
+      canManageImage: auth.hasPermission('productos:editar'),
+      canViewCosts: auth.hasPermission('productos:ver-utilidad'),
+      dialogMode: MediaQuery.sizeOf(context).width >= 1024,
     );
+    if (MediaQuery.sizeOf(context).width >= 1024) {
+      showDialog<void>(context: context, builder: (_) => form);
+    } else {
+      AppNav.push(context, form);
+    }
   }
 
   Future<void> _showStockAdjustment(
@@ -1306,11 +1315,11 @@ class _ProductCard extends StatelessWidget {
                   top: Radius.circular(11),
                 ),
                 child: AspectRatio(
-                  aspectRatio: 1.2,
+                  aspectRatio: 4 / 3,
                   child: DSProductImage(
                     imageUrl: product.imagenUrl,
                     productName: product.nombre,
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                     width: double.infinity,
                   ),
                 ),
@@ -1376,18 +1385,16 @@ class _ProductCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
-                  Expanded(
-                    child: Text(
-                      product.nombre,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: context.colors.textPrimary,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    product.nombre,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: context.colors.textPrimary,
+                      height: 1.2,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     product.codigo,
@@ -1517,10 +1524,12 @@ class _ProductCard extends StatelessWidget {
                         color: AppColors.success.withValues(alpha: .32),
                       ),
                     ),
-                    child: const Text(
-                      '✓ Activo',
+                    child: Text(
+                      product.activo ? 'Activo' : 'Inactivo',
                       style: TextStyle(
-                        color: AppColors.success,
+                        color: product.activo
+                            ? AppColors.success
+                            : context.colors.textTertiary,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1539,6 +1548,13 @@ class _ProductCard extends StatelessWidget {
                           label: const Text('Ingreso'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.success,
+                            minimumSize: const Size(0, 38),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
                             side: BorderSide(
                               color: AppColors.success.withValues(alpha: .35),
                             ),
@@ -1556,6 +1572,13 @@ class _ProductCard extends StatelessWidget {
                           label: const Text('Salida'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.error,
+                            minimumSize: const Size(0, 38),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
                             side: BorderSide(
                               color: AppColors.error.withValues(alpha: .35),
                             ),
@@ -2134,12 +2157,16 @@ class _ProductFormScreen extends ConsumerStatefulWidget {
   final VoidCallback onSaved;
   final ProductosRepository repo;
   final bool canManageImage;
+  final bool canViewCosts;
+  final bool dialogMode;
   const _ProductFormScreen({
     this.product,
     required this.cats,
     required this.onSaved,
     required this.repo,
     required this.canManageImage,
+    required this.canViewCosts,
+    this.dialogMode = false,
   });
 
   @override
@@ -2155,7 +2182,7 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
   String? _imageFilename;
   bool _removeExistingImage = false;
   String _categoriaId = '';
-  bool _posEnabled = false, _activo = true, _saving = false;
+  bool _posEnabled = false, _activo = false, _saving = false;
   String? _error;
   final _creationSession = ProductCreationSession();
 
@@ -2195,12 +2222,14 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
     final nombre = _nombreCtrl.text.trim();
     final venta = double.tryParse(_ventaCtrl.text);
     final costo = double.tryParse(_costoCtrl.text);
+    final isEdit = widget.product != null;
 
-    if (nombre.isEmpty ||
-        _categoriaId.isEmpty ||
-        venta == null ||
-        costo == null) {
+    if (nombre.isEmpty || _categoriaId.isEmpty) {
       setState(() => _error = 'Completa todos los campos obligatorios.');
+      return;
+    }
+    if (isEdit && venta == null) {
+      setState(() => _error = 'Ingresa un precio de venta válido.');
       return;
     }
     setState(() {
@@ -2214,7 +2243,7 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
             nombre: nombre,
             categoriaId: _categoriaId,
             precioVenta: venta,
-            precioCosto: costo,
+            precioCosto: widget.canViewCosts ? costo : null,
             descripcion: _descCtrl.text.trim().isEmpty
                 ? null
                 : _descCtrl.text.trim(),
@@ -2228,21 +2257,12 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
             );
           },
         );
-        // El backend crea con activo=false y disponiblePos=false por defecto.
-        // Si el formulario tiene valores distintos, se corrige con un PATCH.
-        final id = _creationSession.createdId;
-        if (id != null && (_activo != false || _posEnabled != false)) {
-          await widget.repo.update(id, {
-            if (_activo != false) 'activo': _activo,
-            if (_posEnabled != false) 'disponiblePos': _posEnabled,
-          });
-        }
       } else {
         await widget.repo.update(widget.product!.id, {
           'nombre': nombre,
           'categoriaId': _categoriaId,
           'precioVenta': venta,
-          'precioCosto': costo,
+          if (widget.canViewCosts && costo != null) 'precioCosto': costo,
           if (_descCtrl.text.trim().isNotEmpty)
             'descripcion': _descCtrl.text.trim(),
           'disponiblePos': _posEnabled,
@@ -2309,24 +2329,26 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
     final cats = ref.watch(_categoriasProvider).value ?? widget.cats;
     final hasCategoria =
         _categoriaId.isNotEmpty && cats.any((c) => c.id == _categoriaId);
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: context.colors.surface,
       appBar: SubPageAppBar(
         title: widget.product == null ? 'Nuevo producto' : 'Editar producto',
-        actions: [
-          if (!_saving)
-            TextButton(
-              onPressed: _submit,
-              child: const Text(
-                'Guardar',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-        ],
+        actions: widget.dialogMode
+            ? const []
+            : [
+                if (!_saving)
+                  TextButton(
+                    onPressed: _submit,
+                    child: const Text(
+                      'Guardar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+              ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.only(
@@ -2458,67 +2480,108 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
               onChanged: (v) => setState(() => _categoriaId = v ?? ''),
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    label: 'Precio venta (S/) *',
-                    hint: '0.00',
-                    controller: _ventaCtrl,
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
+            if (widget.product != null) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(
+                      label: 'Precio venta (S/)',
+                      hint: '0.00',
+                      controller: _ventaCtrl,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    label: 'Costo (S/) *',
-                    hint: '0.00',
-                    controller: _costoCtrl,
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => setState(() {}),
+                  if (widget.canViewCosts) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: AppTextField(
+                        label: 'Costo (S/)',
+                        hint: '0.00',
+                        controller: _costoCtrl,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (widget.canViewCosts) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.colors.backgroundAlt,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Margen estimado: ',
+                        style: AppTextStyles.bodySmall,
+                      ),
+                      Text(
+                        '${_margin.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: _margin >= 40
+                              ? AppColors.success
+                              : _margin >= 20
+                              ? AppColors.warning
+                              : AppColors.error,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: context.colors.backgroundAlt,
-                borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 12),
+              _SwitchRow(
+                label: 'Disponible para venta',
+                value: _posEnabled,
+                onChanged: _activo
+                    ? (value) => setState(() => _posEnabled = value)
+                    : null,
               ),
-              child: Row(
-                children: [
-                  const Text(
-                    'Margen estimado: ',
-                    style: AppTextStyles.bodySmall,
+              _SwitchRow(
+                label: 'Producto activo',
+                value: _activo,
+                onChanged: (value) => setState(() {
+                  _activo = value;
+                  if (!value) _posEnabled = false;
+                }),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(
+                    color: AppColors.warning.withValues(alpha: .25),
                   ),
-                  Text(
-                    '${_margin.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: _margin >= 40
-                          ? AppColors.success
-                          : _margin >= 20
-                          ? AppColors.warning
-                          : AppColors.error,
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: AppColors.warning,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'El producto se creará inactivo. Luego podrás definir precio y estado.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _SwitchRow(
-              label: 'Disponible para venta',
-              value: _posEnabled,
-              onChanged: (v) => setState(() => _posEnabled = v),
-            ),
-            _SwitchRow(
-              label: 'Producto activo',
-              value: _activo,
-              onChanged: (v) => setState(() => _activo = v),
-            ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(
@@ -2527,28 +2590,64 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            PrimaryButton(
-              text: widget.product == null
-                  ? _creationSession.createdId == null
-                        ? 'Crear producto'
-                        : _imageBytes == null
-                        ? 'Finalizar sin imagen'
-                        : 'Reintentar imagen'
-                  : 'Guardar cambios',
-              onPressed: _saving ? null : _submit,
-              isLoading: _saving,
-            ),
+            if (widget.dialogMode)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: PrimaryButton(
+                      text: _submitLabel,
+                      onPressed: _saving ? null : _submit,
+                      isLoading: _saving,
+                    ),
+                  ),
+                ],
+              )
+            else
+              PrimaryButton(
+                text: _submitLabel,
+                onPressed: _saving ? null : _submit,
+                isLoading: _saving,
+              ),
           ],
         ),
       ),
     );
+    if (!widget.dialogMode) return scaffold;
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: SizedBox(
+        width: 540,
+        height: MediaQuery.sizeOf(context).height * .88,
+        child: scaffold,
+      ),
+    );
   }
+
+  String get _submitLabel => widget.product == null
+      ? _creationSession.createdId == null
+            ? 'Crear producto'
+            : _imageBytes == null
+            ? 'Finalizar sin imagen'
+            : 'Reintentar imagen'
+      : 'Guardar cambios';
 }
 
 class _SwitchRow extends StatelessWidget {
   final String label;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
   const _SwitchRow({
     required this.label,
     required this.value,

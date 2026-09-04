@@ -25,6 +25,7 @@ class RouteAccessPolicy {
   static const _rules = <String, RouteAccessRule>{
     RoutePaths.dashboard: RouteAccessRule(),
     RoutePaths.perfil: RouteAccessRule(),
+    RoutePaths.changePassword: RouteAccessRule(),
     RoutePaths.seguridad: RouteAccessRule(),
     RoutePaths.asistencia: RouteAccessRule(),
     RoutePaths.ventas: RouteAccessRule.any({
@@ -54,11 +55,7 @@ class RouteAccessPolicy {
     RoutePaths.importaciones: RouteAccessRule.any({'importaciones:ejecutar'}),
   };
 
-  static const _entryPaths = {
-    RoutePaths.splash,
-    RoutePaths.login,
-    RoutePaths.changePassword,
-  };
+  static const _entryPaths = {RoutePaths.splash, RoutePaths.login};
 
   static String _path(String location) => Uri.parse(location).path;
 

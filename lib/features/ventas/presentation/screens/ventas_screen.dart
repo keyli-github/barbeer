@@ -52,10 +52,9 @@ class _VentasScreenState extends ConsumerState<VentasScreen> {
       return HistorialVentasView(
         onCreate: canCreate ? _openNewSale : null,
         onRecargoControl: recargo.puedeConfigurar || recargo.puedeCambiar
-            ? () => showModalBottomSheet(
+            ? () => showDialog<void>(
                 context: context,
-                isScrollControlled: true,
-                builder: (_) => const RecargoControlSheet(),
+                builder: (_) => const Dialog(child: RecargoControlSheet()),
               )
             : null,
       );
@@ -88,9 +87,7 @@ class _NuevaVentaInline extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: context.colors.background,
-            border: Border(
-              bottom: BorderSide(color: context.colors.border),
-            ),
+            border: Border(bottom: BorderSide(color: context.colors.border)),
           ),
           child: Row(
             children: [

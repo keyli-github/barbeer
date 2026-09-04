@@ -296,8 +296,10 @@ ComprobanteAnalisis _validAnalysis(String id, String entity) =>
 Future<void> _pumpNuevaVenta(
   WidgetTester tester, {
   required Size size,
-  required Future<List<Producto>> Function() loader,
+  Future<List<Producto>> Function()? loader,
   List<String> permissions = const [],
+  String role = 'VENDEDORA',
+  String? sedeId = 's1',
   VentasRepository? repository,
   CuentasRepository? accountsRepository,
   PickedUploadImage? pickedVoucher,
@@ -321,9 +323,9 @@ Future<void> _pumpNuevaVenta(
               user: UserProfile(
                 id: 'u1',
                 username: 'seller',
-                rol: 'VENDEDORA',
+                rol: role,
                 nivel: 10,
-                sedeId: 's1',
+                sedeId: sedeId,
                 createdAt: '2026-01-01',
                 permisos: permissions,
               ),
@@ -373,19 +375,21 @@ void main() {
       );
       final delegate =
           grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
-      expect(delegate.crossAxisCount, 5);
-      expect(delegate.childAspectRatio, 0.72);
+      expect(delegate.crossAxisCount, 4);
+      expect(delegate.mainAxisExtent, 240);
 
       final disabledConfirm = tester.widget<ElevatedButton>(
         find.byKey(const Key('desktop-cart-confirm')),
       );
       expect(disabledConfirm.onPressed, isNull);
 
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('add-to-sale-modal')), findsOneWidget);
       expect(find.text('Añadir a la Venta'), findsOneWidget);
       expect(find.text('Precio base: S/ 12.00'), findsOneWidget);
+      expect(find.byKey(const Key('product-quantity-field')), findsOneWidget);
+      expect(find.byKey(const Key('product-add-total')), findsOneWidget);
 
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -468,11 +472,13 @@ void main() {
         tester,
         size: const Size(1440, 900),
         loader: () async => _products,
+        role: 'SUPERADMIN',
+        sedeId: 's1',
         permissions: const ['ventas:precio-personalizado'],
       );
       await tester.pump();
 
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('custom-price-field')), findsOneWidget);
 
@@ -509,11 +515,14 @@ void main() {
         repository: repo,
       );
       await tester.pump();
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
+      expect(
+        find.byKey(const Key('desktop-cart-confirm')).hitTestable(),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
       await tester.pump();
 
@@ -621,7 +630,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('+ Agregar').first);
+        await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Confirmar'));
         await tester.pumpAndSettle();
@@ -656,7 +665,7 @@ void main() {
         final payload = sales.creates.single.json;
         expect(payload['cuentaId'], 'account-wallet');
         expect(payload['cuentaMonto'], 7);
-        expect(payload['comprobanteAnalisisId'], 'analysis-wallet');
+        expect(payload['comprobanteAnalisisIds'], ['analysis-wallet']);
         expect(payload.containsKey('comprobante'), isFalse);
         expect(find.text('Venta V-CEN-2026-0042 registrada'), findsOneWidget);
         expect(find.textContaining('Billetera · Yape'), findsOneWidget);
@@ -703,7 +712,7 @@ void main() {
           accountsRepository: accounts,
         );
         await tester.pump();
-        await tester.tap(find.text('+ Agregar').first);
+        await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Confirmar'));
         await tester.pumpAndSettle();
@@ -793,7 +802,7 @@ void main() {
         accountsRepository: accounts,
       );
       await tester.pump();
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -925,7 +934,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -962,7 +971,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -1021,6 +1030,23 @@ void main() {
       expect(find.byKey(const Key('mobile-cart-bar')), findsOneWidget);
     });
 
+    testWidgets('sin sede muestra una indicación neutral, no un error', (
+      tester,
+    ) async {
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        role: 'SUPERADMIN',
+        sedeId: null,
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('select-sede-empty-state')), findsOneWidget);
+      expect(find.text('Selecciona una sede'), findsWidgets);
+      expect(find.text('Algo salió mal'), findsNothing);
+      expect(find.text('Reintentar'), findsNothing);
+    });
+
     testWidgets('el dropdown de billetera abre y lista billeteras reales', (
       tester,
     ) async {
@@ -1035,7 +1061,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -1107,7 +1133,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -1128,10 +1154,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repo.creates, hasLength(1));
-      expect(
-        repo.creates.single.json['comprobanteAnalisisId'],
+      expect(repo.creates.single.json['comprobanteAnalisisIds'], [
         'analysis-partial',
-      );
+      ]);
       await tester.pump(const Duration(seconds: 3));
     });
 
@@ -1184,7 +1209,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('+ Agregar').first);
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
@@ -1245,7 +1270,7 @@ void main() {
           repository: sales,
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('+ Agregar').first);
+        await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Confirmar'));
         await tester.pumpAndSettle();
@@ -1340,7 +1365,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Add product to cart
-        await tester.tap(find.text('+ Agregar').first);
+        await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Confirmar'));
         await tester.pumpAndSettle();

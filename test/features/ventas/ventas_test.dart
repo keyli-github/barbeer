@@ -70,7 +70,9 @@ class _FakeVentasRepository extends VentasRepository {
           String estado,
           String? etiquetaId,
           String? comprobanteAnalisisId,
+          List<String>? comprobanteAnalisisIds,
           String? codigoOperacion,
+          bool? pagoRestoEfectivo,
         })
       >[];
   List<Etiqueta> etiquetas = const [
@@ -133,14 +135,18 @@ class _FakeVentasRepository extends VentasRepository {
     required String estado,
     String? etiquetaId,
     String? comprobanteAnalisisId,
+    List<String>? comprobanteAnalisisIds,
     String? codigoOperacion,
+    bool? pagoRestoEfectivo,
   }) async {
     conciliaciones.add((
       id: id,
       estado: estado,
       etiquetaId: etiquetaId,
       comprobanteAnalisisId: comprobanteAnalisisId,
+      comprobanteAnalisisIds: comprobanteAnalisisIds,
       codigoOperacion: codigoOperacion,
+      pagoRestoEfectivo: pagoRestoEfectivo,
     ));
     return _venta(id);
   }
@@ -1078,7 +1084,8 @@ void main() {
 
       expect(completed, isTrue);
       expect(repo.conciliaciones, hasLength(1));
-      expect(repo.conciliaciones.single.comprobanteAnalisisId, 'analysis-1');
+      expect(repo.conciliaciones.single.comprobanteAnalisisId, isNull);
+      expect(repo.conciliaciones.single.comprobanteAnalisisIds, ['analysis-1']);
       expect(repo.conciliaciones.single.codigoOperacion, isNull);
       await tester.pump(const Duration(seconds: 3));
     });
@@ -1123,6 +1130,7 @@ void main() {
 
       expect(repo.conciliaciones, hasLength(1));
       expect(repo.conciliaciones.single.comprobanteAnalisisId, isNull);
+      expect(repo.conciliaciones.single.comprobanteAnalisisIds, isNull);
       await tester.pump(const Duration(seconds: 3));
     });
 

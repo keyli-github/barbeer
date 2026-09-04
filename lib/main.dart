@@ -38,13 +38,10 @@ class BarBeerApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    // Carga branding remoto (endpoint público) al arrancar la app
-    ref.listen<AuthState>(authProvider, (_, __) {
+    ref.listen<AuthState>(authProvider, (_, _) {
       router.refresh();
     });
-    // Precarga el branding fuera del ciclo de build para evitar
-    // modificar el árbol durante su construcción.
-    Future.microtask(() => ref.read(brandingProvider.notifier).load());
+    ref.watch(brandingProvider);
 
     return MaterialApp.router(
       title: 'Yacare',

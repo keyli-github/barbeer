@@ -199,7 +199,7 @@ class _QuickAction extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: c.withOpacity(0.1),
+              color: c.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: c, size: 22),
@@ -283,18 +283,22 @@ class _BrandingSection extends ConsumerWidget {
             description: 'JPEG/PNG/WebP · máx. 5 MB',
             icon: Icons.image_rounded,
             imageUrl: branding.logoUrl,
-            mutating: branding.mutating,
+            fallbackAsset: 'assets/images/yacare.png',
+            imageFit: BoxFit.contain,
+            mutating: branding.mutation == BrandingMutation.logo,
             onPick: (bytes, filename) async {
               await ref
                   .read(brandingProvider.notifier)
                   .setLogo(bytes, filename);
-              if (context.mounted)
+              if (context.mounted) {
                 AppFeedback.success(context, 'Logo actualizado');
+              }
             },
             onRemove: () async {
               await ref.read(brandingProvider.notifier).removeLogo();
-              if (context.mounted)
+              if (context.mounted) {
                 AppFeedback.success(context, 'Logo restaurado al original');
+              }
             },
           ),
           const Divider(height: 24),
@@ -303,18 +307,22 @@ class _BrandingSection extends ConsumerWidget {
             description: 'JPEG/PNG/WebP · máx. 5 MB',
             icon: Icons.wallpaper_rounded,
             imageUrl: branding.coverUrl,
-            mutating: branding.mutating,
+            fallbackAsset: 'assets/images/login.webp',
+            imageFit: BoxFit.cover,
+            mutating: branding.mutation == BrandingMutation.cover,
             onPick: (bytes, filename) async {
               await ref
                   .read(brandingProvider.notifier)
                   .setCover(bytes, filename);
-              if (context.mounted)
+              if (context.mounted) {
                 AppFeedback.success(context, 'Portada actualizada');
+              }
             },
             onRemove: () async {
               await ref.read(brandingProvider.notifier).removeCover();
-              if (context.mounted)
+              if (context.mounted) {
                 AppFeedback.success(context, 'Portada restaurada al original');
+              }
             },
           ),
         ],
@@ -328,6 +336,8 @@ class _BrandingItem extends StatefulWidget {
   final String description;
   final IconData icon;
   final String? imageUrl;
+  final String fallbackAsset;
+  final BoxFit imageFit;
   final bool mutating;
   // bytes + filename → the backend needs multipart with a real filename
   final Future<void> Function(Uint8List bytes, String filename) onPick;
@@ -338,6 +348,8 @@ class _BrandingItem extends StatefulWidget {
     required this.description,
     required this.icon,
     required this.imageUrl,
+    required this.fallbackAsset,
+    required this.imageFit,
     required this.mutating,
     required this.onPick,
     required this.onRemove,
@@ -361,8 +373,9 @@ class _BrandingItemState extends State<_BrandingItem> {
       final file = result.files.first;
       if (file.bytes == null) return;
       if (file.bytes!.length > _maxBytes) {
-        if (mounted)
+        if (mounted) {
           AppFeedback.error(context, 'Archivo demasiado grande (máx. 5 MB)');
+        }
         return;
       }
       final filename = file.name.isNotEmpty ? file.name : 'image.jpg';
@@ -400,14 +413,11 @@ class _BrandingItemState extends State<_BrandingItem> {
           child: hasCustom
               ? Image.network(
                   widget.imageUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
-                    widget.icon,
-                    color: context.colors.textTertiary,
-                    size: 26,
-                  ),
+                  fit: widget.imageFit,
+                  errorBuilder: (_, _, _) =>
+                      Image.asset(widget.fallbackAsset, fit: widget.imageFit),
                 )
-              : Icon(widget.icon, color: context.colors.textTertiary, size: 26),
+              : Image.asset(widget.fallbackAsset, fit: widget.imageFit),
         ),
         const SizedBox(width: 14),
         Expanded(

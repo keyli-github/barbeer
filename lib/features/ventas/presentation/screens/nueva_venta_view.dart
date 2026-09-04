@@ -39,6 +39,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   final _searchCtrl = TextEditingController();
   List<Producto> _productos = [];
   bool _loadingProducts = true;
+  bool _needsSedeSelection = false;
   String? _errorProducts;
   final List<CarritoItem> _carrito = [];
   bool _submitting = false;
@@ -110,11 +111,14 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           ? selectedSedeId
           : auth.user?.sedeId;
       if (widget.productsLoader == null && effectiveSedeId == null) {
-        throw StateError(
-          auth.user?.isSuperAdmin == true
-              ? 'Selecciona una sede para vender'
-              : 'Tu usuario no tiene una sede asignada',
-        );
+        if (!mounted) return;
+        setState(() {
+          _productos = [];
+          _loadingProducts = false;
+          _needsSedeSelection = true;
+          _loadedSedeId = null;
+        });
+        return;
       }
       final products = widget.productsLoader != null
           ? await widget.productsLoader!()
@@ -130,6 +134,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             .where((p) => p.disponiblePos && p.activo)
             .toList();
         _loadingProducts = false;
+        _needsSedeSelection = false;
         _loadedSedeId = effectiveSedeId;
       });
       if (effectiveSedeId != null) {
@@ -139,6 +144,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       if (!mounted) return;
       setState(() {
         _loadingProducts = false;
+        _needsSedeSelection = false;
         _errorProducts = e is StateError
             ? e.message.toString()
             : 'No se pudieron cargar los productos';
@@ -188,7 +194,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     return item?.cantidad ?? 0;
   }
 
-  void _addToCart(Producto product, {double? precioVenta}) {
+  void _addToCart(Producto product, {double? precioVenta, int quantity = 1}) {
     if (_frozen) return; // Carrito congelado tras error ambiguo
     final existing = _carrito
         .where((i) => i.productoId == product.id)
@@ -196,7 +202,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     // Stock negativo permitido — el backend controla el saldo real.
     setState(() {
       if (existing != null) {
-        existing.cantidad++;
+        existing.cantidad += quantity;
         if (precioVenta != null) existing.precio = precioVenta;
       } else {
         _carrito.add(
@@ -205,6 +211,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             nombre: product.nombre,
             codigo: product.codigo,
             precio: precioVenta ?? product.precioVenta,
+            cantidad: quantity,
           ),
         );
       }
@@ -252,23 +259,27 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       }
     }
 
-    if (mounted) _addToCart(product, precioVenta: result.price);
+    if (mounted) {
+      _addToCart(product, precioVenta: result.price, quantity: result.quantity);
+    }
   }
 
   /// Modal "Añadir a la Venta" equivalente al de la web:
   /// imagen, nombre, precio base, precio a cobrar y confirmación.
   /// Cuando [requiresPin] es true y el precio cambia, muestra campo PIN
   /// (4 dígitos) que el SUPERADMIN debe ingresar para autorizar el precio.
-  Future<({double price, String? pin})?> _showProductModal({
+  Future<({double price, int quantity, String? pin})?> _showProductModal({
     required String nombre,
     required String? imageUrl,
     required double basePrice,
     bool requiresPin = false,
+    int initialQuantity = 1,
   }) async {
     var priceText = basePrice.toStringAsFixed(2);
+    var quantityText = '$initialQuantity';
     var pinText = '';
     String? error;
-    final result = await showDialog<({double price, String? pin})>(
+    final result = await showDialog<({double price, int quantity, String? pin})>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -403,6 +414,35 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                               setDialogState(() {});
                             },
                           ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Cantidad',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: context.colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            key: const Key('product-quantity-field'),
+                            initialValue: quantityText,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: InputDecoration(
+                              hintText: '1',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              quantityText = value;
+                              setDialogState(() {});
+                            },
+                          ),
                           // ── PIN de autorización (solo cuando cambia precio) ──
                           if (showPin) ...[
                             const SizedBox(height: 14),
@@ -473,6 +513,42 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                               ),
                             ),
                           ],
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: context.colors.primarySurface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: context.colors.primaryBorder,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'TOTAL A AÑADIR',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  _fmt(
+                                    entered * (int.tryParse(quantityText) ?? 0),
+                                  ),
+                                  key: const Key('product-add-total'),
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 16),
                           Wrap(
                             alignment: WrapAlignment.end,
@@ -496,8 +572,21 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                                     );
                                     return;
                                   }
+                                  final quantity = int.tryParse(
+                                    quantityText.trim(),
+                                  );
+                                  if (quantity == null ||
+                                      quantity < 1 ||
+                                      quantity > 9999) {
+                                    setDialogState(
+                                      () => error =
+                                          'Ingresa una cantidad entre 1 y 9999',
+                                    );
+                                    return;
+                                  }
                                   Navigator.of(context).pop((
                                     price: value,
+                                    quantity: quantity,
                                     pin: showPin ? pinText : null,
                                   ));
                                 },
@@ -536,6 +625,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       imageUrl: product?.imageUrl,
       basePrice: item.precio,
       requiresPin: !isSuperAdmin,
+      initialQuantity: item.cantidad,
     );
     if (result == null || !mounted) return;
 
@@ -565,7 +655,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     }
 
     if (mounted) {
-      setState(() => item.precio = result.price);
+      setState(() {
+        item.precio = result.price;
+        item.cantidad = result.quantity;
+      });
       _invalidateAnalysisIfAmountChanged();
     }
   }
@@ -1046,14 +1139,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                     .map(
                       (entry) => Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: context.colors.successLight,
+                        child: Material(
+                          color: context.colors.successLight,
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
+                            side: BorderSide(
                               color: context.colors.successBorder,
                             ),
                           ),
+                          clipBehavior: Clip.antiAlias,
                           child: ListTile(
                             dense: true,
                             leading: const Icon(
@@ -1122,23 +1216,26 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                 (_comprobantesAdicionales.isNotEmpty ||
                     _comprobanteAnalisis?.monto != null)) ...[
               const SizedBox(height: AppSpacing.xs),
-              CheckboxListTile.adaptive(
-                key: const Key('pago-resto-efectivo'),
-                value: _pagoRestoEfectivo,
-                onChanged: _frozen
-                    ? null
-                    : (v) => setState(() => _pagoRestoEfectivo = v ?? false),
-                title: const Text(
-                  'La diferencia se cobra en efectivo',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              Material(
+                color: Colors.transparent,
+                child: CheckboxListTile.adaptive(
+                  key: const Key('pago-resto-efectivo'),
+                  value: _pagoRestoEfectivo,
+                  onChanged: _frozen
+                      ? null
+                      : (v) => setState(() => _pagoRestoEfectivo = v ?? false),
+                  title: const Text(
+                    'La diferencia se cobra en efectivo',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'El monto no cubierto por los comprobantes se registra como efectivo.',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
                 ),
-                subtitle: const Text(
-                  'El monto no cubierto por los comprobantes se registra como efectivo.',
-                  style: TextStyle(fontSize: 11),
-                ),
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
-                contentPadding: EdgeInsets.zero,
               ),
             ],
             if (_comprobanteError != null) ...[
@@ -1782,35 +1879,38 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     return ColoredBox(
       key: const Key('desktop-sales-layout'),
       color: context.colors.backgroundAlt,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final cartWidth = constraints.maxWidth < 900 ? 340.0 : 360.0;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: _buildDesktopCatalogPanel()),
-              const SizedBox(width: AppSpacing.md),
-              SizedBox(
-                width: cartWidth,
-                child: _DesktopCartPanel(
-                  items: _carrito,
-                  total: _total,
-                  submitting: _submitting,
-                  frozen: _frozen,
-                  error: _submitError,
-                  onConfirm: _submit,
-                  onSavePending: _submitPending,
-                  onRetry: _retry,
-                  onClear: _frozen ? _discardFrozen : _clearCart,
-                  onChangeQuantity: _changeQuantity,
-                  onRemove: _removeFromCart,
-                  onEditPrice: _frozen ? null : _editPrice,
-                  saleDetails: _buildSaleDetails(refresh: () {}),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1380),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildDesktopCatalogPanel()),
+                const SizedBox(width: AppSpacing.lg),
+                SizedBox(
+                  width: 380,
+                  child: _DesktopCartPanel(
+                    items: _carrito,
+                    total: _total,
+                    submitting: _submitting,
+                    frozen: _frozen,
+                    error: _submitError,
+                    onConfirm: _submit,
+                    onSavePending: _submitPending,
+                    onRetry: _retry,
+                    onClear: _frozen ? _discardFrozen : _clearCart,
+                    onChangeQuantity: _changeQuantity,
+                    onRemove: _removeFromCart,
+                    onEditPrice: _frozen ? null : _editPrice,
+                    saleDetails: _buildSaleDetails(refresh: () {}),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1818,6 +1918,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   Widget _buildDesktopCatalogPanel() {
     final status = _loadingProducts
         ? 'Cargando...'
+        : _needsSedeSelection
+        ? 'Selecciona una sede'
         : _errorProducts != null
         ? 'No disponible'
         : '${_filteredProducts.length} disponibles';
@@ -1925,6 +2027,14 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Widget _buildCatalog({required bool desktop}) {
     if (_loadingProducts) return const DSSkeletonList(count: 6);
+    if (_needsSedeSelection) {
+      return const DSEmptyState(
+        key: Key('select-sede-empty-state'),
+        icon: Icons.location_on_outlined,
+        title: 'Selecciona una sede',
+        message: 'Elige la sede donde registrarás la venta para continuar.',
+      );
+    }
     if (_errorProducts != null) {
       return _RefreshableCatalogState(
         onRefresh: _loadProducts,
@@ -1951,7 +2061,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     if (desktop) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final columns = (constraints.maxWidth / 200).floor().clamp(2, 5);
+          final columns = (constraints.maxWidth / 220).floor().clamp(2, 5);
           return RefreshIndicator(
             onRefresh: _loadProducts,
             child: GridView.builder(
@@ -1960,7 +2070,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
               padding: const EdgeInsets.all(AppSpacing.md),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                childAspectRatio: 0.72,
+                mainAxisExtent: 240,
                 crossAxisSpacing: AppSpacing.sm,
                 mainAxisSpacing: AppSpacing.sm,
               ),
@@ -2000,8 +2110,6 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       frozen: _frozen,
       desktop: desktop,
       onAdd: () => _selectProduct(product),
-      onIncrease: () => _changeQuantity(product.id, 1),
-      onDecrease: () => _changeQuantity(product.id, -1),
     );
   }
 }
@@ -2077,7 +2185,7 @@ class _ProductoCard extends StatelessWidget {
   final int qty;
   final bool frozen;
   final bool desktop;
-  final VoidCallback onAdd, onIncrease, onDecrease;
+  final VoidCallback onAdd;
 
   const _ProductoCard({
     required this.producto,
@@ -2085,8 +2193,6 @@ class _ProductoCard extends StatelessWidget {
     required this.frozen,
     required this.desktop,
     required this.onAdd,
-    required this.onIncrease,
-    required this.onDecrease,
   });
 
   @override
@@ -2115,21 +2221,24 @@ class _ProductoCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Image (top, 4:3 ratio)
-                    Expanded(
-                      flex: 5,
-                      child: DSProductImage(
-                        imageUrl: producto.imageUrl,
-                        productName: producto.nombre,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        radius: 0,
+                    AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: ColoredBox(
+                        color: context.colors.backgroundAlt,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: DSProductImage(
+                            imageUrl: producto.imageUrl,
+                            productName: producto.nombre,
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            height: double.infinity,
+                            radius: 0,
+                          ),
+                        ),
                       ),
                     ),
-                    // Info (bottom)
                     Expanded(
-                      flex: 6,
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: Column(
@@ -2147,20 +2256,18 @@ class _ProductoCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 3),
-                            Expanded(
-                              child: Text(
-                                producto.nombre,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: context.colors.textPrimary,
-                                  height: 1.2,
-                                ),
+                            Text(
+                              producto.nombre,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: context.colors.textPrimary,
+                                height: 1.2,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const Spacer(),
                             Row(
                               children: [
                                 Expanded(
@@ -2199,12 +2306,6 @@ class _ProductoCard extends StatelessWidget {
                                     ),
                                   ),
                               ],
-                            ),
-                            const SizedBox(height: 6),
-                            _buildQuantityControl(
-                              context,
-                              stockBajo: stockBajo,
-                              stock: stock,
                             ),
                           ],
                         ),
@@ -2391,59 +2492,6 @@ class _ProductoCard extends StatelessWidget {
     ),
     boxShadow: AppShadows.card,
   );
-
-  Widget _buildQuantityControl(
-    BuildContext context, {
-    required bool stockBajo,
-    required int? stock,
-  }) {
-    if (qty == 0) {
-      return SizedBox(
-        width: double.infinity,
-        height: desktop ? 32 : 36,
-        child: TextButton(
-          onPressed: frozen ? null : onAdd,
-          style: TextButton.styleFrom(
-            backgroundColor: context.colors.primarySurface,
-            foregroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: const Text(
-            '+ Agregar',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _QtyBtn(
-          icon: Icons.remove_rounded,
-          onTap: frozen ? null : onDecrease,
-          size: desktop ? 28 : 34,
-        ),
-        Text(
-          '$qty',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-            color: AppColors.primary,
-          ),
-        ),
-        _QtyBtn(
-          icon: Icons.add_rounded,
-          onTap: frozen ? null : onIncrease,
-          color: AppColors.primary,
-          size: desktop ? 28 : 34,
-        ),
-      ],
-    );
-  }
 }
 
 class _QtyBtn extends StatelessWidget {
@@ -2590,36 +2638,40 @@ class _DesktopCartPanel extends StatelessWidget {
           ),
           Divider(height: 1, color: context.colors.border),
           // ── Items list ──────────────────────────────────────────────
-          Expanded(
-            flex: 3,
-            child: items.isEmpty
-                ? const _DesktopEmptyCart()
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                    ),
-                    itemCount: items.length,
-                    separatorBuilder: (_, _) =>
-                        Divider(height: 1, color: context.colors.divider),
-                    itemBuilder: (_, index) {
-                      final item = items[index];
-                      return _DesktopCartItem(
-                        key: ValueKey('desktop-cart-item-${item.productoId}'),
-                        item: item,
-                        frozen: frozen,
-                        onDecrease: () => onChangeQuantity(item.productoId, -1),
-                        onIncrease: () => onChangeQuantity(item.productoId, 1),
-                        onRemove: () => onRemove(item.productoId),
-                        onEditPrice: onEditPrice == null
-                            ? null
-                            : () => onEditPrice!(item),
-                      );
-                    },
+          if (items.isEmpty)
+            const Expanded(flex: 3, child: _DesktopEmptyCart())
+          else
+            Flexible(
+              fit: FlexFit.loose,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 180),
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
                   ),
-          ),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) =>
+                      Divider(height: 1, color: context.colors.divider),
+                  itemBuilder: (_, index) {
+                    final item = items[index];
+                    return _DesktopCartItem(
+                      key: ValueKey('desktop-cart-item-${item.productoId}'),
+                      item: item,
+                      frozen: frozen,
+                      onDecrease: () => onChangeQuantity(item.productoId, -1),
+                      onIncrease: () => onChangeQuantity(item.productoId, 1),
+                      onRemove: () => onRemove(item.productoId),
+                      onEditPrice: onEditPrice == null
+                          ? null
+                          : () => onEditPrice!(item),
+                    );
+                  },
+                ),
+              ),
+            ),
           Divider(height: 1, color: context.colors.border),
           // ── Bottom: sale details + totals + buttons (scrollable) ──
-          Flexible(
+          Expanded(
             child: SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),

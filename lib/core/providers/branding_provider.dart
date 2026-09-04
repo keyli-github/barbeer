@@ -5,18 +5,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../network/api_client.dart';
 
+enum BrandingMutation { logo, cover }
+
 class BrandingState {
   final String? logoUrl;
   final String? coverUrl;
   final bool loading;
-  final bool mutating;
+  final BrandingMutation? mutation;
   final String? error;
 
   const BrandingState({
     this.logoUrl,
     this.coverUrl,
     this.loading = true,
-    this.mutating = false,
+    this.mutation,
     this.error,
   });
 
@@ -26,14 +28,15 @@ class BrandingState {
     bool clearLogo = false,
     bool clearCover = false,
     bool? loading,
-    bool? mutating,
+    BrandingMutation? mutation,
+    bool clearMutation = false,
     String? error,
     bool clearError = false,
   }) => BrandingState(
     logoUrl: clearLogo ? null : (logoUrl ?? this.logoUrl),
     coverUrl: clearCover ? null : (coverUrl ?? this.coverUrl),
     loading: loading ?? this.loading,
-    mutating: mutating ?? this.mutating,
+    mutation: clearMutation ? null : (mutation ?? this.mutation),
     error: clearError ? null : (error ?? this.error),
   );
 }
@@ -53,7 +56,7 @@ class BrandingNotifier extends StateNotifier<BrandingState> {
     if (_api == null) return;
     state = state.copyWith(loading: true, clearError: true);
     try {
-      final response = await _api!.get('/branding');
+      final response = await _api.get('/branding');
       _apply(Map<String, dynamic>.from(response.data as Map));
     } catch (error) {
       state = BrandingState(loading: false, error: error.toString());
@@ -61,21 +64,26 @@ class BrandingNotifier extends StateNotifier<BrandingState> {
   }
 
   Future<void> setLogo(Uint8List bytes, String filename) =>
-      _upload('/branding/logo', bytes, filename);
+      _upload('/branding/logo', bytes, filename, BrandingMutation.logo);
 
   Future<void> removeLogo() async {
-    await _remove('/branding/logo');
+    await _remove('/branding/logo', BrandingMutation.logo);
   }
 
   Future<void> setCover(Uint8List bytes, String filename) =>
-      _upload('/branding/login-cover', bytes, filename);
+      _upload('/branding/login-cover', bytes, filename, BrandingMutation.cover);
 
   Future<void> removeCover() async {
-    await _remove('/branding/login-cover');
+    await _remove('/branding/login-cover', BrandingMutation.cover);
   }
 
-  Future<void> _upload(String path, Uint8List bytes, String filename) async {
-    state = state.copyWith(mutating: true, clearError: true);
+  Future<void> _upload(
+    String path,
+    Uint8List bytes,
+    String filename,
+    BrandingMutation mutation,
+  ) async {
+    state = state.copyWith(mutation: mutation, clearError: true);
     try {
       final response = await _api!.postMultipart(
         path,
@@ -87,18 +95,18 @@ class BrandingNotifier extends StateNotifier<BrandingState> {
       );
       _apply(Map<String, dynamic>.from(response.data as Map));
     } catch (error) {
-      state = state.copyWith(mutating: false, error: error.toString());
+      state = state.copyWith(clearMutation: true, error: error.toString());
       rethrow;
     }
   }
 
-  Future<void> _remove(String path) async {
-    state = state.copyWith(mutating: true, clearError: true);
+  Future<void> _remove(String path, BrandingMutation mutation) async {
+    state = state.copyWith(mutation: mutation, clearError: true);
     try {
       final response = await _api!.delete(path);
       _apply(Map<String, dynamic>.from(response.data as Map));
     } catch (error) {
-      state = state.copyWith(mutating: false, error: error.toString());
+      state = state.copyWith(clearMutation: true, error: error.toString());
       rethrow;
     }
   }
@@ -108,7 +116,6 @@ class BrandingNotifier extends StateNotifier<BrandingState> {
       logoUrl: json['logoUrl'] as String?,
       coverUrl: json['coverUrl'] as String?,
       loading: false,
-      mutating: false,
     );
   }
 }

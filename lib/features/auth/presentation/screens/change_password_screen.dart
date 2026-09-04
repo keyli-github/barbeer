@@ -87,102 +87,108 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           onTap: () => FocusScope.of(context).unfocus(),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.isForced) ...[
-                    const SizedBox(height: 24),
-                    Center(
-                      child: Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: context.colors.warningLight,
-                          shape: BoxShape.circle,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.isForced) ...[
+                        const SizedBox(height: 24),
+                        Center(
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: context.colors.warningLight,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.lock_reset_rounded,
+                              color: AppColors.warning,
+                              size: 30,
+                            ),
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.lock_reset_rounded,
-                          color: AppColors.warning,
-                          size: 30,
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Cambio de contrasena requerido',
+                          style: AppTextStyles.headlineMedium,
+                          textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Por seguridad, debes cambiar tu contrasena antes de continuar.',
+                          style: AppTextStyles.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                      if (_error != null) ...[
+                        _errBox(_error!),
+                        const SizedBox(height: 16),
+                      ],
+                      AppTextField(
+                        label: 'Contrasena actual',
+                        hint: 'Ingresa tu contrasena actual',
+                        controller: _cur,
+                        prefixIcon: Icons.lock_outline_rounded,
+                        obscureText: true,
+                        textInputAction: TextInputAction.next,
+                        validator: (v) =>
+                            v == null || v.isEmpty ? 'Requerido' : null,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Cambio de contrasena requerido',
-                      style: AppTextStyles.headlineMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Por seguridad, debes cambiar tu contrasena antes de continuar.',
-                      style: AppTextStyles.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                  ],
-                  if (_error != null) ...[
-                    _errBox(_error!),
-                    const SizedBox(height: 16),
-                  ],
-                  AppTextField(
-                    label: 'Contrasena actual',
-                    hint: 'Ingresa tu contrasena actual',
-                    controller: _cur,
-                    prefixIcon: Icons.lock_outline_rounded,
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Requerido' : null,
+                      const SizedBox(height: 14),
+                      AppTextField(
+                        label: 'Nueva contrasena',
+                        hint: 'Entre 6 y 72 caracteres',
+                        controller: _new,
+                        prefixIcon: Icons.lock_outline_rounded,
+                        obscureText: true,
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) => setState(() {}),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Requerido';
+                          if (v.length < 6 || v.length > 72) {
+                            return 'Debe tener entre 6 y 72 caracteres';
+                          }
+                          if (!v.contains(RegExp(r'[a-z]')))
+                            return 'Necesita minuscula';
+                          if (!v.contains(RegExp(r'[0-9]')))
+                            return 'Necesita numero';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _requirements(),
+                      const SizedBox(height: 14),
+                      AppTextField(
+                        label: 'Confirmar contrasena',
+                        hint: 'Repite la nueva contrasena',
+                        controller: _confirm,
+                        prefixIcon: Icons.lock_outline_rounded,
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onChanged: (_) => setState(() {}),
+                        onSubmitted: (_) {
+                          if (_allOk) _submit();
+                        },
+                        validator: (v) => v != _new.text
+                            ? 'Las contrasenas no coinciden'
+                            : null,
+                      ),
+                      const SizedBox(height: 28),
+                      PrimaryButton(
+                        label: 'Cambiar contrasena',
+                        onPressed: _allOk ? _submit : null,
+                        isLoading: _loading,
+                        icon: Icons.check_rounded,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Nueva contrasena',
-                    hint: 'Entre 6 y 72 caracteres',
-                    controller: _new,
-                    prefixIcon: Icons.lock_outline_rounded,
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    onChanged: (_) => setState(() {}),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Requerido';
-                      if (v.length < 6 || v.length > 72) {
-                        return 'Debe tener entre 6 y 72 caracteres';
-                      }
-                      if (!v.contains(RegExp(r'[a-z]')))
-                        return 'Necesita minuscula';
-                      if (!v.contains(RegExp(r'[0-9]')))
-                        return 'Necesita numero';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  _requirements(),
-                  const SizedBox(height: 14),
-                  AppTextField(
-                    label: 'Confirmar contrasena',
-                    hint: 'Repite la nueva contrasena',
-                    controller: _confirm,
-                    prefixIcon: Icons.lock_outline_rounded,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) {
-                      if (_allOk) _submit();
-                    },
-                    validator: (v) =>
-                        v != _new.text ? 'Las contrasenas no coinciden' : null,
-                  ),
-                  const SizedBox(height: 28),
-                  PrimaryButton(
-                    label: 'Cambiar contrasena',
-                    onPressed: _allOk ? _submit : null,
-                    isLoading: _loading,
-                    icon: Icons.check_rounded,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

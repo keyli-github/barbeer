@@ -57,6 +57,8 @@ void main() {
     expect(actionAllowed({}), isFalse);
     expect(_can(RoutePaths.productos, permissions: _adminPermissions), isTrue);
     expect(_can(RoutePaths.productos), isFalse);
+    expect(_can(RoutePaths.changePassword), isTrue);
+    expect(RouteAccessPolicy.isProtected(RoutePaths.changePassword), isTrue);
     expect(
       _can(
         RoutePaths.importaciones,
@@ -88,6 +90,8 @@ void main() {
       (AuthGateState.unauthenticated, product, {}, 'LOGIN'),
       (authenticated, product, {'productos:leer'}, 'PROTECTED PRODUCTS'),
       (authenticated, product, {}, 'UNAUTHORIZED'),
+      (authenticated, RoutePaths.changePassword, {}, 'CHANGE PASSWORD'),
+      (AuthGateState.unauthenticated, RoutePaths.changePassword, {}, 'LOGIN'),
       (authenticated, '/unknown-protected', {}, 'UNAUTHORIZED'),
     ];
 

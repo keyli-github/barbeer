@@ -53,10 +53,7 @@ void main() {
           authProvider.overrideWith(
             (ref) => _TestAuthNotifier(
               ref.read(authRepositoryProvider),
-              AuthState(
-                status: AuthStatus.authenticated,
-                user: user,
-              ),
+              AuthState(status: AuthStatus.authenticated, user: user),
             ),
           ),
           brandingProvider.overrideWith((_) => BrandingNotifier.noop()),
@@ -136,11 +133,7 @@ void main() {
         rol: 'SUPERADMIN',
         nivel: 100,
         createdAt: '2026-01-01',
-        permisos: [
-          'productos:leer',
-          'usuarios:leer',
-          'establecimientos:leer',
-        ],
+        permisos: ['productos:leer', 'usuarios:leer', 'establecimientos:leer'],
       ),
     );
 
@@ -153,5 +146,21 @@ void main() {
     expect(find.text('PERSONALIZACIÓN DEL SISTEMA'), findsOneWidget);
     expect(find.text('Logo del sistema'), findsOneWidget);
     expect(find.text('Portada del login'), findsOneWidget);
+    final assets = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((image) => image.image)
+        .whereType<AssetImage>()
+        .map((image) => image.assetName);
+    expect(assets, contains('assets/images/yacare.png'));
+    expect(assets, contains('assets/images/login.webp'));
+  });
+
+  test('branding identifica la imagen que se está guardando', () {
+    const logo = BrandingState(mutation: BrandingMutation.logo);
+    const cover = BrandingState(mutation: BrandingMutation.cover);
+
+    expect(logo.mutation, BrandingMutation.logo);
+    expect(cover.mutation, BrandingMutation.cover);
+    expect(logo.mutation == BrandingMutation.cover, isFalse);
   });
 }
