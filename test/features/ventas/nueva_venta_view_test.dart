@@ -353,6 +353,27 @@ Future<void> _pumpNuevaVenta(
 
 void main() {
   group('NuevaVentaView responsive', () {
+    testWidgets('desktop product cards do not overflow at the breakpoint', (
+      tester,
+    ) async {
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1024, 700),
+        loader: () async => _products,
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('desktop-sales-layout')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final grid = tester.widget<GridView>(
+        find.byKey(const Key('desktop-catalog-grid')),
+      );
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 2);
+      expect(delegate.mainAxisExtent, 240);
+    });
+
     testWidgets('desktop shows the redesigned dense grid and fixed cart', (
       tester,
     ) async {

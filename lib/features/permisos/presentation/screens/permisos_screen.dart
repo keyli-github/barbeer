@@ -195,9 +195,7 @@ class PermisosScreen extends ConsumerWidget {
                       selected: state.moduleFilter == m,
                       onTap: () => ref
                           .read(permisosProvider.notifier)
-                          .setModuleFilter(
-                            state.moduleFilter == m ? null : m,
-                          ),
+                          .setModuleFilter(state.moduleFilter == m ? null : m),
                     ),
                   ),
                 ],
@@ -402,14 +400,10 @@ class _ModuleTab extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: selected
-            ? context.colors.primarySurface
-            : context.colors.backgroundAlt,
+        color: selected ? AppColors.brand : context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(
-          color: selected
-              ? context.colors.primaryBorder
-              : context.colors.border,
+          color: selected ? AppColors.brand : context.colors.border,
         ),
       ),
       child: Text(
@@ -417,7 +411,7 @@ class _ModuleTab extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.primary : context.colors.textSecondary,
+          color: selected ? Colors.black : context.colors.textSecondary,
         ),
       ),
     ),

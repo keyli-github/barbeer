@@ -1,9 +1,15 @@
 import 'package:barbeer/features/compras/data/compras_repository.dart';
+import 'package:barbeer/features/compras/presentation/screens/compras_screen.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('desktop purchases layout starts at 1024 logical pixels', () {
+    expect(usesComprasDesktopLayout(1023), isFalse);
+    expect(usesComprasDesktopLayout(1024), isTrue);
+  });
+
   group('Item de nueva compra', () {
     test('parsea valores positivos y calcula el subtotal', () {
       final item = parseCompraCreateItem(
@@ -274,7 +280,10 @@ void main() {
     );
 
     test('compras:leer grants access to /compras', () {
-      expect(_auth('ALMACENERO', ['compras:leer']).canAccess('/compras'), isTrue);
+      expect(
+        _auth('ALMACENERO', ['compras:leer']).canAccess('/compras'),
+        isTrue,
+      );
     });
 
     test('no compras permission denies /compras', () {

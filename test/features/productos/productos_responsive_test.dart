@@ -67,55 +67,82 @@ class _TestAuthNotifier extends AuthNotifier {
   }
 }
 
+const _user = UserProfile(
+  id: 'user-1',
+  username: 'admin',
+  rol: 'ADMIN',
+  nivel: 80,
+  sedeId: 'branch-1',
+  createdAt: '2026-09-01',
+  permisos: [
+    'productos:leer',
+    'productos:crear',
+    'productos:editar',
+    'productos:ver-utilidad',
+  ],
+);
+
+Future<void> _pumpProducts(WidgetTester tester, Size size) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        productosCatalogRepositoryProvider.overrideWithValue(
+          _FakeProductsRepository(),
+        ),
+        authProvider.overrideWith(
+          (ref) => _TestAuthNotifier(
+            ref.read(authRepositoryProvider),
+            const AuthState(status: AuthStatus.authenticated, user: _user),
+          ),
+        ),
+      ],
+      child: const MaterialApp(home: ProductosScreen()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('desktop product cards are compact and create opens a dialog', (
+  testWidgets('mobile product cards stay compact at phone width', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(1440, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    const user = UserProfile(
-      id: 'user-1',
-      username: 'admin',
-      rol: 'ADMIN',
-      nivel: 80,
-      sedeId: 'branch-1',
-      createdAt: '2026-09-01',
-      permisos: [
-        'productos:leer',
-        'productos:crear',
-        'productos:editar',
-        'productos:ver-utilidad',
-      ],
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          productosCatalogRepositoryProvider.overrideWithValue(
-            _FakeProductsRepository(),
-          ),
-          authProvider.overrideWith(
-            (ref) => _TestAuthNotifier(
-              ref.read(authRepositoryProvider),
-              const AuthState(status: AuthStatus.authenticated, user: user),
-            ),
-          ),
-        ],
-        child: const MaterialApp(home: ProductosScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _pumpProducts(tester, const Size(390, 844));
 
     final card = find.byKey(const Key('product-card-product-1'));
     expect(card, findsOneWidget);
-    expect(tester.getSize(card).height, lessThan(390));
+    expect(tester.getSize(card).height, lessThan(500));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('desktop product cards are compact and create opens a dialog', (
+    tester,
+  ) async {
+    await _pumpProducts(tester, const Size(1440, 900));
+
+    final card = find.byKey(const Key('product-card-product-1'));
+    expect(card, findsOneWidget);
+    expect(tester.getSize(card).height, lessThan(430));
 
     await tester.tap(find.byKey(const Key('productos-create-desktop')));
     await tester.pumpAndSettle();
     expect(find.byType(Dialog), findsOneWidget);
     expect(find.text('Nuevo producto'), findsOneWidget);
+  });
+
+  testWidgets('wide desktop adds columns instead of stretching product cards', (
+    tester,
+  ) async {
+    await _pumpProducts(tester, const Size(1920, 1080));
+
+    final card = find.byKey(const Key('product-card-product-1'));
+    expect(card, findsOneWidget);
+    expect(tester.getSize(card).width, lessThan(300));
+    expect(tester.getSize(card).height, lessThan(430));
+    expect(tester.takeException(), isNull);
   });
 }

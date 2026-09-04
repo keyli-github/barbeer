@@ -476,20 +476,16 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: selected
-              ? context.colors.primarySurface
-              : context.colors.backgroundAlt,
+          color: selected ? AppColors.brand : context.colors.backgroundAlt,
           borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
-            color: selected
-                ? context.colors.primaryBorder
-                : context.colors.border,
+            color: selected ? AppColors.brand : context.colors.border,
           ),
         ),
         child: Text(
           label,
           style: AppTextStyles.labelLarge.copyWith(
-            color: selected ? AppColors.primary : context.colors.textSecondary,
+            color: selected ? Colors.black : context.colors.textSecondary,
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -328,17 +329,20 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
               SliverLayoutBuilder(
                 builder: (context, constraints) {
                   final gap = desktop ? 12.0 : AppSpacing.sm;
-                  final minCardWidth = desktop ? 210.0 : 180.0;
-                  final availableWidth = desktop
-                      ? constraints.crossAxisExtent - 48
-                      : constraints.crossAxisExtent - (AppSpacing.md * 2);
+                  final minCardWidth = desktop ? 210.0 : 150.0;
+                  final hPad = desktop ? 48.0 : AppSpacing.md * 2;
+                  final availableWidth = constraints.crossAxisExtent - hPad;
                   final columns =
                       ((availableWidth + gap) / (minCardWidth + gap))
                           .floor()
-                          .clamp(1, desktop ? 5 : 3);
+                          .clamp(1, 8);
                   final cardWidth =
                       (availableWidth - gap * (columns - 1)) / columns;
-                  final desktopCardHeight = cardWidth * .75 + 180;
+                  // Image takes 3/4 of cardWidth; info section is fixed ~160,
+                  // stock buttons add ~90 on desktop, "Ver detalle" ~36 on mobile.
+                  final imageHeight = cardWidth * .75;
+                  final infoHeight = desktop ? 250.0 : 160.0;
+                  final cardHeight = imageHeight + infoHeight;
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                       desktop ? 24 : AppSpacing.md,
@@ -349,8 +353,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
-                        childAspectRatio: desktop ? 1 : 0.56,
-                        mainAxisExtent: desktop ? desktopCardHeight : null,
+                        mainAxisExtent: cardHeight,
                         crossAxisSpacing: gap,
                         mainAxisSpacing: gap,
                       ),
@@ -872,240 +875,243 @@ class _ProductsTable extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: MediaQuery.sizeOf(context).width - 80,
-            ),
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                context.colors.backgroundAlt,
-              ),
-              columnSpacing: 16,
-              horizontalMargin: 16,
-              columns: const [
-                DataColumn(label: Text('Producto')),
-                DataColumn(label: Text('Categoría')),
-                DataColumn(label: Text('Precio venta'), numeric: true),
-                DataColumn(label: Text('Costo'), numeric: true),
-                DataColumn(label: Text('Margen'), numeric: true),
-                DataColumn(label: Text('Venta')),
-                DataColumn(label: Text('Estado')),
-                DataColumn(label: Text('Acciones')),
-              ],
-              rows: items
-                  .map(
-                    (p) => DataRow(
-                      cells: [
-                        // Producto (image + nombre + código)
-                        DataCell(
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 220),
-                            child: Row(
+        child: LayoutBuilder(
+          builder: (context, tableConstraints) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: tableConstraints.maxWidth),
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(
+                  context.colors.backgroundAlt,
+                ),
+                columnSpacing: 16,
+                horizontalMargin: 16,
+                columns: const [
+                  DataColumn(label: Text('Producto')),
+                  DataColumn(label: Text('Categoría')),
+                  DataColumn(label: Text('Precio venta'), numeric: true),
+                  DataColumn(label: Text('Costo'), numeric: true),
+                  DataColumn(label: Text('Margen'), numeric: true),
+                  DataColumn(label: Text('Venta')),
+                  DataColumn(label: Text('Estado')),
+                  DataColumn(label: Text('Acciones')),
+                ],
+                rows: items
+                    .map(
+                      (p) => DataRow(
+                        cells: [
+                          // Producto (image + nombre + código)
+                          DataCell(
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 220),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  DSProductImageSquare(
+                                    imageUrl: p.imagenUrl,
+                                    size: 36,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          p.nombre,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          p.codigo,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: context.colors.textTertiary,
+                                            fontFamily: 'monospace',
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Categoría
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.brand.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                p.categoria,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.brand,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Precio venta
+                          DataCell(
+                            Text(
+                              FormatUtils.currency(p.precioVenta),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.brand,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          // Costo
+                          DataCell(
+                            Text(
+                              p.precioCosto != null
+                                  ? FormatUtils.currency(p.precioCosto!)
+                                  : '—',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: context.colors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          // Margen
+                          DataCell(
+                            Text(
+                              p.margin != null
+                                  ? '${p.margin!.toStringAsFixed(0)}%'
+                                  : '—',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: _marginColor(p.margin),
+                              ),
+                            ),
+                          ),
+                          // Disponible POS
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.disponiblePos
+                                    ? AppColors.success.withValues(alpha: 0.1)
+                                    : context.colors.backgroundAlt,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                p.disponiblePos ? 'Sí' : 'No',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.disponiblePos
+                                      ? AppColors.success
+                                      : context.colors.textTertiary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Estado
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.activo
+                                    ? AppColors.success.withValues(alpha: 0.1)
+                                    : AppColors.error.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                p.activo ? 'Activo' : 'Inactivo',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.activo
+                                      ? AppColors.success
+                                      : AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Acciones
+                          DataCell(
+                            Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                DSProductImageSquare(
-                                  imageUrl: p.imagenUrl,
-                                  size: 36,
-                                ),
-                                const SizedBox(width: 10),
-                                Flexible(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        p.nombre,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        p.codigo,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: context.colors.textTertiary,
-                                          fontFamily: 'monospace',
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                if (canEdit) ...[
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      size: 18,
+                                    ),
+                                    tooltip: 'Editar',
+                                    onPressed: () => onEdit(p),
+                                    color: context.colors.textSecondary,
                                   ),
-                                ),
+                                  IconButton(
+                                    icon: Icon(
+                                      p.activo
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      size: 18,
+                                    ),
+                                    tooltip: p.activo
+                                        ? 'Desactivar'
+                                        : 'Activar',
+                                    onPressed: () => onToggleActivo(p),
+                                    color: context.colors.textSecondary,
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      p.disponiblePos
+                                          ? Icons.remove_shopping_cart_outlined
+                                          : Icons.shopping_cart_outlined,
+                                      size: 18,
+                                    ),
+                                    tooltip: p.disponiblePos
+                                        ? 'Quitar de venta'
+                                        : 'Poner en venta',
+                                    onPressed: () => onTogglePos(p),
+                                    color: context.colors.textSecondary,
+                                  ),
+                                ],
+                                if (canDelete)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      size: 18,
+                                    ),
+                                    tooltip: 'Dar de baja',
+                                    onPressed: () => onDelete(p),
+                                    color: AppColors.error,
+                                  ),
                               ],
                             ),
                           ),
-                        ),
-                        // Categoría
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brand.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              p.categoria,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.brand,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Precio venta
-                        DataCell(
-                          Text(
-                            FormatUtils.currency(p.precioVenta),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.brand,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        // Costo
-                        DataCell(
-                          Text(
-                            p.precioCosto != null
-                                ? FormatUtils.currency(p.precioCosto!)
-                                : '—',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: context.colors.textSecondary,
-                            ),
-                          ),
-                        ),
-                        // Margen
-                        DataCell(
-                          Text(
-                            p.margin != null
-                                ? '${p.margin!.toStringAsFixed(0)}%'
-                                : '—',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: _marginColor(p.margin),
-                            ),
-                          ),
-                        ),
-                        // Disponible POS
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: p.disponiblePos
-                                  ? AppColors.success.withValues(alpha: 0.1)
-                                  : context.colors.backgroundAlt,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              p.disponiblePos ? 'Sí' : 'No',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: p.disponiblePos
-                                    ? AppColors.success
-                                    : context.colors.textTertiary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Estado
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: p.activo
-                                  ? AppColors.success.withValues(alpha: 0.1)
-                                  : AppColors.error.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              p.activo ? 'Activo' : 'Inactivo',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: p.activo
-                                    ? AppColors.success
-                                    : AppColors.error,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Acciones
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (canEdit) ...[
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.edit_outlined,
-                                    size: 18,
-                                  ),
-                                  tooltip: 'Editar',
-                                  onPressed: () => onEdit(p),
-                                  color: context.colors.textSecondary,
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    p.activo
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    size: 18,
-                                  ),
-                                  tooltip: p.activo ? 'Desactivar' : 'Activar',
-                                  onPressed: () => onToggleActivo(p),
-                                  color: context.colors.textSecondary,
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    p.disponiblePos
-                                        ? Icons.remove_shopping_cart_outlined
-                                        : Icons.shopping_cart_outlined,
-                                    size: 18,
-                                  ),
-                                  tooltip: p.disponiblePos
-                                      ? 'Quitar de venta'
-                                      : 'Poner en venta',
-                                  onPressed: () => onTogglePos(p),
-                                  color: context.colors.textSecondary,
-                                ),
-                              ],
-                              if (canDelete)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                  ),
-                                  tooltip: 'Dar de baja',
-                                  onPressed: () => onDelete(p),
-                                  color: AppColors.error,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                  .toList(),
+                        ],
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
           ),
         ),
@@ -1169,14 +1175,10 @@ class _Chip extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: selected
-            ? context.colors.primarySurface
-            : context.colors.backgroundAlt,
+        color: selected ? AppColors.brand : context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(
-          color: selected
-              ? context.colors.primaryBorder
-              : context.colors.border,
+          color: selected ? AppColors.brand : context.colors.border,
         ),
       ),
       child: Text(
@@ -1184,7 +1186,7 @@ class _Chip extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          color: selected ? AppColors.primary : context.colors.textSecondary,
+          color: selected ? Colors.black : context.colors.textSecondary,
         ),
       ),
     ),
@@ -1691,8 +1693,8 @@ class _StockAdjustmentDialogState extends State<_StockAdjustmentDialog> {
     title: Text(
       widget.initialType == 'ENTRADA' ? 'Ingreso de stock' : 'Salida de stock',
     ),
-    content: SizedBox(
-      width: 420,
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2617,14 +2619,16 @@ class _ProductFormState extends ConsumerState<_ProductFormScreen> {
       ),
     );
     if (!widget.dialogMode) return scaffold;
+    final viewport = MediaQuery.sizeOf(context);
     return Dialog(
+      insetPadding: const EdgeInsets.all(24),
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: SizedBox(
-        width: 540,
-        height: MediaQuery.sizeOf(context).height * .88,
+        width: math.min(540.0, viewport.width - 48),
+        height: math.min(viewport.height * .88, viewport.height - 48),
         child: scaffold,
       ),
     );

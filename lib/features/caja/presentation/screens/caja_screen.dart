@@ -2270,113 +2270,109 @@ class _MovementsDesktopTable extends StatelessWidget {
   const _MovementsDesktopTable({required this.movements});
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: context.colors.surface,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: context.colors.border),
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: MediaQuery.sizeOf(context).width - 400,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(
+            context.colors.backgroundAlt,
           ),
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(
-              context.colors.backgroundAlt,
-            ),
-            columnSpacing: 16,
-            horizontalMargin: 16,
-            columns: const [
-              DataColumn(label: Text('Fecha')),
-              DataColumn(label: Text('Tipo')),
-              DataColumn(label: Text('Concepto')),
-              DataColumn(label: Text('Origen/Método')),
-              DataColumn(label: Text('Monto'), numeric: true),
-              DataColumn(label: Text('Usuario')),
-            ],
-            rows: movements.map((m) {
-              final incoming = m.tipo == 'ENTRADA';
-              final color = incoming ? AppColors.success : AppColors.error;
-              return DataRow(
-                cells: [
-                  DataCell(
-                    Text(
-                      _dateTime(m.createdAt),
+          columnSpacing: 16,
+          horizontalMargin: 16,
+          columns: const [
+            DataColumn(label: Text('Fecha')),
+            DataColumn(label: Text('Tipo')),
+            DataColumn(label: Text('Concepto')),
+            DataColumn(label: Text('Origen/Método')),
+            DataColumn(label: Text('Monto'), numeric: true),
+            DataColumn(label: Text('Comprobante')),
+            DataColumn(label: Text('Usuario')),
+          ],
+          rows: movements.map((m) {
+            final incoming = m.tipo == 'ENTRADA';
+            final color = incoming ? AppColors.success : AppColors.error;
+            return DataRow(
+              cells: [
+                DataCell(
+                  Text(
+                    _dateTime(m.createdAt),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      m.tipo,
                       style: TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        color: context.colors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        m.tipo,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                        ),
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      m.concepto,
-                      style: const TextStyle(fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      [
-                        if (m.medioPago?.isNotEmpty ?? false) m.medioPago!,
-                        if (m.etiqueta?.isNotEmpty ?? false) m.etiqueta!,
-                        if (m.origen.isNotEmpty) m.origen,
-                      ].join(' · '),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.colors.textTertiary,
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    Text(
-                      '${incoming ? '+' : '-'} ${_money(m.monto)}',
-                      style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        fontFamily: 'monospace',
                         color: color,
                       ),
                     ),
                   ),
-                  DataCell(
-                    Text(
-                      m.usuario,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: context.colors.textSecondary,
-                      ),
+                ),
+                DataCell(
+                  Text(
+                    m.concepto,
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    [
+                      if (m.medioPago?.isNotEmpty ?? false) m.medioPago!,
+                      if (m.etiqueta?.isNotEmpty ?? false) m.etiqueta!,
+                      if (m.origen.isNotEmpty) m.origen,
+                    ].join(' · '),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textTertiary,
                     ),
                   ),
-                ],
-              );
-            }).toList(),
-          ),
+                ),
+                DataCell(
+                  Text(
+                    '${incoming ? '+' : '-'} ${_money(m.monto)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'monospace',
+                      color: color,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  m.comprobante?.isNotEmpty ?? false
+                      ? _ComprobanteBtn(url: m.comprobante)
+                      : const SizedBox.shrink(),
+                ),
+                DataCell(
+                  Text(
+                    m.usuario,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
         ),
       ),
     ),
@@ -2410,14 +2406,14 @@ class _FilterRow extends StatelessWidget {
             onSelected: (_) => onChanged(values[index]),
             showCheckmark: false,
             visualDensity: VisualDensity.compact,
-            selectedColor: context.colors.primarySurface,
+            selectedColor: AppColors.brand,
             side: BorderSide(
               color: active
                   ? context.colors.primaryBorder
                   : context.colors.border,
             ),
             labelStyle: AppTextStyles.labelSmall.copyWith(
-              color: active ? AppColors.primary : context.colors.textSecondary,
+              color: active ? Colors.black : context.colors.textSecondary,
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
             ),
           ),

@@ -254,7 +254,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: colors.backgroundAlt,
-        selectedColor: colors.primarySurface,
+        selectedColor: colors.brand,
         disabledColor: colors.surfaceAlt,
         side: BorderSide(color: colors.border),
         shape: RoundedRectangleBorder(
@@ -264,7 +264,7 @@ class AppTheme {
           color: colors.textSecondary,
         ),
         secondaryLabelStyle: AppTextStyles.labelLarge.copyWith(
-          color: colors.primary,
+          color: scheme.onSecondary,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       ),

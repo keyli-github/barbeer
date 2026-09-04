@@ -32,6 +32,11 @@ final _turnosRepoProvider = Provider<TurnosRepository>(
   (ref) => TurnosRepository(ApiClient.instance),
 );
 
+const double asistenciaDesktopBreakpoint = 1024;
+
+bool usesAsistenciaDesktopLayout(double width) =>
+    width >= asistenciaDesktopBreakpoint;
+
 // ─── Asistencia state / notifier ──────────────────────────────────────────────
 
 class _AsistenciaState {
@@ -344,6 +349,18 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     // Sede efectiva para crear/listar turnos.
     final effectiveTurnoSedeId = sedeId ?? auth.user?.sedeId;
 
+    if (usesAsistenciaDesktopLayout(MediaQuery.sizeOf(context).width)) {
+      return _buildDesktop(
+        state: state,
+        notifier: notifier,
+        sedeId: sedeId,
+        effectiveTurnoSedeId: effectiveTurnoSedeId,
+        canCreate: canCreate,
+        canEdit: canEdit,
+        canDelete: canDelete,
+      );
+    }
+
     return Scaffold(
       backgroundColor: context.colors.background,
       // FAB "Nuevo turno" — solo visible en la pestaña Turnos.
@@ -473,12 +490,12 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: active
-                                ? context.colors.primarySurface
+                                ? AppColors.brand
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: active
-                                  ? context.colors.primaryBorder
+                                  ? AppColors.brand
                                   : Colors.transparent,
                             ),
                           ),
@@ -489,7 +506,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                                 t.icon,
                                 size: 14,
                                 color: active
-                                    ? AppColors.primary
+                                    ? Colors.black
                                     : context.colors.textSecondary,
                               ),
                               const SizedBox(width: 5),
@@ -501,7 +518,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                                       ? FontWeight.w700
                                       : FontWeight.w500,
                                   color: active
-                                      ? AppColors.primary
+                                      ? Colors.black
                                       : context.colors.textSecondary,
                                 ),
                               ),
@@ -580,13 +597,190 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     );
   }
 
+  Widget _buildDesktop({
+    required _AsistenciaState state,
+    required _AsistenciaNotifier notifier,
+    required String? sedeId,
+    required String? effectiveTurnoSedeId,
+    required bool canCreate,
+    required bool canEdit,
+    required bool canDelete,
+  }) {
+    Widget content;
+    switch (_tabIndex) {
+      case 0:
+        content = _QrKioscoTab(sedeId: sedeId, desktop: true);
+      case 1:
+        content = _planillaContent(
+          state,
+          notifier,
+          canCreate,
+          canEdit,
+          canDelete,
+          desktop: true,
+        );
+      case 2:
+        content = _marcajesContent(state, desktop: true);
+      case 3:
+        content = _TurnosTab(
+          sedeId: sedeId,
+          canEdit: canEdit,
+          canDelete: canDelete,
+          desktop: true,
+          canCreate: canCreate,
+          onCreate: () => _showCreateTurno(
+            sedeId: sedeId,
+            effectiveTurnoSedeId: effectiveTurnoSedeId,
+          ),
+        );
+      default:
+        content = const SizedBox.shrink();
+    }
+
+    return Scaffold(
+      key: const Key('asistencia-desktop-layout'),
+      backgroundColor: context.colors.background,
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final title = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Asistencia', style: AppTextStyles.headlineLarge),
+                    const SizedBox(height: 3),
+                    Text(
+                      _attendanceDateLabel(state.fecha),
+                      style: AppTextStyles.bodySmall,
+                    ),
+                  ],
+                );
+                final controls = Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const Key('asistencia-desktop-date'),
+                      onPressed: () => _pickAttendanceDate(state, notifier),
+                      icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                      label: Text(state.fecha),
+                    ),
+                    for (var i = 0; i < _tabs.length; i++)
+                      _AttendanceDesktopTab(
+                        icon: _tabs[i].icon,
+                        label: _tabs[i].label,
+                        selected: _tabIndex == i,
+                        onTap: () => setState(() => _tabIndex = i),
+                      ),
+                  ],
+                );
+                if (constraints.maxWidth < 940) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 14), controls],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: title),
+                    Flexible(flex: 3, child: controls),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            if (_tabIndex == 1 && state.resumen != null && !state.loading) ...[
+              _AttendanceDesktopKpis(resumen: state.resumen!),
+              const SizedBox(height: 16),
+            ],
+            Expanded(child: content),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAttendanceDate(
+    _AsistenciaState state,
+    _AsistenciaNotifier notifier,
+  ) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(state.fecha) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      notifier.setFecha(DateFormat('yyyy-MM-dd').format(picked));
+    }
+  }
+
+  void _showCreateTurno({
+    required String? sedeId,
+    required String? effectiveTurnoSedeId,
+  }) {
+    final turnosNotifier = ref.read(_turnosProvider(sedeId).notifier);
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 600,
+      dialogHeight: 620,
+      page: _TurnoFormSheet(
+        sedeId: effectiveTurnoSedeId ?? '',
+        onSaved: (nombre, horaInicio, horaFin, margenTardanza) async {
+          await turnosNotifier.crear(
+            sedeId: effectiveTurnoSedeId ?? '',
+            nombre: nombre,
+            horaInicio: horaInicio,
+            horaFin: horaFin,
+            margenTardanza: margenTardanza,
+          );
+        },
+      ),
+    );
+  }
+
+  String _attendanceDateLabel(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value;
+    const weekdays = [
+      'lunes',
+      'martes',
+      'miércoles',
+      'jueves',
+      'viernes',
+      'sábado',
+      'domingo',
+    ];
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    return '${weekdays[date.weekday - 1]}, ${date.day} de ${months[date.month - 1]} de ${date.year}';
+  }
+
   Widget _planillaContent(
     _AsistenciaState state,
     _AsistenciaNotifier notifier,
     bool canCreate,
     bool canEdit,
-    bool canDelete,
-  ) {
+    bool canDelete, {
+    bool desktop = false,
+  }) {
     if (state.loading) return const AppLoading(key: ValueKey('l'));
     if (state.error != null) {
       return AppErrorState(
@@ -624,10 +818,11 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
         );
         if (ok) await notifier.eliminar(emp.asistenciaId!);
       },
+      desktop: desktop,
     );
   }
 
-  Widget _marcajesContent(_AsistenciaState state) {
+  Widget _marcajesContent(_AsistenciaState state, {bool desktop = false}) {
     if (state.loading) return const AppLoading(key: ValueKey('lm'));
     if (state.items.isEmpty) {
       return const AppEmptyState(
@@ -636,7 +831,7 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
         description: 'No hay entradas o salidas para esta fecha.',
       );
     }
-    return _MarcajesView(items: state.items);
+    return _MarcajesView(items: state.items, desktop: desktop);
   }
 
   void _showRegistrar(
@@ -677,18 +872,125 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
   }
 }
 
+class _AttendanceDesktopTab extends StatelessWidget {
+  const _AttendanceDesktopTab({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(8),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.brand : context.colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: selected ? AppColors.brand : context.colors.border,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: selected ? Colors.black : context.colors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? Colors.black : context.colors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AttendanceDesktopKpis extends StatelessWidget {
+  const _AttendanceDesktopKpis({required this.resumen});
+
+  final AsistenciaResumen resumen;
+
+  @override
+  Widget build(BuildContext context) {
+    final values = [
+      ('TOTAL PLANILLA', resumen.totalEmpleados, context.colors.textPrimary),
+      ('PRESENTES', resumen.presente, AppColors.success),
+      ('AUSENTES', resumen.ausente, AppColors.error),
+      ('CON TARDANZA', resumen.tardanza, AppColors.warning),
+    ];
+    return Row(
+      children: [
+        for (var i = 0; i < values.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              decoration: BoxDecoration(
+                color: context.colors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.colors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    values[i].$1,
+                    style: TextStyle(
+                      color: context.colors.textTertiary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${values[i].$2}',
+                    style: TextStyle(
+                      color: values[i].$3,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 // ─── Planilla view ────────────────────────────────────────────────────────────
 
 class _PlanillaView extends StatelessWidget {
   final List<AsistenciaPlanilla> items;
   final int page, totalPages, total;
   final bool canCreate, canEdit, canDelete;
+  final bool desktop;
   final ValueChanged<int> onPageChange;
   final ValueChanged<AsistenciaPlanilla> onRegister, onEdit;
   final ValueChanged<AsistenciaPlanilla> onDelete;
 
   const _PlanillaView({
-    super.key,
     required this.items,
     required this.page,
     required this.totalPages,
@@ -700,119 +1002,280 @@ class _PlanillaView extends StatelessWidget {
     required this.onRegister,
     required this.onEdit,
     required this.onDelete,
+    this.desktop = false,
   });
 
   @override
-  Widget build(BuildContext context) => ListView.builder(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-    itemCount: items.length + 1,
-    itemBuilder: (_, i) {
-      if (i == items.length) {
-        return AppPagination(
-          page: page,
-          totalPages: totalPages,
-          total: total,
-          onPageChange: onPageChange,
-        );
-      }
-      final emp = items[i];
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.colors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: context.colors.borderLight),
-            boxShadow: AppShadows.card,
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: AppColors.avatarColor(
-                  emp.username,
-                ).withOpacity(0.15),
-                child: Text(
-                  _initials(emp.username),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.avatarColor(emp.username),
-                    fontSize: 13,
+  Widget build(BuildContext context) {
+    if (desktop) return _buildDesktop(context);
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      itemCount: items.length + 1,
+      itemBuilder: (_, i) {
+        if (i == items.length) {
+          return AppPagination(
+            page: page,
+            totalPages: totalPages,
+            total: total,
+            onPageChange: onPageChange,
+          );
+        }
+        final emp = items[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: context.colors.borderLight),
+              boxShadow: AppShadows.card,
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: AppColors.avatarColor(
+                    emp.username,
+                  ).withOpacity(0.15),
+                  child: Text(
+                    _initials(emp.username),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.avatarColor(emp.username),
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      emp.username,
-                      style: AppTextStyles.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '${emp.rol}${emp.turno != null ? " · ${emp.turno}" : ""}',
-                      style: AppTextStyles.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (emp.horaEntrada != null)
-                      Text(
-                        'Entrada: ${_fmtHour(emp.horaEntrada!)}',
-                        style: AppTextStyles.labelSmall,
-                      ),
-                    if (emp.horaSalida != null)
-                      Text(
-                        'Salida: ${_fmtHour(emp.horaSalida!)}',
-                        style: AppTextStyles.labelSmall,
-                      ),
-                    if (emp.horasTrabajadas != null)
-                      Text(
-                        '${emp.horasTrabajadas!.toStringAsFixed(1)}h trabajadas',
-                        style: AppTextStyles.labelSmall,
-                      ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _StatusBadge(estado: emp.estado),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (emp.asistenciaId == null && canCreate)
-                        _IconBtn(
-                          icon: Icons.add_rounded,
-                          color: AppColors.primary,
-                          onTap: () => onRegister(emp),
+                      Text(
+                        emp.username,
+                        style: AppTextStyles.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${emp.rol}${emp.turno != null ? " · ${emp.turno}" : ""}',
+                        style: AppTextStyles.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (emp.horaEntrada != null)
+                        Text(
+                          'Entrada: ${_fmtHour(emp.horaEntrada!)}',
+                          style: AppTextStyles.labelSmall,
                         ),
-                      if (emp.asistenciaId != null && canEdit)
-                        _IconBtn(
-                          icon: Icons.edit_rounded,
-                          color: AppColors.primary,
-                          onTap: () => onEdit(emp),
+                      if (emp.horaSalida != null)
+                        Text(
+                          'Salida: ${_fmtHour(emp.horaSalida!)}',
+                          style: AppTextStyles.labelSmall,
                         ),
-                      if (emp.asistenciaId != null && canDelete)
-                        _IconBtn(
-                          icon: Icons.delete_rounded,
-                          color: AppColors.error,
-                          onTap: () => onDelete(emp),
+                      if (emp.horasTrabajadas != null)
+                        Text(
+                          '${emp.horasTrabajadas!.toStringAsFixed(1)}h trabajadas',
+                          style: AppTextStyles.labelSmall,
                         ),
                     ],
                   ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _StatusBadge(estado: emp.estado),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (emp.asistenciaId == null && canCreate)
+                          _IconBtn(
+                            icon: Icons.add_rounded,
+                            color: AppColors.primary,
+                            onTap: () => onRegister(emp),
+                          ),
+                        if (emp.asistenciaId != null && canEdit)
+                          _IconBtn(
+                            icon: Icons.edit_rounded,
+                            color: AppColors.primary,
+                            onTap: () => onEdit(emp),
+                          ),
+                        if (emp.asistenciaId != null && canDelete)
+                          _IconBtn(
+                            icon: Icons.delete_rounded,
+                            color: AppColors.error,
+                            onTap: () => onDelete(emp),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDesktop(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 1120
+          ? 3
+          : constraints.maxWidth >= 720
+          ? 2
+          : 1;
+      final width = (constraints.maxWidth - ((columns - 1) * 16)) / columns;
+      return ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              for (final employee in items)
+                SizedBox(
+                  width: width,
+                  child: _buildDesktopEmployeeCard(context, employee),
+                ),
+            ],
+          ),
+          AppPagination(
+            page: page,
+            totalPages: totalPages,
+            total: total,
+            onPageChange: onPageChange,
+          ),
+        ],
+      );
+    },
+  );
+
+  Widget _buildDesktopEmployeeCard(
+    BuildContext context,
+    AsistenciaPlanilla employee,
+  ) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.avatarColor(
+                employee.username,
+              ).withValues(alpha: 0.15),
+              child: Text(
+                _initials(employee.username),
+                style: TextStyle(
+                  color: AppColors.avatarColor(employee.username),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    employee.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.titleMedium,
+                  ),
+                  Text(employee.rol, style: AppTextStyles.labelSmall),
                 ],
+              ),
+            ),
+            _StatusBadge(estado: employee.estado),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            _attendanceStat(context, 'Turno', employee.turno ?? '—'),
+            const SizedBox(width: 8),
+            _attendanceStat(
+              context,
+              'Entrada',
+              employee.horaEntrada == null
+                  ? '—'
+                  : _fmtHour(employee.horaEntrada!),
+            ),
+            const SizedBox(width: 8),
+            _attendanceStat(
+              context,
+              'Horas',
+              employee.horasTrabajadas == null
+                  ? '—'
+                  : '${employee.horasTrabajadas!.toStringAsFixed(1)}h',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Divider(height: 1, color: context.colors.border),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (employee.asistenciaId == null && canCreate)
+              _IconBtn(
+                icon: Icons.add_rounded,
+                color: AppColors.primary,
+                onTap: () => onRegister(employee),
+              ),
+            if (employee.asistenciaId != null && canEdit)
+              _IconBtn(
+                icon: Icons.edit_rounded,
+                color: AppColors.primary,
+                onTap: () => onEdit(employee),
+              ),
+            if (employee.asistenciaId != null && canDelete)
+              _IconBtn(
+                icon: Icons.delete_rounded,
+                color: AppColors.error,
+                onTap: () => onDelete(employee),
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget _attendanceStat(BuildContext context, String label, String value) =>
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          decoration: BoxDecoration(
+            color: context.colors.backgroundAlt,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: [
+              Text(label, style: AppTextStyles.labelSmall),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
         ),
       );
-    },
-  );
 
   String _initials(String u) {
     final p = u.trim().split(' ');
@@ -860,7 +1323,8 @@ class _IconBtn extends StatelessWidget {
 
 class _MarcajesView extends StatelessWidget {
   final List<AsistenciaPlanilla> items;
-  const _MarcajesView({required this.items});
+  final bool desktop;
+  const _MarcajesView({required this.items, this.desktop = false});
 
   @override
   Widget build(BuildContext context) {
@@ -894,6 +1358,8 @@ class _MarcajesView extends StatelessWidget {
         description: 'No hay entradas o salidas registradas para esta fecha.',
       );
     }
+
+    if (desktop) return _buildDesktop(context, marcajes);
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -994,6 +1460,89 @@ class _MarcajesView extends StatelessWidget {
     );
   }
 
+  Widget _buildDesktop(
+    BuildContext context,
+    List<Map<String, String>> marcajes,
+  ) => Container(
+    key: const Key('asistencia-desktop-marcajes'),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.colors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Marcajes de la fecha seleccionada',
+                style: AppTextStyles.titleMedium,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'Solo se muestran los marcajes de la página actual.',
+                style: AppTextStyles.labelSmall,
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: context.colors.border),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: SingleChildScrollView(
+                  child: DataTable(
+                    headingRowColor: WidgetStatePropertyAll(
+                      context.colors.backgroundAlt,
+                    ),
+                    columns: const [
+                      DataColumn(label: Text('Hora')),
+                      DataColumn(label: Text('Empleado')),
+                      DataColumn(label: Text('Acción')),
+                      DataColumn(label: Text('Tipo')),
+                    ],
+                    rows: [
+                      for (final mark in marcajes)
+                        DataRow(
+                          cells: [
+                            DataCell(Text(_fmtHour(mark['hora']!))),
+                            DataCell(Text(mark['empleado']!)),
+                            DataCell(Text(mark['detalle']!)),
+                            DataCell(
+                              Text(
+                                mark['tipo']!,
+                                style: TextStyle(
+                                  color: mark['tipo'] == 'ENTRADA'
+                                      ? AppColors.success
+                                      : mark['tipo'] == 'TARDANZA'
+                                      ? AppColors.warning
+                                      : AppColors.error,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   String _fmtHour(String iso) {
     try {
       return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal());
@@ -1007,7 +1556,8 @@ class _MarcajesView extends StatelessWidget {
 
 class _QrKioscoTab extends ConsumerStatefulWidget {
   final String? sedeId;
-  const _QrKioscoTab({required this.sedeId});
+  final bool desktop;
+  const _QrKioscoTab({required this.sedeId, this.desktop = false});
 
   @override
   ConsumerState<_QrKioscoTab> createState() => _QrKioscoTabState();
@@ -1089,132 +1639,142 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
       );
     }
 
+    final qrCard = Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: context.colors.borderLight),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.qr_code_2_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Escanea para marcar',
+                style: AppTextStyles.titleMedium.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+              const Spacer(),
+              if (_qr != null)
+                Text(
+                  '${_secondsLeft}s',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _secondsLeft < 10
+                        ? AppColors.error
+                        : context.colors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _loadQr,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: context.colors.primarySurface,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.refresh_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const SizedBox(
+              height: 260,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            SizedBox(
+              height: 260,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.error,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Error al generar QR', style: AppTextStyles.titleMedium),
+                  const SizedBox(height: 8),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: _loadQr,
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    label: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            )
+          else if (_qr != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: QrImageView(
+                data: _qr!.token,
+                version: QrVersions.auto,
+                size: 220,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          if (_qr != null) ...[
+            const SizedBox(height: 12),
+            Text('Fecha: ${_qr!.fecha}', style: AppTextStyles.labelSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Escanea este código con la app móvil.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (widget.desktop) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Expanded(
+            child: SingleChildScrollView(child: _TodayArrivalsSection()),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(width: 340, child: SingleChildScrollView(child: qrCard)),
+        ],
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
         children: [
-          // QR Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: context.colors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: context.colors.borderLight),
-              boxShadow: AppShadows.card,
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.qr_code_2_rounded,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'QR Kiosco',
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (_qr != null)
-                      Text(
-                        '${_secondsLeft}s',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _secondsLeft < 10
-                              ? AppColors.error
-                              : context.colors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: _loadQr,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: context.colors.primarySurface,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.qr_code_2_rounded,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                if (_loading)
-                  const SizedBox(
-                    height: 260,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_error != null)
-                  SizedBox(
-                    height: 260,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: AppColors.error,
-                          size: 40,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Error al generar QR',
-                          style: AppTextStyles.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.bodySmall,
-                        ),
-                        const SizedBox(height: 16),
-                        TextButton.icon(
-                          onPressed: _loadQr,
-                          icon: const Icon(Icons.qr_code_2_rounded),
-                          label: const Text('Reintentar'),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (_qr != null)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: QrImageView(
-                      data: _qr!.token,
-                      version: QrVersions.auto,
-                      size: 220,
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-                if (_qr != null) ...[
-                  const SizedBox(height: 12),
-                  Text('Fecha: ${_qr!.fecha}', style: AppTextStyles.labelSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Los empleados escanean este código para marcar asistencia',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.bodySmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
+          qrCard,
           const SizedBox(height: 16),
-          // Llegadas de hoy
-          _TodayArrivalsSection(),
+          const _TodayArrivalsSection(),
         ],
       ),
     );
@@ -1897,10 +2457,15 @@ class _ScannerErrorView extends StatelessWidget {
 class _TurnosTab extends ConsumerWidget {
   final String? sedeId;
   final bool canEdit, canDelete;
+  final bool desktop, canCreate;
+  final VoidCallback? onCreate;
   const _TurnosTab({
     required this.sedeId,
     required this.canEdit,
     required this.canDelete,
+    this.desktop = false,
+    this.canCreate = false,
+    this.onCreate,
   });
 
   @override
@@ -1930,6 +2495,8 @@ class _TurnosTab extends ConsumerWidget {
         title: 'Sin turnos',
         description: 'Crea el primer turno para esta sede.',
       );
+    } else if (desktop) {
+      content = _buildDesktopTable(context, state, notifier, sedesMap);
     } else {
       content = ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -2102,10 +2669,165 @@ class _TurnosTab extends ConsumerWidget {
       );
     }
 
-    // El FAB "Nuevo turno" está en el Scaffold padre (AsistenciaScreen),
-    // que lo posiciona correctamente respetando SafeArea.
+    if (desktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.schedule_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${state.total} turno${state.total == 1 ? '' : 's'}',
+                style: AppTextStyles.titleMedium,
+              ),
+              const Spacer(),
+              if (canCreate)
+                FilledButton.icon(
+                  key: const Key('asistencia-desktop-new-shift'),
+                  onPressed: onCreate,
+                  icon: const Icon(Icons.add_rounded, size: 17),
+                  label: const Text('Nuevo turno'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Expanded(child: content),
+        ],
+      );
+    }
+
     return content;
   }
+
+  Widget _buildDesktopTable(
+    BuildContext context,
+    _TurnosState state,
+    _TurnosNotifier notifier,
+    Map<String, String> sedesMap,
+  ) => Container(
+    key: const Key('asistencia-desktop-shifts-table'),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: context.colors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: SingleChildScrollView(
+            child: DataTable(
+              headingRowColor: WidgetStatePropertyAll(
+                context.colors.backgroundAlt,
+              ),
+              columns: const [
+                DataColumn(label: Text('Nombre')),
+                DataColumn(label: Text('Horario')),
+                DataColumn(label: Text('Margen de tardanza')),
+                DataColumn(label: Text('Estado')),
+                DataColumn(label: Text('Acciones')),
+              ],
+              rows: [
+                for (final shift in state.items)
+                  DataRow(
+                    cells: [
+                      DataCell(
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              shift.nombre,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (sedesMap.containsKey(shift.sedeId))
+                              Text(
+                                sedesMap[shift.sedeId]!,
+                                style: AppTextStyles.labelSmall,
+                              ),
+                          ],
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          '${shift.horaInicioLabel} – ${shift.horaFinLabel}',
+                          style: const TextStyle(fontFamily: 'monospace'),
+                        ),
+                      ),
+                      DataCell(Text('${shift.margenTardanza} min')),
+                      DataCell(_StatusPill(activo: shift.activo)),
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (canEdit)
+                              _IconBtn(
+                                icon: Icons.edit_rounded,
+                                color: AppColors.primary,
+                                onTap: () => ResponsiveForm.showPage<void>(
+                                  context: context,
+                                  dialogWidth: 600,
+                                  dialogHeight: 620,
+                                  page: _TurnoFormSheet(
+                                    sedeId: shift.sedeId,
+                                    turno: shift,
+                                    onSaved:
+                                        (
+                                          nombre,
+                                          horaInicio,
+                                          horaFin,
+                                          margenTardanza,
+                                        ) async {
+                                          await notifier.editar(
+                                            shift.id,
+                                            nombre: nombre,
+                                            horaInicio: horaInicio,
+                                            horaFin: horaFin,
+                                            margenTardanza: margenTardanza,
+                                          );
+                                        },
+                                  ),
+                                ),
+                              ),
+                            if (canDelete)
+                              _IconBtn(
+                                icon: Icons.delete_rounded,
+                                color: AppColors.error,
+                                onTap: () async {
+                                  final confirmed = await ConfirmDialog.show(
+                                    context: context,
+                                    title: 'Eliminar turno',
+                                    description:
+                                        '¿Eliminar "${shift.nombre}"? Si tiene jornadas asociadas, solo se desactivará.',
+                                    confirmLabel: 'Eliminar',
+                                    isDanger: true,
+                                  );
+                                  if (confirmed) {
+                                    await notifier.eliminar(shift.id);
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _StatusPill extends StatelessWidget {

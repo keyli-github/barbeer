@@ -648,6 +648,7 @@ class _DesktopOrdenesView extends StatelessWidget {
           const AppEmptyState(
             icon: Icons.shopping_cart_outlined,
             title: 'Sin órdenes',
+            description: 'No hay compras guardadas aún.',
           )
         else ...[
           for (final order in state.items)
@@ -693,6 +694,13 @@ class _DesktopProveedoresView extends StatelessWidget {
     child: ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        Text('Proveedores', style: AppTextStyles.titleLarge),
+        const SizedBox(height: 3),
+        Text(
+          'Administra la información de tus proveedores.',
+          style: AppTextStyles.bodySmall,
+        ),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -736,6 +744,7 @@ class _DesktopProveedoresView extends StatelessWidget {
           const AppEmptyState(
             icon: Icons.local_shipping_outlined,
             title: 'Sin proveedores',
+            description: 'No hay proveedores con los filtros aplicados.',
           )
         else ...[
           for (final provider in state.items)
@@ -888,12 +897,12 @@ class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
                         ),
                         decoration: BoxDecoration(
                           color: state.estadoFilter == e.$1
-                              ? context.colors.primarySurface
+                              ? AppColors.brand
                               : context.colors.backgroundAlt,
                           borderRadius: BorderRadius.circular(AppRadius.full),
                           border: Border.all(
                             color: state.estadoFilter == e.$1
-                                ? context.colors.primaryBorder
+                                ? AppColors.brand
                                 : context.colors.border,
                           ),
                         ),
@@ -905,7 +914,7 @@ class _OrdenesTabState extends ConsumerState<_OrdenesTab> {
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             color: state.estadoFilter == e.$1
-                                ? AppColors.primary
+                                ? Colors.black
                                 : context.colors.textSecondary,
                           ),
                         ),
@@ -1753,7 +1762,7 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
         notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
       );
       if (mounted) {
-        Navigator.of(context).pop();
+        if (!widget.embedded) Navigator.of(context).pop();
         widget.onCreated();
       }
     } catch (e) {
@@ -1766,6 +1775,8 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) return _buildEmbedded(context);
+
     return Scaffold(
       backgroundColor: context.colors.surface,
       appBar: const SubPageAppBar(title: 'Nueva orden de compra'),
@@ -1954,6 +1965,273 @@ class _NuevaOrdenScreenState extends State<_NuevaOrdenScreen> {
       ),
     );
   }
+
+  Widget _buildEmbedded(BuildContext context) => ColoredBox(
+    key: const Key('compras-desktop-new-order-layout'),
+    color: context.colors.background,
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final editor = _buildEmbeddedEditor(context);
+                final summary = _buildEmbeddedSummary(context);
+                if (constraints.maxWidth < 900) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [editor, const SizedBox(height: 16), summary],
+                    ),
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: SingleChildScrollView(child: editor)),
+                    const SizedBox(width: 20),
+                    SizedBox(
+                      width: 330,
+                      child: SingleChildScrollView(child: summary),
+                    ),
+                  ],
+                );
+              },
+            ),
+    ),
+  );
+
+  Widget _buildEmbeddedEditor(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (widget.user.isSuperAdmin) ...[
+        DropdownButtonFormField<String>(
+          key: ValueKey('desktop-sede-$_sedeId'),
+          initialValue: _sedeId.isEmpty ? null : _sedeId,
+          decoration: _dropdownDecoration('Sede *'),
+          hint: const Text('Seleccionar sede'),
+          items: _sedes
+              .map(
+                (sede) =>
+                    DropdownMenuItem(value: sede.id, child: Text(sede.nombre)),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _sedeId = value ?? ''),
+        ),
+        const SizedBox(height: 14),
+      ],
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final provider = DropdownButtonFormField<String>(
+            key: ValueKey('desktop-proveedor-$_proveedorId'),
+            initialValue: _proveedorId.isEmpty ? null : _proveedorId,
+            isExpanded: true,
+            decoration: _dropdownDecoration('Proveedor *'),
+            hint: const Text('Seleccionar proveedor'),
+            items: _proveedores
+                .map(
+                  (provider) => DropdownMenuItem(
+                    value: provider.id,
+                    child: Text(
+                      provider.nombre,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => setState(() => _proveedorId = value ?? ''),
+          );
+          final product = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('desktop-producto-$_productoId'),
+                  initialValue: _productoId.isEmpty ? null : _productoId,
+                  isExpanded: true,
+                  decoration: _dropdownDecoration('Seleccionar producto'),
+                  hint: const Text('Seleccione un producto para agregar'),
+                  items: _productos
+                      .where(
+                        (producto) => !_items.any(
+                          (item) => item.producto.id == producto.id,
+                        ),
+                      )
+                      .map(
+                        (producto) => DropdownMenuItem(
+                          value: producto.id,
+                          child: Text(
+                            '${producto.nombre} · ${producto.codigo}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setState(() => _productoId = value ?? ''),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: _addProduct,
+                  icon: const Icon(Icons.add_rounded, size: 17),
+                  label: const Text('Agregar'),
+                ),
+              ),
+            ],
+          );
+          if (constraints.maxWidth < 680) {
+            return Column(
+              children: [provider, const SizedBox(height: 12), product],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: provider),
+              const SizedBox(width: 12),
+              Expanded(child: product),
+            ],
+          );
+        },
+      ),
+      const SizedBox(height: 16),
+      Container(
+        key: const Key('compras-desktop-order-items'),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: context.colors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: _items.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 46),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 30,
+                      color: context.colors.textTertiary,
+                    ),
+                    const SizedBox(height: 10),
+                    Text('Lista vacía', style: AppTextStyles.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Seleccione un producto arriba para comenzar.',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                  ],
+                ),
+              )
+            : Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    for (final item in _items)
+                      _CompraDraftCard(
+                        key: ValueKey(item.producto.id),
+                        line: item,
+                        onChanged: () => setState(() {}),
+                        onRemove: () => _removeItem(item),
+                      ),
+                  ],
+                ),
+              ),
+      ),
+    ],
+  );
+
+  Widget _buildEmbeddedSummary(BuildContext context) => Container(
+    key: const Key('compras-desktop-order-summary'),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      border: Border.all(color: context.colors.border),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          color: context.colors.backgroundAlt,
+          child: const Row(
+            children: [
+              Icon(Icons.shopping_bag_outlined, size: 17),
+              SizedBox(width: 8),
+              Text('Resumen de la orden', style: AppTextStyles.titleMedium),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: context.colors.border),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Subtotal', style: AppTextStyles.bodySmall),
+                  Text(
+                    'S/ ${_total.toStringAsFixed(2)}',
+                    style: AppTextStyles.bodyMedium,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Divider(height: 1, color: context.colors.border),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Total', style: AppTextStyles.titleMedium),
+                  Text(
+                    'S/ ${_total.toStringAsFixed(2)}',
+                    style: AppTextStyles.headlineMedium.copyWith(
+                      color: AppColors.brand,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _notasCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Notas',
+                  hintText: 'Notas de la orden...',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.error, fontSize: 12),
+                ),
+              ],
+              const SizedBox(height: 16),
+              PrimaryButton(
+                label: 'Crear orden',
+                onPressed: _saving ? null : _submit,
+                isLoading: _saving,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Se guardará al confirmar.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.labelSmall,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 
   InputDecoration _dropdownDecoration(String label) => InputDecoration(
     labelText: label,

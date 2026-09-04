@@ -40,5 +40,12 @@ void main() {
         theme.colorScheme.onInverseSurface,
       );
     });
+
+    test('$mode selected chips keep readable foreground contrast', () {
+      final background = theme.chipTheme.selectedColor!;
+      final foreground = theme.chipTheme.secondaryLabelStyle!.color!;
+
+      expect(_contrast(background, foreground), greaterThanOrEqualTo(4.5));
+    });
   }
 }

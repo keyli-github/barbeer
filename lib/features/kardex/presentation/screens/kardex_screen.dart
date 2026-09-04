@@ -650,12 +650,12 @@ class _HeaderState extends State<_Header> {
                       ),
                       decoration: BoxDecoration(
                         color: widget.tipoFilter == t.$1
-                            ? context.colors.primarySurface
+                            ? AppColors.brand
                             : context.colors.backgroundAlt,
                         borderRadius: BorderRadius.circular(AppRadius.full),
                         border: Border.all(
                           color: widget.tipoFilter == t.$1
-                              ? context.colors.primaryBorder
+                              ? AppColors.brand
                               : context.colors.border,
                         ),
                       ),
@@ -667,7 +667,7 @@ class _HeaderState extends State<_Header> {
                               ? FontWeight.w700
                               : FontWeight.w500,
                           color: widget.tipoFilter == t.$1
-                              ? AppColors.primary
+                              ? Colors.black
                               : context.colors.textSecondary,
                         ),
                       ),

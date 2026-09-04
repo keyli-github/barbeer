@@ -2221,8 +2221,7 @@ class _ProductoCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    AspectRatio(
-                      aspectRatio: 4 / 3,
+                    Expanded(
                       child: ColoredBox(
                         color: context.colors.backgroundAlt,
                         child: Padding(
@@ -2238,7 +2237,8 @@ class _ProductoCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Expanded(
+                    SizedBox(
+                      height: 72,
                       child: Padding(
                         padding: const EdgeInsets.all(8),
                         child: Column(
@@ -2638,305 +2638,311 @@ class _DesktopCartPanel extends StatelessWidget {
           ),
           Divider(height: 1, color: context.colors.border),
           // ── Items list ──────────────────────────────────────────────
-          if (items.isEmpty)
-            const Expanded(flex: 3, child: _DesktopEmptyCart())
-          else
-            Flexible(
-              fit: FlexFit.loose,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 180),
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                  ),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) =>
-                      Divider(height: 1, color: context.colors.divider),
-                  itemBuilder: (_, index) {
-                    final item = items[index];
-                    return _DesktopCartItem(
-                      key: ValueKey('desktop-cart-item-${item.productoId}'),
-                      item: item,
-                      frozen: frozen,
-                      onDecrease: () => onChangeQuantity(item.productoId, -1),
-                      onIncrease: () => onChangeQuantity(item.productoId, 1),
-                      onRemove: () => onRemove(item.productoId),
-                      onEditPrice: onEditPrice == null
-                          ? null
-                          : () => onEditPrice!(item),
-                    );
-                  },
-                ),
-              ),
-            ),
-          Divider(height: 1, color: context.colors.border),
-          // ── Bottom: sale details + totals + buttons (scrollable) ──
           Expanded(
             child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  children: [
-                    if (error != null) ...[
-                      Container(
-                        key: const Key('desktop-cart-error'),
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: frozen
-                              ? context.colors.warningLight
-                              : context.colors.errorLight,
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusMD,
-                          ),
-                          border: Border.all(
-                            color: frozen
-                                ? context.colors.warningBorder
-                                : context.colors.errorBorder,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              error!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: frozen
-                                    ? AppColors.warning
-                                    : AppColors.error,
-                              ),
-                            ),
-                            if (frozen) ...[
-                              const SizedBox(height: AppSpacing.xxs),
-                              Text(
-                                'Reintenta sin modificar el carrito para conservar la operación.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: context.colors.textSecondary,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: AppSpacing.xs),
-                            TextButton(
-                              key: const Key('desktop-cart-retry'),
-                              onPressed: submitting ? null : onRetry,
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(0, 32),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                foregroundColor: frozen
-                                    ? AppColors.warning
-                                    : AppColors.error,
-                              ),
-                              child: const Text('Reintentar'),
-                            ),
-                          ],
-                        ),
+              child: Column(
+                children: [
+                  if (items.isEmpty)
+                    const SizedBox(height: 220, child: _DesktopEmptyCart())
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                    ],
-                    if (items.isNotEmpty) ...[
-                      saleDetails,
-                      const SizedBox(height: AppSpacing.sm),
-                    ],
-                    if (total !=
-                        items.fold(0.0, (sum, item) => sum + item.subtotal))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Subtotal',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: context.colors.textSecondary,
-                              ),
-                            ),
-                            Text(
-                              _fmt(
-                                items.fold(
-                                  0.0,
-                                  (sum, item) => sum + item.subtotal,
-                                ),
-                              ),
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) =>
+                          Divider(height: 1, color: context.colors.divider),
+                      itemBuilder: (_, index) {
+                        final item = items[index];
+                        return _DesktopCartItem(
+                          key: ValueKey('desktop-cart-item-${item.productoId}'),
+                          item: item,
+                          frozen: frozen,
+                          onDecrease: () =>
+                              onChangeQuantity(item.productoId, -1),
+                          onIncrease: () =>
+                              onChangeQuantity(item.productoId, 1),
+                          onRemove: () => onRemove(item.productoId),
+                          onEditPrice: onEditPrice == null
+                              ? null
+                              : () => onEditPrice!(item),
+                        );
+                      },
+                    ),
+                  Divider(height: 1, color: context.colors.border),
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Text(
-                            'TOTAL A COBRAR',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                              color: context.colors.textTertiary,
+                        if (error != null) ...[
+                          Container(
+                            key: const Key('desktop-cart-error'),
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: frozen
+                                  ? context.colors.warningLight
+                                  : context.colors.errorLight,
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMD,
+                              ),
+                              border: Border.all(
+                                color: frozen
+                                    ? context.colors.warningBorder
+                                    : context.colors.errorBorder,
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          _fmt(total),
-                          key: const Key('desktop-cart-total'),
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.brand,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'MÉTODO DE PAGO',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: context.colors.textTertiary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (onSavePending != null) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: AppSpacing.buttonHeightSmall,
-                              child: ElevatedButton.icon(
-                                key: const Key('desktop-cart-save-pending'),
-                                onPressed: items.isEmpty || submitting
-                                    ? null
-                                    : onSavePending,
-                                icon: const Icon(
-                                  Icons.access_time_rounded,
-                                  size: 15,
-                                ),
-                                label: const Text(
-                                  'DEJAR PDTE.',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  error!,
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.4,
-                                    fontSize: 13,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: frozen
+                                        ? AppColors.warning
+                                        : AppColors.error,
                                   ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2D1F00),
-                                  foregroundColor: AppColors.warning,
-                                  disabledBackgroundColor:
-                                      context.colors.border,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusLG,
+                                if (frozen) ...[
+                                  const SizedBox(height: AppSpacing.xxs),
+                                  Text(
+                                    'Reintenta sin modificar el carrito para conservar la operación.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: context.colors.textSecondary,
                                     ),
-                                    side: BorderSide(
-                                      color: AppColors.warning.withValues(
-                                        alpha: 0.5,
+                                  ),
+                                ],
+                                const SizedBox(height: AppSpacing.xs),
+                                TextButton(
+                                  key: const Key('desktop-cart-retry'),
+                                  onPressed: submitting ? null : onRetry,
+                                  style: TextButton.styleFrom(
+                                    minimumSize: const Size(0, 32),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    foregroundColor: frozen
+                                        ? AppColors.warning
+                                        : AppColors.error,
+                                  ),
+                                  child: const Text('Reintentar'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                        if (items.isNotEmpty) ...[
+                          saleDetails,
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                        if (total !=
+                            items.fold(0.0, (sum, item) => sum + item.subtotal))
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppSpacing.xxs,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Subtotal',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.colors.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  _fmt(
+                                    items.fold(
+                                      0.0,
+                                      (sum, item) => sum + item.subtotal,
+                                    ),
+                                  ),
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'TOTAL A COBRAR',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                  color: context.colors.textTertiary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              _fmt(total),
+                              key: const Key('desktop-cart-total'),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.brand,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'MÉTODO DE PAGO',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: context.colors.textTertiary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        if (onSavePending != null) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: AppSpacing.buttonHeightSmall,
+                                  child: ElevatedButton.icon(
+                                    key: const Key('desktop-cart-save-pending'),
+                                    onPressed: items.isEmpty || submitting
+                                        ? null
+                                        : onSavePending,
+                                    icon: const Icon(
+                                      Icons.access_time_rounded,
+                                      size: 15,
+                                    ),
+                                    label: const Text(
+                                      'DEJAR PDTE.',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.4,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2D1F00),
+                                      foregroundColor: AppColors.warning,
+                                      disabledBackgroundColor:
+                                          context.colors.border,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppSpacing.radiusLG,
+                                        ),
+                                        side: BorderSide(
+                                          color: AppColors.warning.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SizedBox(
-                              height: AppSpacing.buttonHeightSmall,
-                              child: ElevatedButton.icon(
-                                key: const Key('desktop-cart-confirm'),
-                                onPressed: items.isEmpty || submitting
-                                    ? null
-                                    : onConfirm,
-                                icon: submitting
-                                    ? const SizedBox(
-                                        width: 14,
-                                        height: 14,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.black,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SizedBox(
+                                  height: AppSpacing.buttonHeightSmall,
+                                  child: ElevatedButton.icon(
+                                    key: const Key('desktop-cart-confirm'),
+                                    onPressed: items.isEmpty || submitting
+                                        ? null
+                                        : onConfirm,
+                                    icon: submitting
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.black,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.check_rounded,
+                                            size: 15,
+                                          ),
+                                    label: const Text(
+                                      'CONFIRMAR',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.4,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.brand,
+                                      foregroundColor: Colors.black,
+                                      disabledBackgroundColor:
+                                          context.colors.border,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppSpacing.radiusLG,
                                         ),
-                                      )
-                                    : const Icon(Icons.check_rounded, size: 15),
-                                label: const Text(
-                                  'CONFIRMAR',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.4,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.brand,
-                                  foregroundColor: Colors.black,
-                                  disabledBackgroundColor:
-                                      context.colors.border,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      AppSpacing.radiusLG,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
+                          const SizedBox(height: AppSpacing.xs),
                         ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                    ],
-                    if (onSavePending == null)
-                      SizedBox(
-                        width: double.infinity,
-                        height: AppSpacing.buttonHeight,
-                        child: ElevatedButton.icon(
-                          key: const Key('desktop-cart-confirm'),
-                          onPressed: items.isEmpty || submitting
-                              ? null
-                              : onConfirm,
-                          icon: submitting
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.black,
+                        if (onSavePending == null)
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSpacing.buttonHeight,
+                            child: ElevatedButton.icon(
+                              key: const Key('desktop-cart-confirm'),
+                              onPressed: items.isEmpty || submitting
+                                  ? null
+                                  : onConfirm,
+                              icon: submitting
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.black,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_rounded, size: 15),
+                              label: const Text(
+                                'CONFIRMAR VENTA',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.brand,
+                                foregroundColor: Colors.black,
+                                disabledBackgroundColor: context.colors.border,
+                                disabledForegroundColor:
+                                    context.colors.textTertiary,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusLG,
                                   ),
-                                )
-                              : const Icon(Icons.check_rounded, size: 15),
-                          label: const Text(
-                            'CONFIRMAR VENTA',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.brand,
-                            foregroundColor: Colors.black,
-                            disabledBackgroundColor: context.colors.border,
-                            disabledForegroundColor:
-                                context.colors.textTertiary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppSpacing.radiusLG,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
