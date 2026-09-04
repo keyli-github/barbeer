@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_feedback.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/etiqueta.dart';
 import '../providers/etiquetas_provider.dart';
@@ -63,12 +63,22 @@ class _EtiquetasScreenState extends ConsumerState<EtiquetasScreen> {
   }
 
   void _openCreate() {
-    AppNav.push(context, EtiquetaFormSheet(onDone: _load));
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 560,
+      dialogHeight: 560,
+      page: EtiquetaFormSheet(onDone: _load),
+    );
   }
 
   void _openEdit(Etiqueta etiqueta) {
     if (etiqueta.esSistema) return;
-    AppNav.push(context, EtiquetaFormSheet(etiqueta: etiqueta, onDone: _load));
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 560,
+      dialogHeight: 560,
+      page: EtiquetaFormSheet(etiqueta: etiqueta, onDone: _load),
+    );
   }
 
   Future<void> _toggleEstado(Etiqueta etiqueta) async {

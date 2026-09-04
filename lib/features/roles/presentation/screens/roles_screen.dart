@@ -15,6 +15,7 @@ import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 Set<String> rolePermissionIds(Map<String, dynamic> role) {
@@ -205,8 +206,7 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 80),
           children: [
             GridView.count(
-              crossAxisCount:
-                  MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+              crossAxisCount: MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
               childAspectRatio: 2.2,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
@@ -264,8 +264,7 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
                       child: FilterChip(
                         label: Text(option.$2),
                         selected: _filter == option.$1,
-                        onSelected: (_) =>
-                            setState(() => _filter = option.$1),
+                        onSelected: (_) => setState(() => _filter = option.$1),
                       ),
                     ),
                 ],
@@ -294,12 +293,8 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
                   isSuperAdmin: isSuperAdmin,
                   onEdit: () => _showEditModal(context, ref, role),
                   onDelete: () => _deleteRole(context, ref, role),
-                  onAssignPerms: () => _showPermissionsModal(
-                    context,
-                    ref,
-                    role,
-                    state,
-                  ),
+                  onAssignPerms: () =>
+                      _showPermissionsModal(context, ref, role, state),
                 ),
               AppPagination(
                 page: state.page,
@@ -316,9 +311,11 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
   }
 
   void _showCreateModal(BuildContext context, WidgetRef ref) {
-    AppNav.push(
-      context,
-      _RoleForm(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 620,
+      dialogHeight: 600,
+      page: _RoleForm(
         onSave: (data) => ref.read(rolesProvider.notifier).createRole(data),
       ),
     );
@@ -329,9 +326,11 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
     WidgetRef ref,
     Map<String, dynamic> role,
   ) {
-    AppNav.push(
-      context,
-      _RoleEditForm(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 620,
+      dialogHeight: 600,
+      page: _RoleEditForm(
         role: role,
         onSave: (data) => ref
             .read(rolesProvider.notifier)
@@ -369,9 +368,11 @@ class _RolesScreenState extends ConsumerState<RolesScreen> {
     Map<String, dynamic> role,
     RolesState state,
   ) {
-    AppNav.push(
-      context,
-      _PermissionsAssign(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 900,
+      dialogHeight: 760,
+      page: _PermissionsAssign(
         role: role,
         allPermisos: state.allPermisos,
         onSave: (ids) => ref
@@ -437,10 +438,7 @@ class _RoleMetric extends StatelessWidget {
           'Página actual',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 10,
-            color: context.colors.textTertiary,
-          ),
+          style: TextStyle(fontSize: 10, color: context.colors.textTertiary),
         ),
       ],
     ),

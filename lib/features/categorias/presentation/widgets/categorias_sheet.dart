@@ -12,6 +12,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/categoria.dart';
 import '../providers/categorias_provider.dart';
@@ -246,9 +247,11 @@ class CategoriasSheet extends ConsumerWidget {
     WidgetRef ref, {
     Categoria? categoria,
   }) async {
-    await AppNav.push<void>(
-      context,
-      _CategoriaForm(
+    await ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 540,
+      dialogHeight: 520,
+      page: _CategoriaForm(
         categoria: categoria,
         onSave:
             ({required nombre, required descripcion, required activo}) async {

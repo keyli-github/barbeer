@@ -13,6 +13,7 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../../core/routes/route_paths.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../reportes/presentation/providers/reportes_provider.dart';
@@ -137,9 +138,13 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showOpening(BuildContext context) async {
-    final saved = await AppNav.push<bool>(
-      context,
-      _OpeningSheet(initialCounts: ref.read(cajaProvider).aperturaSugerida),
+    final saved = await ResponsiveForm.showPage<bool>(
+      context: context,
+      dialogWidth: 640,
+      dialogHeight: 760,
+      page: _OpeningSheet(
+        initialCounts: ref.read(cajaProvider).aperturaSugerida,
+      ),
     );
     if (saved == true && mounted) _success('Caja abierta correctamente');
   }
@@ -171,7 +176,12 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showMovement(BuildContext context, String tipo) async {
-    final saved = await AppNav.push<bool>(context, _MovementSheet(tipo: tipo));
+    final saved = await ResponsiveForm.showPage<bool>(
+      context: context,
+      dialogWidth: 560,
+      dialogHeight: 520,
+      page: _MovementSheet(tipo: tipo),
+    );
     if (saved == true && mounted) {
       _success(tipo == 'ENTRADA' ? 'Entrada registrada' : 'Salida registrada');
     }

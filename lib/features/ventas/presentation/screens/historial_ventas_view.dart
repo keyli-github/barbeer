@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/ds_states.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
@@ -31,9 +31,11 @@ class _HistorialState extends ConsumerState<HistorialVentasView> {
   Future<void> _refresh() =>
       ref.read(ventasListProvider(_useMis).notifier).refresh();
 
-  void _openConciliar(Venta venta) => AppNav.push(
-    context,
-    ConciliarVentaScreen(venta: venta, onDone: _refresh),
+  void _openConciliar(Venta venta) => ResponsiveForm.showPage<void>(
+    context: context,
+    dialogWidth: 840,
+    dialogHeight: 800,
+    page: ConciliarVentaScreen(venta: venta, onDone: _refresh),
   );
 
   Future<void> _anular(Venta venta) async {

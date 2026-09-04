@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -12,6 +11,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/categoria.dart';
 import '../providers/categorias_provider.dart';
@@ -303,10 +303,11 @@ class CategoriasScreen extends ConsumerWidget {
     WidgetRef ref, {
     Categoria? categoria,
   }) async {
-    await AppNav.push<void>(
-      context,
-      _CategoriaForm(
+    await ResponsiveForm.show<void>(
+      context: context,
+      builder: (dialogMode) => _CategoriaForm(
         categoria: categoria,
+        dialogMode: dialogMode,
         onSave:
             ({required nombre, required descripcion, required activo}) async {
               await ref
@@ -670,6 +671,7 @@ class _CategoryFilters extends ConsumerWidget {
 
 class _CategoriaForm extends StatefulWidget {
   final Categoria? categoria;
+  final bool dialogMode;
   final Future<void> Function({
     required String nombre,
     required String descripcion,
@@ -677,7 +679,11 @@ class _CategoriaForm extends StatefulWidget {
   })
   onSave;
 
-  const _CategoriaForm({this.categoria, required this.onSave});
+  const _CategoriaForm({
+    this.categoria,
+    required this.dialogMode,
+    required this.onSave,
+  });
 
   @override
   State<_CategoriaForm> createState() => _CategoriaFormState();
@@ -708,11 +714,12 @@ class _CategoriaFormState extends State<_CategoriaForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: context.colors.surface,
-    appBar: SubPageAppBar(
-      title: widget.categoria == null ? 'Nueva categoria' : 'Editar categoria',
-    ),
+  Widget build(BuildContext context) => ResponsiveFormScaffold(
+    dialogMode: widget.dialogMode,
+    dialogKey: const ValueKey('category-form-dialog'),
+    dialogWidth: 540,
+    dialogHeight: 520,
+    title: widget.categoria == null ? 'Nueva categoria' : 'Editar categoria',
     body: SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Form(

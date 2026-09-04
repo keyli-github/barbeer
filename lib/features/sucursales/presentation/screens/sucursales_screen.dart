@@ -14,6 +14,7 @@ import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_states.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 class SucursalesState {
@@ -236,9 +237,11 @@ class SucursalesScreen extends ConsumerWidget {
     WidgetRef ref,
     Map<String, dynamic>? sede,
   ) {
-    AppNav.push(
-      context,
-      _SedeForm(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 620,
+      dialogHeight: 680,
+      page: _SedeForm(
         sede: sede,
         onSave: (data) async {
           if (sede == null) {

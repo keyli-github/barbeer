@@ -9,6 +9,7 @@ import 'package:barbeer/core/theme/app_colors.dart';
 import 'package:barbeer/core/widgets/app_button.dart';
 import 'package:barbeer/core/widgets/app_feedback.dart';
 import 'package:barbeer/core/widgets/app_text_field.dart';
+import 'package:barbeer/core/widgets/responsive_form.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
 
@@ -19,9 +20,11 @@ void showPrecuadreSheet(
   required VoidCallback onSuccess,
   Map<double, int> initialCounts = const {},
 }) {
-  AppNav.push<void>(
-    context,
-    _PrecuadreSheet(onSuccess: onSuccess, initialCounts: initialCounts),
+  ResponsiveForm.showPage<void>(
+    context: context,
+    dialogWidth: 640,
+    dialogHeight: 760,
+    page: _PrecuadreSheet(onSuccess: onSuccess, initialCounts: initialCounts),
   );
 }
 
@@ -127,9 +130,11 @@ void showCierreSheet(
   Map<double, int> initialCounts = const {},
   required VoidCallback onSuccess,
 }) {
-  AppNav.push<void>(
-    context,
-    _CierreSheet(
+  ResponsiveForm.showPage<void>(
+    context: context,
+    dialogWidth: 680,
+    dialogHeight: 800,
+    page: _CierreSheet(
       canForzar: canForzar,
       initialCounts: initialCounts,
       onSuccess: onSuccess,

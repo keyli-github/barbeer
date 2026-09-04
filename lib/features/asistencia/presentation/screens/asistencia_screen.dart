@@ -18,6 +18,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/asistencia_repository.dart';
 
@@ -358,9 +359,11 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                 final turnosNotifier = ref.read(
                   _turnosProvider(sedeId).notifier,
                 );
-                AppNav.push(
-                  context,
-                  _TurnoFormSheet(
+                ResponsiveForm.showPage<void>(
+                  context: context,
+                  dialogWidth: 600,
+                  dialogHeight: 620,
+                  page: _TurnoFormSheet(
                     sedeId: effectiveTurnoSedeId ?? '',
                     onSaved:
                         (nombre, horaInicio, horaFin, margenTardanza) async {
@@ -641,9 +644,11 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
     _AsistenciaNotifier notifier,
     bool isEdit,
   ) {
-    AppNav.push(
-      context,
-      _RegistrarSheet(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 620,
+      dialogHeight: 680,
+      page: _RegistrarSheet(
         emp: emp,
         isEdit: isEdit,
         onSaved: (estado, turno, horaEntrada, horaSalida, notas) async {
@@ -2029,9 +2034,11 @@ class _TurnosTab extends ConsumerWidget {
                             _IconBtn(
                               icon: Icons.edit_rounded,
                               color: AppColors.primary,
-                              onTap: () => AppNav.push(
-                                context,
-                                _TurnoFormSheet(
+                              onTap: () => ResponsiveForm.showPage<void>(
+                                context: context,
+                                dialogWidth: 600,
+                                dialogHeight: 620,
+                                page: _TurnoFormSheet(
                                   sedeId: turno.sedeId,
                                   turno: turno,
                                   onSaved:

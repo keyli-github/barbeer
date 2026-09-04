@@ -20,6 +20,7 @@ import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 const passwordPolicyHint =
@@ -524,9 +525,11 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
     List<Map<String, dynamic>> availableRoles,
     List<Map<String, dynamic>> activeSedes,
   ) {
-    AppNav.push(
-      context,
-      _UserForm(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 680,
+      dialogHeight: 760,
+      page: _UserForm(
         roles: availableRoles,
         sedes: activeSedes,
         isSuperAdmin: ref.read(authProvider).user?.isSuperAdmin ?? false,
@@ -543,9 +546,11 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
     List<Map<String, dynamic>> availableRoles,
     List<Map<String, dynamic>> activeSedes,
   ) {
-    AppNav.push(
-      context,
-      _UserEditForm(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 680,
+      dialogHeight: 720,
+      page: _UserEditForm(
         user: user,
         roles: availableRoles,
         sedes: editableSedesForUser(activeSedes, user),
@@ -607,9 +612,11 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
   }
 
   void _showPermissions(BuildContext context, String userId, String username) {
-    AppNav.push(
-      context,
-      Scaffold(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 900,
+      dialogHeight: 760,
+      page: Scaffold(
         appBar: AppBar(title: Text('Permisos: $username')),
         body: PermissionEditorSheet(
           userId: userId,

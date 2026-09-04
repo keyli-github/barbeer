@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_feedback.dart';
 import '../../../../core/widgets/ds_product_image.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
@@ -65,9 +66,11 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
   }
 
   void _openConciliar() {
-    AppNav.push(
-      context,
-      ConciliarVentaScreen(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 840,
+      dialogHeight: 800,
+      page: ConciliarVentaScreen(
         venta: _venta,
         onDone: () {
           widget.onChanged?.call();

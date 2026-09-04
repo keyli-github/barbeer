@@ -13,6 +13,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_ui_components.dart';
 import '../../../../core/widgets/ds_product_image.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categorias/data/categorias_repository.dart' show Categoria;
 import '../../../productos/data/productos_repository.dart' as products;
@@ -22,13 +23,20 @@ import '../../data/inventario_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-final _invRepoProvider = Provider<InventarioRepository>(
+final inventarioRepositoryProvider = Provider<InventarioRepository>(
   (ref) => InventarioRepository(ApiClient.instance),
 );
 
+final inventarioProductsRepositoryProvider =
+    Provider<products.ProductosRepository>(
+      (ref) => products.ProductosRepository(ApiClient.instance),
+    );
+
 /// Categorías activas del catálogo — usadas en el filtro de inventario.
-final _invCatsProvider = FutureProvider<List<Categoria>>((ref) async {
-  return products.ProductosRepository(ApiClient.instance).categorias();
+final inventarioCategoriesProvider = FutureProvider<List<Categoria>>((
+  ref,
+) async {
+  return ref.watch(inventarioProductsRepositoryProvider).categorias();
 });
 
 class _InvState {
@@ -171,7 +179,7 @@ class _InvNotifier extends StateNotifier<_InvState> {
 
 final _invProvider = StateNotifierProvider<_InvNotifier, _InvState>(
   (ref) => _InvNotifier(
-    ref.watch(_invRepoProvider),
+    ref.watch(inventarioRepositoryProvider),
     ref.watch(globalSedeIdProvider),
   ),
 );
@@ -186,7 +194,7 @@ class InventarioScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final state = ref.watch(_invProvider);
     final notifier = ref.read(_invProvider.notifier);
-    final catsAsync = ref.watch(_invCatsProvider);
+    final catsAsync = ref.watch(inventarioCategoriesProvider);
     // Permisos alineados con el backend:
     // inventario:configurar → configurar parámetros de stock (min/max/etc.)
     // inventario:ajustar-stock → ajustar stock y registrar en kardex
@@ -300,14 +308,15 @@ class InventarioScreen extends ConsumerWidget {
 
   void _showAdjust(BuildContext context, WidgetRef ref, InventarioItem item) {
     final auth = ref.read(authProvider);
-    AppNav.push(
-      context,
-      _PinAdjustWrapper(
+    ResponsiveForm.show<void>(
+      context: context,
+      builder: (dialogMode) => _PinAdjustWrapper(
         item: item,
+        dialogMode: dialogMode,
         isSuperAdmin: auth.user?.isSuperAdmin == true,
         sedeId: ref.read(globalSedeIdProvider),
         onSaved: () => ref.read(_invProvider.notifier).load(),
-        repo: ref.read(_invRepoProvider),
+        repo: ref.read(inventarioRepositoryProvider),
       ),
     );
   }
@@ -317,14 +326,16 @@ class InventarioScreen extends ConsumerWidget {
     WidgetRef ref, {
     InventarioItem? item,
   }) {
-    AppNav.push(
-      context,
-      _InventoryConfigScreen(
+    ResponsiveForm.show<void>(
+      context: context,
+      builder: (dialogMode) => _InventoryConfigScreen(
         item: item,
+        dialogMode: dialogMode,
         auth: ref.read(authProvider),
         selectedSedeId: ref.read(globalSedeIdProvider),
         sedes: ref.read(sedeScopeOptionsProvider).valueOrNull ?? const [],
-        repo: ref.read(_invRepoProvider),
+        repo: ref.read(inventarioRepositoryProvider),
+        productsRepo: ref.read(inventarioProductsRepositoryProvider),
         onSaved: () => ref.read(_invProvider.notifier).load(),
       ),
     );
@@ -898,6 +909,7 @@ class _InventoryStatusBadge extends StatelessWidget {
 
 class _PinAdjustWrapper extends StatelessWidget {
   final InventarioItem item;
+  final bool dialogMode;
   final bool isSuperAdmin;
   final String? sedeId;
   final VoidCallback onSaved;
@@ -905,6 +917,7 @@ class _PinAdjustWrapper extends StatelessWidget {
 
   const _PinAdjustWrapper({
     required this.item,
+    required this.dialogMode,
     required this.isSuperAdmin,
     required this.sedeId,
     required this.onSaved,
@@ -913,8 +926,12 @@ class _PinAdjustWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Ajuste de stock')),
+    return ResponsiveFormScaffold(
+      dialogMode: dialogMode,
+      dialogKey: const ValueKey('inventory-adjust-dialog'),
+      dialogWidth: 580,
+      dialogHeight: 520,
+      title: 'Ajuste de stock',
       body: PinStockAdjustSheet(
         productId: item.productoId,
         productName: item.producto,
@@ -923,6 +940,7 @@ class _PinAdjustWrapper extends StatelessWidget {
         isSuperAdmin: isSuperAdmin,
         repo: UsuarioAdminRepository(ApiClient.instance),
         onSaved: onSaved,
+        showHeader: false,
       ),
     );
   }
@@ -1393,18 +1411,22 @@ class _InventarioTile extends StatelessWidget {
 
 class _InventoryConfigScreen extends StatefulWidget {
   final InventarioItem? item;
+  final bool dialogMode;
   final AuthState auth;
   final String? selectedSedeId;
   final List<SedeScopeOption> sedes;
   final InventarioRepository repo;
+  final products.ProductosRepository productsRepo;
   final VoidCallback onSaved;
 
   const _InventoryConfigScreen({
     this.item,
+    required this.dialogMode,
     required this.auth,
     required this.selectedSedeId,
     required this.sedes,
     required this.repo,
+    required this.productsRepo,
     required this.onSaved,
   });
 
@@ -1475,15 +1497,14 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
   Future<void> _loadProducts() async {
     setState(() => _loading = true);
     try {
-      final repository = products.ProductosRepository(ApiClient.instance);
-      final first = await repository.list(
+      final first = await widget.productsRepo.list(
         pagina: 1,
         limite: 100,
         activo: 'true',
       );
       final loaded = [...first.data];
       for (var page = 2; page <= first.totalPaginas; page++) {
-        final next = await repository.list(
+        final next = await widget.productsRepo.list(
           pagina: page,
           limite: 100,
           activo: 'true',
@@ -1558,12 +1579,13 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
     final productLocked = item != null;
     final sedeLocked = item?.sedeId.isNotEmpty == true;
 
-    return Scaffold(
-      backgroundColor: context.colors.surface,
-      appBar: SubPageAppBar(
-        title: item == null ? 'Agregar al inventario' : 'Configurar inventario',
-        subtitle: 'Mínimos, objetivo y ubicación',
-      ),
+    return ResponsiveFormScaffold(
+      dialogMode: widget.dialogMode,
+      dialogKey: const ValueKey('inventory-config-dialog'),
+      dialogWidth: 640,
+      dialogHeight: 580,
+      title: item == null ? 'Agregar al inventario' : 'Configurar inventario',
+      subtitle: 'Mínimos, objetivo y ubicación',
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [

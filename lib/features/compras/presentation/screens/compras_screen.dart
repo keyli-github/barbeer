@@ -14,6 +14,7 @@ import '../../../../core/widgets/app_empty_state.dart';
 import '../../../../core/widgets/app_loading.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/app_ui_components.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/data/models/auth_models.dart';
 import '../../../productos/data/productos_repository.dart';
@@ -428,9 +429,11 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showNuevaOrden(BuildContext context) {
-    AppNav.push(
-      context,
-      _NuevaOrdenScreen(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 960,
+      dialogHeight: 800,
+      page: _NuevaOrdenScreen(
         repo: ref.read(_comprasRepoProvider),
         productosRepo: ref.read(_productosRepoProvider),
         user: ref.read(authProvider).user!,
@@ -441,9 +444,11 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showNuevoProveedor(BuildContext context) {
-    AppNav.push(
-      context,
-      _ProveedorScreen(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 620,
+      dialogHeight: 680,
+      page: _ProveedorScreen(
         repo: ref.read(_comprasRepoProvider),
         onSaved: () => ref.read(_provsProvider.notifier).load(),
       ),
@@ -451,9 +456,11 @@ class _ComprasScreenState extends ConsumerState<ComprasScreen>
   }
 
   void _showEditProveedor(BuildContext context, Proveedor p) {
-    AppNav.push(
-      context,
-      _ProveedorScreen(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogWidth: 620,
+      dialogHeight: 680,
+      page: _ProveedorScreen(
         proveedor: p,
         repo: ref.read(_comprasRepoProvider),
         onSaved: () => ref.read(_provsProvider.notifier).load(),

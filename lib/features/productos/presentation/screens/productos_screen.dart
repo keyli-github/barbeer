@@ -12,6 +12,7 @@ import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_spacing.dart' as spacing;
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/format_utils.dart';
+import '../../../../core/widgets/responsive_form.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categorias/data/categorias_repository.dart';
@@ -335,6 +336,9 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                       ((availableWidth + gap) / (minCardWidth + gap))
                           .floor()
                           .clamp(1, desktop ? 5 : 3);
+                  final cardWidth =
+                      (availableWidth - gap * (columns - 1)) / columns;
+                  final desktopCardHeight = cardWidth * .75 + 180;
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                       desktop ? 24 : AppSpacing.md,
@@ -346,12 +350,13 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
                         childAspectRatio: desktop ? 1 : 0.56,
-                        mainAxisExtent: desktop ? 390 : null,
+                        mainAxisExtent: desktop ? desktopCardHeight : null,
                         crossAxisSpacing: gap,
                         mainAxisSpacing: gap,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, i) => _ProductCard(
+                          key: ValueKey('product-card-${state.items[i].id}'),
                           product: state.items[i],
                           canEdit: canEdit,
                           canDelete: canDelete,
@@ -428,9 +433,6 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     final canDelete = ref
         .read(authProvider)
         .hasPermission('productos:eliminar');
-    final canViewCosts = ref
-        .read(authProvider)
-        .hasPermission('productos:ver-utilidad');
     // rootNavigator: true → se muestra ENCIMA del Shell (sin bottom nav)
     AppNav.push(
       context,
@@ -438,17 +440,7 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
         product: product,
         canEdit: canEdit,
         canDelete: canDelete,
-        onEdit: () async => AppNav.push(
-          context,
-          _ProductFormScreen(
-            product: product,
-            cats: ref.read(_categoriasProvider).value ?? [],
-            onSaved: () => ref.read(_productosNotifier.notifier).load(),
-            repo: ref.read(productosCatalogRepositoryProvider),
-            canManageImage: canEdit,
-            canViewCosts: canViewCosts,
-          ),
-        ),
+        onEdit: () => _showForm(context, ref, product),
         onToggle: () async {
           await ref
               .read(productosCatalogRepositoryProvider)
@@ -463,22 +455,24 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     );
   }
 
-  void _showForm(BuildContext context, WidgetRef ref, Producto? product) {
+  Future<void> _showForm(
+    BuildContext context,
+    WidgetRef ref,
+    Producto? product,
+  ) async {
     final auth = ref.read(authProvider);
-    final form = _ProductFormScreen(
-      product: product,
-      cats: ref.read(_categoriasProvider).value ?? [],
-      onSaved: () => ref.read(_productosNotifier.notifier).load(),
-      repo: ref.read(productosCatalogRepositoryProvider),
-      canManageImage: auth.hasPermission('productos:editar'),
-      canViewCosts: auth.hasPermission('productos:ver-utilidad'),
-      dialogMode: MediaQuery.sizeOf(context).width >= 1024,
+    await ResponsiveForm.show<void>(
+      context: context,
+      builder: (dialogMode) => _ProductFormScreen(
+        product: product,
+        cats: ref.read(_categoriasProvider).value ?? [],
+        onSaved: () => ref.read(_productosNotifier.notifier).load(),
+        repo: ref.read(productosCatalogRepositoryProvider),
+        canManageImage: auth.hasPermission('productos:editar'),
+        canViewCosts: auth.hasPermission('productos:ver-utilidad'),
+        dialogMode: dialogMode,
+      ),
     );
-    if (MediaQuery.sizeOf(context).width >= 1024) {
-      showDialog<void>(context: context, builder: (_) => form);
-    } else {
-      AppNav.push(context, form);
-    }
   }
 
   Future<void> _showStockAdjustment(
@@ -1275,6 +1269,7 @@ class _ProductCard extends StatelessWidget {
       onSalida;
 
   const _ProductCard({
+    super.key,
     required this.product,
     required this.canEdit,
     required this.canDelete,
