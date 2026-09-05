@@ -78,7 +78,9 @@ void main() {
     await tester.pumpAndSettle();
     final createDialog = find.byKey(const Key('category-form-dialog'));
     expect(createDialog, findsOneWidget);
-    expect(tester.getSize(createDialog), const Size(540, 520));
+    expect(tester.getSize(createDialog).width, 540);
+    expect(tester.getSize(createDialog).height, lessThan(520));
+    expect(tester.getCenter(createDialog), const Offset(720, 450));
     expect(find.text('Nueva categoria'), findsOneWidget);
     await tester.tap(find.byKey(const Key('responsive-form-close')));
     await tester.pumpAndSettle();

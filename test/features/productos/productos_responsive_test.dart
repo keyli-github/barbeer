@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/categorias/data/categorias_repository.dart';
+import 'package:barbeer/features/inventario/data/inventario_repository.dart';
 import 'package:barbeer/features/productos/data/productos_repository.dart';
 import 'package:barbeer/features/productos/presentation/screens/productos_screen.dart';
 import 'package:flutter/material.dart';
@@ -61,6 +64,23 @@ class _FakeProductsRepository extends ProductosRepository {
   ];
 }
 
+class _FakeInventoryRepository extends InventarioRepository {
+  _FakeInventoryRepository() : super(ApiClient.instance);
+
+  final response = Completer<InventarioPage>();
+
+  @override
+  Future<InventarioPage> list({
+    int pagina = 1,
+    int limite = 25,
+    String? q,
+    String? categoriaId,
+    String? estado,
+    String? sedeId,
+    String? productoId,
+  }) => response.future;
+}
+
 class _TestAuthNotifier extends AuthNotifier {
   _TestAuthNotifier(super.repository, AuthState value) {
     state = value;
@@ -79,10 +99,15 @@ const _user = UserProfile(
     'productos:crear',
     'productos:editar',
     'productos:ver-utilidad',
+    'inventario:ajustar',
   ],
 );
 
-Future<void> _pumpProducts(WidgetTester tester, Size size) async {
+Future<void> _pumpProducts(
+  WidgetTester tester,
+  Size size, {
+  InventarioRepository? inventoryRepository,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -94,6 +119,10 @@ Future<void> _pumpProducts(WidgetTester tester, Size size) async {
         productosCatalogRepositoryProvider.overrideWithValue(
           _FakeProductsRepository(),
         ),
+        if (inventoryRepository != null)
+          productosInventarioRepositoryProvider.overrideWithValue(
+            inventoryRepository,
+          ),
         authProvider.overrideWith(
           (ref) => _TestAuthNotifier(
             ref.read(authRepositoryProvider),
@@ -126,7 +155,7 @@ void main() {
 
     final card = find.byKey(const Key('product-card-product-1'));
     expect(card, findsOneWidget);
-    expect(tester.getSize(card).height, lessThan(430));
+    expect(tester.getSize(card).height, lessThan(360));
 
     await tester.tap(find.byKey(const Key('productos-create-desktop')));
     await tester.pumpAndSettle();
@@ -142,7 +171,56 @@ void main() {
     final card = find.byKey(const Key('product-card-product-1'));
     expect(card, findsOneWidget);
     expect(tester.getSize(card).width, lessThan(300));
-    expect(tester.getSize(card).height, lessThan(430));
+    expect(tester.getSize(card).height, lessThan(360));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('stock adjustment dialog opens before inventory request ends', (
+    tester,
+  ) async {
+    final inventory = _FakeInventoryRepository();
+    await _pumpProducts(
+      tester,
+      const Size(1440, 900),
+      inventoryRepository: inventory,
+    );
+
+    await tester.tap(find.text('Ingreso'));
+    await tester.pump();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('Ingreso de stock'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    inventory.response.complete(
+      const InventarioPage(
+        data: [
+          InventarioItem(
+            id: 'inventory-1',
+            productoId: 'product-1',
+            sedeId: 'branch-1',
+            codigo: 'AGU-1',
+            producto: 'Agua',
+            categoria: 'Bebidas',
+            unidad: 'unidad',
+            ubicacion: '',
+            estado: 'OK',
+            stock: 20,
+            min: 5,
+            max: 50,
+            costo: 2,
+            updatedAt: '2026-09-04',
+          ),
+        ],
+        total: 1,
+        pagina: 1,
+        totalPaginas: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cantidad'), findsOneWidget);
+    expect(find.text('Agua · Stock 20.0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

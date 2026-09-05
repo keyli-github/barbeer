@@ -75,7 +75,7 @@ void main() {
     final dialog = find.byKey(const ValueKey('test-form-dialog'));
     expect(dialog, findsOneWidget);
     expect(find.byType(Dialog), findsOneWidget);
-    expect(tester.getSize(dialog), const Size(560, 500));
+    expect(tester.getSize(dialog), const Size(560, 320));
     expect(tester.getCenter(dialog), const Offset(720, 450));
     expect(find.byKey(const ValueKey('responsive-form-close')), findsOneWidget);
   });
@@ -100,7 +100,7 @@ void main() {
 
     final dialog = find.byKey(const ValueKey('test-page-dialog'));
     expect(find.byType(Dialog), findsOneWidget);
-    expect(tester.getSize(dialog), const Size(680, 600));
+    expect(tester.getSize(dialog), const Size(680, 320));
     expect(tester.getCenter(dialog), const Offset(720, 450));
     expect(find.text('Formulario existente'), findsOneWidget);
   });
@@ -115,5 +115,45 @@ void main() {
     expect(find.byType(Dialog), findsNothing);
     expect(find.text('Formulario existente'), findsOneWidget);
     expect(find.text('Contenido existente'), findsOneWidget);
+  });
+
+  testWidgets('desktop dialog grows only when scrollable content needs it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => ResponsiveForm.showPage<void>(
+                context: context,
+                dialogKey: const ValueKey('tall-page-dialog'),
+                dialogWidth: 600,
+                dialogHeight: 700,
+                page: Scaffold(
+                  appBar: AppBar(title: const Text('Contenido largo')),
+                  body: const SingleChildScrollView(
+                    child: SizedBox(height: 460),
+                  ),
+                ),
+              ),
+              child: const Text('Abrir contenido largo'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir contenido largo'));
+    await tester.pumpAndSettle();
+
+    final dialog = find.byKey(const ValueKey('tall-page-dialog'));
+    expect(tester.getSize(dialog).height, greaterThan(320));
+    expect(tester.getSize(dialog).height, lessThanOrEqualTo(700));
   });
 }

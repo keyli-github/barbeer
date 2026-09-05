@@ -149,7 +149,9 @@ void main() {
     await tester.pumpAndSettle();
     final addDialog = find.byKey(const Key('inventory-config-dialog'));
     expect(addDialog, findsOneWidget);
-    expect(tester.getSize(addDialog), const Size(640, 580));
+    expect(tester.getSize(addDialog).width, 640);
+    expect(tester.getSize(addDialog).height, lessThan(580));
+    expect(tester.getCenter(addDialog), const Offset(720, 450));
     expect(find.text('Agregar al inventario'), findsOneWidget);
     await tester.tap(find.byKey(const Key('responsive-form-close')));
     await tester.pumpAndSettle();
@@ -165,7 +167,9 @@ void main() {
     await tester.pumpAndSettle();
     final adjustDialog = find.byKey(const Key('inventory-adjust-dialog'));
     expect(adjustDialog, findsOneWidget);
-    expect(tester.getSize(adjustDialog), const Size(580, 520));
+    expect(tester.getSize(adjustDialog).width, 580);
+    expect(tester.getSize(adjustDialog).height, lessThan(520));
+    expect(tester.getCenter(adjustDialog), const Offset(720, 450));
     expect(find.text('Ajuste de stock'), findsOneWidget);
     expect(find.text('Agua'), findsWidgets);
   });

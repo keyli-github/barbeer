@@ -26,7 +26,7 @@ final productosCatalogRepositoryProvider = Provider<ProductosRepository>(
   (ref) => ProductosRepository(ApiClient.instance),
 );
 
-final _productosInventarioRepositoryProvider = Provider<InventarioRepository>(
+final productosInventarioRepositoryProvider = Provider<InventarioRepository>(
   (ref) => InventarioRepository(ApiClient.instance),
 );
 
@@ -338,10 +338,9 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                           .clamp(1, 8);
                   final cardWidth =
                       (availableWidth - gap * (columns - 1)) / columns;
-                  // Image takes 3/4 of cardWidth; info section is fixed ~160,
-                  // stock buttons add ~90 on desktop, "Ver detalle" ~36 on mobile.
+                  // The body and stock actions fit in 180 logical pixels.
                   final imageHeight = cardWidth * .75;
-                  final infoHeight = desktop ? 250.0 : 160.0;
+                  final infoHeight = desktop ? 180.0 : 160.0;
                   final cardHeight = imageHeight + infoHeight;
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
@@ -484,27 +483,18 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     Producto product,
     String type,
   ) async {
-    final repository = ref.read(_productosInventarioRepositoryProvider);
-    final page = await repository.list(
-      limite: 1,
-      productoId: product.id,
-      sedeId: ref.read(globalSedeIdProvider),
-    );
-    if (!context.mounted) return;
-    if (page.data.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Configura este producto en Inventario antes de ajustar stock.',
-          ),
-        ),
-      );
-      return;
-    }
+    final repository = ref.read(productosInventarioRepositoryProvider);
     await showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (_) => _StockAdjustmentDialog(
-        item: page.data.first,
+        itemFuture: repository
+            .list(
+              limite: 1,
+              productoId: product.id,
+              sedeId: ref.read(globalSedeIdProvider),
+            )
+            .then((page) => page.data.firstOrNull),
         initialType: type,
         repository: repository,
         onSaved: () => ref.read(_productosNotifier.notifier).load(),
@@ -1627,13 +1617,13 @@ class _ProductCard extends StatelessWidget {
 }
 
 class _StockAdjustmentDialog extends StatefulWidget {
-  final InventarioItem item;
+  final Future<InventarioItem?> itemFuture;
   final String initialType;
   final InventarioRepository repository;
   final VoidCallback onSaved;
 
   const _StockAdjustmentDialog({
-    required this.item,
+    required this.itemFuture,
     required this.initialType,
     required this.repository,
     required this.onSaved,
@@ -1656,7 +1646,7 @@ class _StockAdjustmentDialogState extends State<_StockAdjustmentDialog> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(InventarioItem item) async {
     final amount = double.tryParse(_quantity.text.replaceAll(',', '.'));
     if (amount == null || amount <= 0) {
       setState(() => _error = 'Ingresa una cantidad válida.');
@@ -1668,7 +1658,7 @@ class _StockAdjustmentDialogState extends State<_StockAdjustmentDialog> {
     });
     try {
       await widget.repository.ajustar(
-        widget.item.id,
+        item.id,
         tipo: widget.initialType,
         cantidad: amount,
         referencia: _reference.text.trim().isEmpty
@@ -1689,46 +1679,76 @@ class _StockAdjustmentDialogState extends State<_StockAdjustmentDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.initialType == 'ENTRADA' ? 'Ingreso de stock' : 'Salida de stock',
-    ),
-    content: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('${widget.item.producto} · Stock ${widget.item.stock}'),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _quantity,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Cantidad'),
+  Widget build(BuildContext context) => FutureBuilder<InventarioItem?>(
+    future: widget.itemFuture,
+    builder: (context, snapshot) {
+      final item = snapshot.data;
+      final loading = snapshot.connectionState != ConnectionState.done;
+      final unavailable = !loading && (snapshot.hasError || item == null);
+      return AlertDialog(
+        title: Text(
+          widget.initialType == 'ENTRADA'
+              ? 'Ingreso de stock'
+              : 'Salida de stock',
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: loading
+              ? const SizedBox(
+                  width: 420,
+                  height: 120,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : unavailable
+              ? Text(
+                  snapshot.hasError
+                      ? 'No se pudo cargar el inventario. Intenta nuevamente.'
+                      : 'Configura este producto en Inventario antes de ajustar stock.',
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${item!.producto} · Stock ${item.stock}'),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _quantity,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(labelText: 'Cantidad'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _reference,
+                      decoration: const InputDecoration(
+                        labelText: 'Referencia',
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : () => Navigator.pop(context),
+            child: const Text('Cancelar'),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _reference,
-            decoration: const InputDecoration(labelText: 'Referencia'),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!, style: const TextStyle(color: AppColors.error)),
-          ],
+          if (!unavailable)
+            FilledButton(
+              onPressed: loading || _saving ? null : () => _submit(item!),
+              child: Text(_saving ? 'Guardando...' : 'Confirmar'),
+            ),
         ],
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: _saving ? null : () => Navigator.pop(context),
-        child: const Text('Cancelar'),
-      ),
-      FilledButton(
-        onPressed: _saving ? null : _submit,
-        child: Text(_saving ? 'Guardando...' : 'Confirmar'),
-      ),
-    ],
+      );
+    },
   );
 }
 

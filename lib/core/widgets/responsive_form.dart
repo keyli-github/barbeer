@@ -39,22 +39,12 @@ class ResponsiveForm {
     return showDialog<T>(
       context: context,
       useRootNavigator: true,
-      builder: (dialogContext) {
-        final viewport = MediaQuery.sizeOf(dialogContext);
-        return Dialog(
-          insetPadding: const EdgeInsets.all(24),
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: SizedBox(
-            key: dialogKey,
-            width: math.min(dialogWidth, viewport.width - 48),
-            height: math.min(dialogHeight, viewport.height - 48),
-            child: page,
-          ),
-        );
-      },
+      builder: (_) => _AdaptivePageDialog(
+        dialogKey: dialogKey,
+        width: dialogWidth,
+        maxHeight: dialogHeight,
+        child: page,
+      ),
     );
   }
 }
@@ -103,6 +93,65 @@ class ResponsiveFormScaffold extends StatelessWidget {
 
     if (!dialogMode) return scaffold;
 
+    return _AdaptivePageDialog(
+      dialogKey: dialogKey,
+      width: dialogWidth,
+      maxHeight: dialogHeight,
+      child: scaffold,
+    );
+  }
+}
+
+class _AdaptivePageDialog extends StatefulWidget {
+  final Key? dialogKey;
+  final double width;
+  final double maxHeight;
+  final Widget child;
+
+  const _AdaptivePageDialog({
+    required this.dialogKey,
+    required this.width,
+    required this.maxHeight,
+    required this.child,
+  });
+
+  @override
+  State<_AdaptivePageDialog> createState() => _AdaptivePageDialogState();
+}
+
+class _AdaptivePageDialogState extends State<_AdaptivePageDialog> {
+  static const _compactHeight = 320.0;
+  double _height = _compactHeight;
+  bool _resizeScheduled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewportHeight = MediaQuery.sizeOf(context).height - 48;
+    final maxHeight = math.min(widget.maxHeight, viewportHeight);
+    _height = math.min(_height, maxHeight);
+  }
+
+  bool _onMetrics(ScrollMetricsNotification notification) {
+    final metrics = notification.metrics;
+    if (metrics.axis != Axis.vertical || metrics.maxScrollExtent <= 1) {
+      return false;
+    }
+    final viewportHeight = MediaQuery.sizeOf(context).height - 48;
+    final maxHeight = math.min(widget.maxHeight, viewportHeight);
+    final target = math.min(_height + metrics.maxScrollExtent, maxHeight);
+    if (target <= _height + 1 || _resizeScheduled) return false;
+
+    _resizeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resizeScheduled = false;
+      if (mounted) setState(() => _height = target);
+    });
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final viewport = MediaQuery.sizeOf(context);
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
@@ -110,11 +159,18 @@ class ResponsiveFormScaffold extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      child: SizedBox(
-        key: dialogKey,
-        width: math.min(dialogWidth, viewport.width - 48),
-        height: math.min(dialogHeight, viewport.height - 48),
-        child: scaffold,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        child: SizedBox(
+          key: widget.dialogKey,
+          width: math.min(widget.width, viewport.width - 48),
+          height: _height,
+          child: NotificationListener<ScrollMetricsNotification>(
+            onNotification: _onMetrics,
+            child: widget.child,
+          ),
+        ),
       ),
     );
   }

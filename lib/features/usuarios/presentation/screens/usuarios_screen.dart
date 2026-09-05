@@ -418,8 +418,7 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                 _UsersDesktopTable(
                   users: filteredUsers,
                   auth: auth,
-                  onTap: (user) =>
-                      _showDetail(context, ref, user['id'] as String),
+                  onTap: (user) => _showDetail(context, ref, user),
                   onEdit: (user) => _showEditModal(
                     context,
                     ref,
@@ -440,8 +439,7 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
                   _UserTile(
                     user: user,
                     auth: auth,
-                    onTap: () =>
-                        _showDetail(context, ref, user['id'] as String),
+                    onTap: () => _showDetail(context, ref, user),
                     onEdit: () => _showEditModal(
                       context,
                       ref,
@@ -471,13 +469,11 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
     );
   }
 
-  Future<void> _showDetail(
+  void _showDetail(
     BuildContext context,
     WidgetRef ref,
-    String id,
-  ) async {
-    final user = await ref.read(usuariosProvider.notifier).getUser(id);
-    if (user == null || !context.mounted) return;
+    Map<String, dynamic> user,
+  ) {
     final state = ref.read(usuariosProvider);
     final auth = ref.read(authProvider);
     final availableRoles = assignableRoles(
@@ -488,9 +484,12 @@ class _UsuariosScreenState extends ConsumerState<UsuariosScreen> {
     final activeSedes = state.sedes
         .where((sede) => sede['activo'] == true)
         .toList();
-    AppNav.push(
-      context,
-      _UserDetailScreen(
+    ResponsiveForm.showPage<void>(
+      context: context,
+      dialogKey: const ValueKey('user-detail-dialog'),
+      dialogWidth: 680,
+      dialogHeight: 680,
+      page: _UserDetailScreen(
         user: user,
         roles: availableRoles,
         sedes: activeSedes,
@@ -1126,10 +1125,21 @@ class _UserDetailScreen extends StatelessWidget {
         : user['sedeId'] as String? ?? 'Sin sede';
     final protected = rol == 'SUPERADMIN';
 
+    final dialogMode =
+        MediaQuery.sizeOf(context).width >= ResponsiveForm.desktopBreakpoint;
     return Scaffold(
       backgroundColor: context.colors.backgroundAlt,
-      appBar: SubPageAppBar(
-        title: 'Detalle de usuario',
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Detalle de usuario'),
+        leading: IconButton(
+          tooltip: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(
+            dialogMode ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded,
+            size: 20,
+          ),
+        ),
         actions: [
           if (canEdit && !protected)
             IconButton(
@@ -1143,7 +1153,7 @@ class _UserDetailScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, dialogMode ? 20 : 80),
         child: Column(
           children: [
             // Avatar + nombre
