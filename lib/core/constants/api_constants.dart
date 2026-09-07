@@ -1,6 +1,6 @@
 class ApiConstants {
   ApiConstants._();
-  static const String localBaseUrl = 'http://127.0.0.1:3001/api';
+  static const String localBaseUrl = 'https://hia-server.tail99b0ec.ts.net/backend-bar/api';
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURACIÓN DE URL

@@ -338,9 +338,13 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                           .clamp(1, 8);
                   final cardWidth =
                       (availableWidth - gap * (columns - 1)) / columns;
-                  // The body and stock actions fit in 180 logical pixels.
+                  // Mobile stock actions use two full-width buttons.
                   final imageHeight = cardWidth * .75;
-                  final infoHeight = desktop ? 180.0 : 160.0;
+                  final infoHeight = desktop
+                      ? 180.0
+                      : canAdjustStock
+                      ? 260.0
+                      : 160.0;
                   final cardHeight = imageHeight + infoHeight;
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
@@ -1283,6 +1287,32 @@ class _ProductCard extends StatelessWidget {
         : (product.margin ?? -1) >= 20
         ? AppColors.warning
         : AppColors.error;
+    final ingresoButton = OutlinedButton.icon(
+      onPressed: onIngreso,
+      icon: const Icon(Icons.arrow_circle_down_outlined, size: 16),
+      label: const Text('Ingreso'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.success,
+        minimumSize: Size(0, desktop ? 38.0 : 44.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        side: BorderSide(color: AppColors.success.withValues(alpha: .35)),
+      ),
+    );
+    final salidaButton = OutlinedButton.icon(
+      onPressed: onSalida,
+      icon: const Icon(Icons.arrow_circle_up_outlined, size: 16),
+      label: const Text('Salida'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.error,
+        minimumSize: Size(0, desktop ? 38.0 : 44.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        side: BorderSide(color: AppColors.error.withValues(alpha: .35)),
+      ),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -1493,7 +1523,7 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
           ),
-          if (desktop && canAdjustStock)
+          if (canAdjustStock)
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Column(
@@ -1523,57 +1553,22 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onIngreso,
-                          icon: const Icon(
-                            Icons.arrow_circle_down_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Ingreso'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.success,
-                            minimumSize: const Size(0, 38),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            side: BorderSide(
-                              color: AppColors.success.withValues(alpha: .35),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onSalida,
-                          icon: const Icon(
-                            Icons.arrow_circle_up_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Salida'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            minimumSize: const Size(0, 38),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            side: BorderSide(
-                              color: AppColors.error.withValues(alpha: .35),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  if (desktop)
+                    Row(
+                      children: [
+                        Expanded(child: ingresoButton),
+                        const SizedBox(width: 8),
+                        Expanded(child: salidaButton),
+                      ],
+                    )
+                  else
+                    Column(
+                      children: [
+                        SizedBox(width: double.infinity, child: ingresoButton),
+                        const SizedBox(height: 6),
+                        SizedBox(width: double.infinity, child: salidaButton),
+                      ],
+                    ),
                 ],
               ),
             )
