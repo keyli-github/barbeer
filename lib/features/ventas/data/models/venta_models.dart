@@ -94,6 +94,7 @@ class ComprobanteAnalisis {
   final ComprobanteConfianza confianza;
   final List<String> advertencias;
   final DateTime? expiraAt;
+  final bool requiereIngresoManual;
 
   const ComprobanteAnalisis({
     required this.id,
@@ -112,6 +113,7 @@ class ComprobanteAnalisis {
     required this.confianza,
     required this.advertencias,
     this.expiraAt,
+    this.requiereIngresoManual = false,
   });
 
   factory ComprobanteAnalisis.fromJson(Map<String, dynamic> json) {
@@ -141,6 +143,7 @@ class ComprobanteAnalisis {
           .whereType<String>()
           .toList(),
       expiraAt: DateTime.tryParse(json['expiraAt'] as String? ?? ''),
+      requiereIngresoManual: json['requiereIngresoManual'] as bool? ?? false,
     );
   }
 
@@ -198,10 +201,12 @@ String? comprobanteAnalysisError({
 
 // ─── Conciliación ──────────────────────────────────────────────────────────
 
-enum EstadoConciliacion { pendiente, efectivo, billetera }
+enum EstadoConciliacion { pendiente, efectivo, billetera, multiple }
 
 EstadoConciliacion parseEstadoConciliacion(String? value) {
   switch (value?.toUpperCase()) {
+    case 'MULTIPLE':
+      return EstadoConciliacion.multiple;
     case 'EFECTIVO':
       return EstadoConciliacion.efectivo;
     case 'BILLETERA':
@@ -213,6 +218,8 @@ EstadoConciliacion parseEstadoConciliacion(String? value) {
 
 String estadoConciliacionLabel(EstadoConciliacion e) {
   switch (e) {
+    case EstadoConciliacion.multiple:
+      return 'Pago mixto';
     case EstadoConciliacion.pendiente:
       return 'Pendiente';
     case EstadoConciliacion.efectivo:
@@ -272,6 +279,8 @@ class VentaItem {
   final int cantidad;
   final double precioUnitario;
   final double subtotal;
+  final double? recargoMonto;
+  final String? recargoMotivo;
 
   const VentaItem({
     required this.id,
@@ -281,6 +290,8 @@ class VentaItem {
     required this.cantidad,
     required this.precioUnitario,
     required this.subtotal,
+    this.recargoMonto,
+    this.recargoMotivo,
   });
 
   factory VentaItem.fromJson(Map<String, dynamic> j) => VentaItem(
@@ -291,6 +302,8 @@ class VentaItem {
     cantidad: (j['cantidad'] as num?)?.toInt() ?? 0,
     precioUnitario: (j['precioUnitario'] as num?)?.toDouble() ?? 0,
     subtotal: (j['subtotal'] as num?)?.toDouble() ?? 0,
+    recargoMonto: (j['recargoMonto'] as num?)?.toDouble(),
+    recargoMotivo: j['recargoMotivo'] as String?,
   );
 }
 
@@ -319,6 +332,7 @@ class Venta {
   final String? cuentaId;
   final String? cuentaNombre;
   final double? cuentaMonto;
+  final List<Map<String, dynamic>> cuentaCargos;
   final ConciliacionVenta? conciliacion;
   final List<ConciliacionVenta> conciliaciones;
   final List<ComprobanteAnalisis> comprobantesAnalisis;
@@ -342,6 +356,7 @@ class Venta {
     this.cuentaId,
     this.cuentaNombre,
     this.cuentaMonto,
+    this.cuentaCargos = const [],
     this.conciliacion,
     this.conciliaciones = const [],
     this.comprobantesAnalisis = const [],
@@ -364,8 +379,26 @@ class Venta {
     recargoMonto: (j['recargoMonto'] as num?)?.toDouble(),
     recargoMotivo: j['recargoMotivo'] as String?,
     cuentaId: j['cuentaId'] as String?,
-    cuentaNombre: (j['cuenta'] as Map?)?['nombre'] as String?,
-    cuentaMonto: (j['cuentaMonto'] as num?)?.toDouble(),
+    cuentaNombre:
+        (j['cuenta'] as Map?)?['nombre'] as String? ??
+        ((j['cuentaCargos'] as List?)?.isNotEmpty == true
+            ? (j['cuentaCargos'] as List)
+                  .map(
+                    (item) => (item['cuenta'] as Map?)?['nombre'] ?? 'Cuenta',
+                  )
+                  .join(', ')
+            : null),
+    cuentaMonto:
+        (j['cuentaMonto'] as num?)?.toDouble() ??
+        ((j['cuentaCargos'] as List?)?.isNotEmpty == true
+            ? (j['cuentaCargos'] as List).fold<double>(
+                0,
+                (sum, item) => sum + (item['monto'] as num).toDouble(),
+              )
+            : null),
+    cuentaCargos: (j['cuentaCargos'] as List? ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(),
     conciliacion: j['conciliacion'] is Map
         ? ConciliacionVenta.fromJson(
             Map<String, dynamic>.from(j['conciliacion'] as Map),
@@ -393,7 +426,12 @@ class Venta {
   );
 
   bool get isAnulada => estado == EstadoVenta.anulada;
-  bool get isPendiente => conciliacion?.estado == EstadoConciliacion.pendiente;
+  bool get isPendiente =>
+      !isAnulada &&
+      (conciliacion?.estado == EstadoConciliacion.pendiente ||
+          conciliaciones.any(
+            (payment) => payment.estado == EstadoConciliacion.pendiente,
+          ));
 }
 
 /// Returns true when the recargo amount should be surfaced to the user.
@@ -423,6 +461,19 @@ class VendedorVenta {
 class CreateVentaPayload {
   final Map<String, dynamic> json;
 
+  CreateVentaPayload._(Map<String, dynamic> value)
+    : json = Map.unmodifiable(value);
+  factory CreateVentaPayload.fromRecovery(Map<String, dynamic> value) =>
+      CreateVentaPayload._(
+        Map<String, dynamic>.from(value)
+          ..remove('superadminPin')
+          ..remove('_originalCajaId'),
+      );
+
+  /// Only the transient network copy may contain this authorization secret.
+  CreateVentaPayload withEphemeralPin(String pin) =>
+      CreateVentaPayload._({...json, 'superadminPin': pin});
+
   CreateVentaPayload({
     required String idempotencyKey,
     required List<Map<String, dynamic>> items,
@@ -440,6 +491,7 @@ class CreateVentaPayload {
     String? recargoMotivo,
     String? cuentaId,
     double? cuentaMonto,
+    List<Map<String, dynamic>>? cuentaCargos,
     // Método cuando se guarda PENDIENTE (EFECTIVO o BILLETERA).
     String? metodoPagoPendiente,
     // Diferencia de billetera cubierta en efectivo (vuelto).
@@ -456,7 +508,8 @@ class CreateVentaPayload {
          'estadoConciliacion': estadoConciliacion.name.toUpperCase(),
          'etiquetaId': ?etiquetaId,
          // Use plural when available (supports multiple receipts).
-         if (comprobanteAnalisisIds != null && comprobanteAnalisisIds.isNotEmpty)
+         if (comprobanteAnalisisIds != null &&
+             comprobanteAnalisisIds.isNotEmpty)
            'comprobanteAnalisisIds': List.unmodifiable(comprobanteAnalisisIds)
          else if (comprobanteAnalisisId != null)
            'comprobanteAnalisisId': comprobanteAnalisisId,
@@ -470,6 +523,12 @@ class CreateVentaPayload {
          'recargoMotivo': ?recargoMotivo,
          'cuentaId': ?cuentaId,
          'cuentaMonto': ?cuentaMonto,
+         if (cuentaCargos != null && cuentaCargos.isNotEmpty)
+           'cuentaCargos': List.unmodifiable(
+             cuentaCargos.map(
+               (charge) => Map<String, dynamic>.unmodifiable(charge),
+             ),
+           ),
          'metodoPagoPendiente': ?metodoPagoPendiente,
          if (pagoRestoEfectivo == true) 'pagoRestoEfectivo': true,
          if (precioAuthTokens != null && precioAuthTokens.isNotEmpty)

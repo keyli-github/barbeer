@@ -182,8 +182,15 @@ class CajaNotifier extends StateNotifier<CajaState> {
   Future<void> reaperturar(String id) =>
       _action(() => _repository.reaperturar(id));
 
-  Future<void> abrir(Map<double, int> cantidades) => _action(() async {
-    await _repository.abrir(cantidades, sedeId: state.sedeId);
+  Future<void> abrir(
+    Map<double, int> cantidades, {
+    double saldoInicialYape = 0,
+  }) => _action(() async {
+    await _repository.abrir(
+      cantidades,
+      sedeId: state.sedeId,
+      saldoInicialYape: saldoInicialYape,
+    );
   });
 
   Future<void> registrarMovimiento({
@@ -192,6 +199,7 @@ class CajaNotifier extends StateNotifier<CajaState> {
     String? concepto,
     String? etiquetaId,
     String? personalUsuarioId,
+    String? cuentaId,
   }) async {
     final id = state.actual?.id;
     if (id == null) return;
@@ -203,6 +211,7 @@ class CajaNotifier extends StateNotifier<CajaState> {
         concepto: concepto,
         etiquetaId: etiquetaId,
         personalUsuarioId: personalUsuarioId,
+        cuentaId: cuentaId,
       ),
     );
   }

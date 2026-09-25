@@ -141,7 +141,6 @@ class InventarioRepository {
         'productoId': productoId,
         if (sedeId != null) 'sedeId': sedeId,
         if (stockMin != null) 'stockMin': stockMin,
-        if (stockMax != null) 'stockMax': stockMax,
         if (ubicacion != null) 'ubicacion': ubicacion,
       },
     );

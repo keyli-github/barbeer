@@ -10,6 +10,8 @@ class Turno {
   final int horaFin;
   final int margenTardanza;
   final bool activo;
+  final String? rolId;
+  final List<Map<String, dynamic>> horarios;
 
   const Turno({
     required this.id,
@@ -19,6 +21,8 @@ class Turno {
     required this.horaFin,
     required this.margenTardanza,
     required this.activo,
+    this.rolId,
+    this.horarios = const [],
   });
 
   factory Turno.fromJson(Map<String, dynamic> j) => Turno(
@@ -29,6 +33,10 @@ class Turno {
     horaFin: (j['horaFin'] as num?)?.toInt() ?? 0,
     margenTardanza: (j['margenTardanza'] as num?)?.toInt() ?? 15,
     activo: j['activo'] as bool? ?? true,
+    rolId: j['rolId'] as String?,
+    horarios: (j['horarios'] as List? ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(),
   );
 
   String get horaInicioLabel => _minutesToHHMM(horaInicio);
@@ -336,6 +344,8 @@ class TurnosRepository {
     required int horaFin,
     int margenTardanza = 15,
     bool activo = true,
+    String? rolId,
+    List<Map<String, dynamic>>? horarios,
   }) async {
     final r = await _api.post(
       '/turnos',
@@ -346,6 +356,8 @@ class TurnosRepository {
         'horaFin': horaFin,
         'margenTardanza': margenTardanza,
         'activo': activo,
+        'rolId': ?rolId,
+        'horarios': ?horarios,
       },
     );
     return Turno.fromJson(Map<String, dynamic>.from(r.data as Map));
@@ -358,6 +370,8 @@ class TurnosRepository {
     int? horaFin,
     int? margenTardanza,
     bool? activo,
+    String? rolId,
+    List<Map<String, dynamic>>? horarios,
   }) async {
     final r = await _api.patch(
       '/turnos/$id',
@@ -367,6 +381,8 @@ class TurnosRepository {
         if (horaFin != null) 'horaFin': horaFin,
         if (margenTardanza != null) 'margenTardanza': margenTardanza,
         if (activo != null) 'activo': activo,
+        if (horarios != null || rolId != null) 'rolId': rolId,
+        'horarios': ?horarios,
       },
     );
     return Turno.fromJson(Map<String, dynamic>.from(r.data as Map));

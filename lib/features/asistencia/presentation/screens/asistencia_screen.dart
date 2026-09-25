@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../widgets/shift_schedule_editor.dart';
+import '../../../../core/utils/business_time.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -56,7 +58,7 @@ class _AsistenciaState {
     this.totalPages = 1,
     this.total = 0,
     String? fecha,
-  }) : fecha = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+  }) : fecha = fecha ?? businessDate();
 
   _AsistenciaState copyWith({
     List<AsistenciaPlanilla>? items,
@@ -263,6 +265,8 @@ class _TurnosNotifier extends StateNotifier<_TurnosState> {
     required int horaInicio,
     required int horaFin,
     int margenTardanza = 15,
+    String? rolId,
+    List<Map<String, dynamic>>? horarios,
   }) async {
     await _repo.crear(
       sedeId: sedeId,
@@ -270,6 +274,8 @@ class _TurnosNotifier extends StateNotifier<_TurnosState> {
       horaInicio: horaInicio,
       horaFin: horaFin,
       margenTardanza: margenTardanza,
+      rolId: rolId,
+      horarios: horarios,
     );
     await load(resetPage: true);
   }
@@ -281,6 +287,8 @@ class _TurnosNotifier extends StateNotifier<_TurnosState> {
     int? horaFin,
     int? margenTardanza,
     bool? activo,
+    String? rolId,
+    List<Map<String, dynamic>>? horarios,
   }) async {
     await _repo.editar(
       id,
@@ -289,6 +297,8 @@ class _TurnosNotifier extends StateNotifier<_TurnosState> {
       horaFin: horaFin,
       margenTardanza: margenTardanza,
       activo: activo,
+      rolId: rolId,
+      horarios: horarios,
     );
     await load();
   }
@@ -383,13 +393,22 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
                   page: _TurnoFormSheet(
                     sedeId: effectiveTurnoSedeId ?? '',
                     onSaved:
-                        (nombre, horaInicio, horaFin, margenTardanza) async {
+                        (
+                          nombre,
+                          horaInicio,
+                          horaFin,
+                          margenTardanza,
+                          rolId,
+                          horarios,
+                        ) async {
                           await turnosNotifier.crear(
                             sedeId: effectiveTurnoSedeId ?? '',
                             nombre: nombre,
                             horaInicio: horaInicio,
                             horaFin: horaFin,
                             margenTardanza: margenTardanza,
+                            rolId: rolId,
+                            horarios: horarios,
                           );
                         },
                   ),
@@ -731,15 +750,25 @@ class _AsistenciaScreenState extends ConsumerState<AsistenciaScreen> {
       dialogHeight: 620,
       page: _TurnoFormSheet(
         sedeId: effectiveTurnoSedeId ?? '',
-        onSaved: (nombre, horaInicio, horaFin, margenTardanza) async {
-          await turnosNotifier.crear(
-            sedeId: effectiveTurnoSedeId ?? '',
-            nombre: nombre,
-            horaInicio: horaInicio,
-            horaFin: horaFin,
-            margenTardanza: margenTardanza,
-          );
-        },
+        onSaved:
+            (
+              nombre,
+              horaInicio,
+              horaFin,
+              margenTardanza,
+              rolId,
+              horarios,
+            ) async {
+              await turnosNotifier.crear(
+                sedeId: effectiveTurnoSedeId ?? '',
+                nombre: nombre,
+                horaInicio: horaInicio,
+                horaFin: horaFin,
+                margenTardanza: margenTardanza,
+                rolId: rolId,
+                horarios: horarios,
+              );
+            },
       ),
     );
   }
@@ -1286,7 +1315,7 @@ class _PlanillaView extends StatelessWidget {
 
   String _fmtHour(String iso) {
     try {
-      return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal());
+      return DateFormat('HH:mm').format(businessTime(DateTime.parse(iso)));
     } catch (_) {
       return iso;
     }
@@ -1545,7 +1574,7 @@ class _MarcajesView extends StatelessWidget {
 
   String _fmtHour(String iso) {
     try {
-      return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal());
+      return DateFormat('HH:mm').format(businessTime(DateTime.parse(iso)));
     } catch (_) {
       return iso;
     }
@@ -1600,15 +1629,14 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
     try {
       final repo = ref.read(_asistenciaRepoProvider);
       final qr = await repo.qrKiosco(sedeId: widget.sedeId);
+      if (!mounted) return;
       setState(() {
         _qr = qr;
         _loading = false;
         _secondsLeft = qr.expiraEnSegundos;
       });
-      // Refresh QR before it expires (at 30s or at expiry - 5s)
-      final refreshAfter = qr.expiraEnSegundos > 35
-          ? 30
-          : (qr.expiraEnSegundos - 5).clamp(5, 300);
+      // The kiosk token is stable for the business day; renew at expiration.
+      final refreshAfter = qr.expiraEnSegundos.clamp(1, 86400);
       _refreshTimer = Timer(Duration(seconds: refreshAfter), _loadQr);
       // Countdown timer
       _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -1805,7 +1833,7 @@ class _EmployeeAttendanceView extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Registra tu entrada o salida escaneando el QR vigente de tu sede.',
+              'Registra tu entrada diaria con el QR de tu sede. La salida se registra automáticamente al finalizar el turno.',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: context.colors.textTertiary,
               ),
@@ -1831,7 +1859,7 @@ class _EmployeeAttendanceView extends StatelessWidget {
                     Positioned(
                       bottom: 20,
                       child: Text(
-                        'ENTRADA / SALIDA',
+                        'ENTRADA DIARIA',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: context.colors.textTertiary,
                           letterSpacing: 1.2,
@@ -2058,7 +2086,7 @@ class _TodayArrivalsSectionState extends ConsumerState<_TodayArrivalsSection> {
 
   String _fmtHour(String iso) {
     try {
-      return DateFormat('HH:mm').format(DateTime.parse(iso).toLocal());
+      return DateFormat('HH:mm').format(businessTime(DateTime.parse(iso)));
     } catch (_) {
       return iso;
     }
@@ -2614,6 +2642,8 @@ class _TurnosTab extends ConsumerWidget {
                                         horaInicio,
                                         horaFin,
                                         margenTardanza,
+                                        rolId,
+                                        horarios,
                                       ) async {
                                         await notifier.editar(
                                           turno.id,
@@ -2621,6 +2651,8 @@ class _TurnosTab extends ConsumerWidget {
                                           horaInicio: horaInicio,
                                           horaFin: horaFin,
                                           margenTardanza: margenTardanza,
+                                          rolId: rolId,
+                                          horarios: horarios,
                                         );
                                       },
                                 ),
@@ -2786,6 +2818,8 @@ class _TurnosTab extends ConsumerWidget {
                                           horaInicio,
                                           horaFin,
                                           margenTardanza,
+                                          rolId,
+                                          horarios,
                                         ) async {
                                           await notifier.editar(
                                             shift.id,
@@ -2793,6 +2827,8 @@ class _TurnosTab extends ConsumerWidget {
                                             horaInicio: horaInicio,
                                             horaFin: horaFin,
                                             margenTardanza: margenTardanza,
+                                            rolId: rolId,
+                                            horarios: horarios,
                                           );
                                         },
                                   ),
@@ -2863,6 +2899,8 @@ class _TurnoFormSheet extends StatefulWidget {
     int horaInicio,
     int horaFin,
     int margenTardanza,
+    String? rolId,
+    List<Map<String, dynamic>> horarios,
   )
   onSaved;
 
@@ -2877,6 +2915,8 @@ class _TurnoFormSheet extends StatefulWidget {
 }
 
 class _TurnoFormSheetState extends State<_TurnoFormSheet> {
+  String? _roleId;
+  late List<Map<String, dynamic>> _schedules;
   final _nombreCtrl = TextEditingController();
   final _margenCtrl = TextEditingController();
   TimeOfDay _horaInicio = const TimeOfDay(hour: 8, minute: 0);
@@ -2899,6 +2939,21 @@ class _TurnoFormSheetState extends State<_TurnoFormSheet> {
     } else {
       _margenCtrl.text = '15';
     }
+    _roleId = widget.turno?.rolId;
+    _schedules = List.generate(
+      7,
+      (day) => Map<String, dynamic>.from(
+        widget.turno?.horarios
+                .where((item) => item['diaSemana'] == day)
+                .firstOrNull ??
+            {
+              'diaSemana': day,
+              'horaInicio': _timeToMinutes(_horaInicio),
+              'horaFin': _timeToMinutes(_horaFin),
+              'activo': true,
+            },
+      ),
+    );
   }
 
   @override
@@ -2929,6 +2984,11 @@ class _TurnoFormSheetState extends State<_TurnoFormSheet> {
         } else {
           _horaFin = picked;
         }
+        for (final schedule in _schedules) {
+          schedule[isInicio ? 'horaInicio' : 'horaFin'] = _timeToMinutes(
+            picked,
+          );
+        }
       });
     }
   }
@@ -2955,6 +3015,8 @@ class _TurnoFormSheetState extends State<_TurnoFormSheet> {
         _timeToMinutes(_horaInicio),
         _timeToMinutes(_horaFin),
         margen,
+        _roleId,
+        _schedules,
       );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -3124,6 +3186,15 @@ class _TurnoFormSheetState extends State<_TurnoFormSheet> {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
+            const SizedBox(height: 16),
+            ShiftScheduleEditor(
+              roleId: _roleId,
+              schedules: _schedules,
+              onChanged: (role, schedules) => setState(() {
+                _roleId = role;
+                _schedules = schedules;
+              }),
+            ),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -3185,10 +3256,12 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
       _turnoCtrl.text = widget.emp.turno ?? '';
       _notasCtrl.text = widget.emp.notas ?? '';
       if (widget.emp.horaEntrada != null) {
-        _horaEntrada = DateTime.tryParse(widget.emp.horaEntrada!);
+        final instant = DateTime.tryParse(widget.emp.horaEntrada!);
+        _horaEntrada = instant == null ? null : businessTime(instant);
       }
       if (widget.emp.horaSalida != null) {
-        _horaSalida = DateTime.tryParse(widget.emp.horaSalida!);
+        final instant = DateTime.tryParse(widget.emp.horaSalida!);
+        _horaSalida = instant == null ? null : businessTime(instant);
       }
     }
   }
@@ -3201,7 +3274,7 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
   }
 
   Future<void> _pickDateTime(bool isEntrada) async {
-    final now = DateTime.now();
+    final now = businessTime(DateTime.now());
     final initial = isEntrada ? (_horaEntrada ?? now) : (_horaSalida ?? now);
 
     final date = await showDatePicker(
@@ -3222,7 +3295,7 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
     );
     if (time == null || !mounted) return;
 
-    final combined = DateTime(
+    final combined = DateTime.utc(
       date.year,
       date.month,
       date.day,
@@ -3258,8 +3331,8 @@ class _RegistrarSheetState extends State<_RegistrarSheet> {
       await widget.onSaved(
         _estado,
         _turnoCtrl.text.trim().isEmpty ? null : _turnoCtrl.text.trim(),
-        _horaEntrada?.toIso8601String(),
-        _horaSalida?.toIso8601String(),
+        _horaEntrada?.add(const Duration(hours: 5)).toIso8601String(),
+        _horaSalida?.add(const Duration(hours: 5)).toIso8601String(),
         _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
       );
       if (mounted) Navigator.of(context).pop();
@@ -3404,7 +3477,7 @@ class _DateTimePickerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fmt = value != null
-        ? DateFormat('dd/MM/yyyy HH:mm').format(value!.toLocal())
+        ? DateFormat('dd/MM/yyyy HH:mm').format(value!)
         : 'No asignado';
 
     return Column(

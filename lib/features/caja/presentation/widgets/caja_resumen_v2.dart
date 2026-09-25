@@ -58,6 +58,13 @@ class CajaResumenPrincipalV2 extends StatelessWidget {
                 ),
                 _MetricCard(
                   width: width,
+                  label: 'Saldo Yape esperado',
+                  value: resumen.saldoYapeEsperado,
+                  icon: Icons.account_balance_wallet_outlined,
+                  color: AppColors.primary,
+                ),
+                _MetricCard(
+                  width: width,
                   label: 'Efectivo esperado',
                   value: resumen.efectivoEsperado,
                   icon: Icons.account_balance_rounded,

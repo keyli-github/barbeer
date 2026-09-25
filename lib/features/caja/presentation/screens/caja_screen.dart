@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'cash_period_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,6 +45,17 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
       backgroundColor: context.colors.background,
       body: Column(
         children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => ResponsiveForm.showPage(
+                context: context,
+                page: const CashPeriodScreen(),
+              ),
+              icon: const Icon(Icons.date_range),
+              label: const Text('Resumen por fechas'),
+            ),
+          ),
           if (isDesktop)
             CajaDesktopHeader(
               historial: _historial,
@@ -998,6 +1010,7 @@ class _OpeningSheet extends ConsumerStatefulWidget {
 }
 
 class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
+  final _yapeController = TextEditingController(text: '0');
   late final Map<double, TextEditingController> _controllers;
   bool _loading = false;
 
@@ -1021,6 +1034,7 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
 
   @override
   void dispose() {
+    _yapeController.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -1069,6 +1083,15 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
           ),
           const SizedBox(height: 16),
           _TotalBand(label: 'Total de apertura', value: _total),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _yapeController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Saldo inicial Yape (S/)',
+              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+            ),
+          ),
           const SizedBox(height: 18),
           PrimaryButton(
             label: 'Abrir caja',
@@ -1082,12 +1105,18 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
   );
 
   Future<void> _submit() async {
+    if (_loading) return;
+    final yape = double.tryParse(_yapeController.text.replaceAll(',', '.'));
+    if (yape == null || !yape.isFinite || yape < 0) {
+      _sheetError(context, 'Ingresa un saldo inicial Yape válido.');
+      return;
+    }
     setState(() => _loading = true);
     try {
       await ref.read(cajaProvider.notifier).abrir({
         for (final entry in _controllers.entries)
           entry.key: int.tryParse(entry.value.text) ?? 0,
-      });
+      }, saldoInicialYape: yape);
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
       if (mounted) _sheetError(context, error);
@@ -1107,6 +1136,20 @@ class _MovementSheet extends ConsumerStatefulWidget {
 }
 
 class _MovementSheetState extends ConsumerState<_MovementSheet> {
+  String? _accountId;
+  late final Future<List<Map<String, dynamic>>> _accounts = _loadAccounts();
+  Future<List<Map<String, dynamic>>> _loadAccounts() async {
+    final sede = ref.read(cajaProvider).sedeId;
+    if (sede == null) return [];
+    final result = await ApiClient.instance.get(
+      '/cuentas/selector',
+      queryParameters: {'sedeId': sede},
+    );
+    return (result.data as List)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _conceptController = TextEditingController();
@@ -1318,6 +1361,41 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
                   onChanged: (v) => setState(() => _personalId = v),
                 ),
               ],
+              const SizedBox(height: 14),
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: _accounts,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError)
+                    return const Text(
+                      'No se pudieron cargar las cuentas. Cierra y vuelve a intentar para asociar una.',
+                    );
+                  if (!snapshot.hasData) return const LinearProgressIndicator();
+                  return DropdownButtonFormField<String>(
+                    initialValue: _accountId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Cuenta asociada (opcional)',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Sin cuenta'),
+                      ),
+                      ...snapshot.data!.map(
+                        (account) => DropdownMenuItem(
+                          value: '${account['id']}',
+                          child: Text('${account['nombre']}'),
+                        ),
+                      ),
+                    ],
+                    onChanged: _loading
+                        ? null
+                        : (value) => setState(
+                            () => _accountId = value == '' ? null : value,
+                          ),
+                  );
+                },
+              ),
               const SizedBox(height: 20),
               AppButton(
                 label: entrada ? 'Registrar entrada' : 'Registrar salida',
@@ -1350,6 +1428,7 @@ class _MovementSheetState extends ConsumerState<_MovementSheet> {
             concepto: _conceptController.text.trim(),
             etiquetaId: _etiquetaId,
             personalUsuarioId: _requierePersonal ? _personalId : null,
+            cuentaId: _accountId,
           );
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {

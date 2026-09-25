@@ -58,6 +58,45 @@ class AppDestination {
 
 const appDestinations = <AppDestination>[
   AppDestination(
+    path: RoutePaths.ventasSinLuz,
+    label: 'Ventas sin luz',
+    icon: Icons.history,
+    activeIcon: Icons.history,
+    section: AppDestinationSection.operations,
+  ),
+  AppDestination(
+    path: RoutePaths.notificaciones,
+    label: 'Alertas y revisiones',
+    icon: Icons.notifications_outlined,
+    activeIcon: Icons.notifications,
+    section: AppDestinationSection.operations,
+    permissions: ['notificaciones:leer'],
+  ),
+  AppDestination(
+    path: RoutePaths.pagos,
+    label: 'Pagos del personal',
+    shortLabel: 'Pagos',
+    icon: Icons.payments_outlined,
+    activeIcon: Icons.payments,
+    section: AppDestinationSection.staff,
+  ),
+  AppDestination(
+    path: RoutePaths.gastosInternos,
+    label: 'Gastos internos',
+    icon: Icons.receipt_outlined,
+    activeIcon: Icons.receipt,
+    section: AppDestinationSection.operations,
+    permissions: ['gastos-internos:leer'],
+  ),
+  AppDestination(
+    path: RoutePaths.productosInternos,
+    label: 'Productos internos',
+    icon: Icons.chair_outlined,
+    activeIcon: Icons.chair,
+    section: AppDestinationSection.inventory,
+    permissions: ['productos-internos:leer'],
+  ),
+  AppDestination(
     path: RoutePaths.dashboard,
     label: 'Dashboard',
     title: 'Panel principal',

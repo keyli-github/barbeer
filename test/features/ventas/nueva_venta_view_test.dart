@@ -109,6 +109,11 @@ class _RetryVentasRepository extends VentasRepository {
   _RetryVentasRepository() : super(ApiClient.instance);
 
   final attempts = <CreateVentaPayload>[];
+  final validatedPins = <String>[];
+  @override
+  Future<void> validarClaveSuperadmin(String pin) async {
+    validatedPins.add(pin);
+  }
 
   @override
   Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
@@ -298,7 +303,7 @@ Future<void> _pumpNuevaVenta(
   required Size size,
   Future<List<Producto>> Function()? loader,
   List<String> permissions = const [],
-  String role = 'VENDEDORA',
+  String role = 'CAJERO',
   String? sedeId = 's1',
   VentasRepository? repository,
   CuentasRepository? accountsRepository,
@@ -352,6 +357,45 @@ Future<void> _pumpNuevaVenta(
 }
 
 void main() {
+  testWidgets(
+    'seller authorization is requested again for an ambiguous retry',
+    (tester) async {
+      final repo = _RetryVentasRepository();
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1280, 900),
+        role: 'VENDEDORA',
+        permissions: ['ventas:crear'],
+        repository: repo,
+        loader: () async => _products,
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(repo.attempts, isEmpty);
+      expect(find.text('Autorizar venta'), findsOneWidget);
+      await tester.enterText(find.byType(TextFormField).last, 'test-secret');
+      await tester.tap(find.text('Continuar'));
+      await tester.pumpAndSettle();
+      expect(repo.validatedPins, ['test-secret']);
+      expect(repo.attempts.single.json['superadminPin'], 'test-secret');
+      await tester.tap(find.byKey(const Key('desktop-cart-retry')));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Autorizar venta'), findsOneWidget);
+      expect(
+        (tester.widget<TextFormField>(
+          find.byType(TextFormField).last,
+        )).controller!.text,
+        isEmpty,
+      );
+      expect(repo.attempts, hasLength(1));
+    },
+  );
   group('NuevaVentaView responsive', () {
     testWidgets('desktop product cards do not overflow at the breakpoint', (
       tester,

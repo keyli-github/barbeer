@@ -13,6 +13,7 @@ import '../../../../core/widgets/barbeer_wordmark.dart';
 import '../../../../core/widgets/sede_scope_selector.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'desktop_shell.dart';
+import '../../../../core/widgets/offline_data_banner.dart';
 
 // ─── GlobalKey para abrir el panel "Ver más" ──────────────────────────────────
 final shellScaffoldKey = GlobalKey<ScaffoldState>();
@@ -63,7 +64,7 @@ class ShellScreen extends ConsumerWidget {
         onLogout: () => ref.read(authProvider.notifier).logout(),
         headerAction: const SedeScopeSelector(),
         logoUrl: logoUrl,
-        child: child,
+        child: OfflineDataBanner(child: child),
       );
     }
 
@@ -110,7 +111,7 @@ class ShellScreen extends ConsumerWidget {
               )
             : null,
         endDrawerEnableOpenDragGesture: false,
-        body: child,
+        body: OfflineDataBanner(child: child),
         bottomNavigationBar: _BottomNavBar(
           current: currentPath,
           barModules: barModules,
@@ -599,12 +600,14 @@ class _PanelItem extends StatelessWidget {
                 color: active ? Colors.black : context.colors.textTertiary,
               ),
               const SizedBox(width: 12),
-              Text(
-                module.label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  color: active ? Colors.black : context.colors.textSecondary,
+              Expanded(
+                child: Text(
+                  module.label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    color: active ? Colors.black : context.colors.textSecondary,
+                  ),
                 ),
               ),
             ],

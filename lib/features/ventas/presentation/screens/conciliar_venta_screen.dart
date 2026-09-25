@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../widgets/manual_receipt_form.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -110,7 +111,7 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
         _analizandoComprobante = true;
         _error = null;
       });
-      final analysis = await _repository.analizarComprobante(
+      var analysis = await _repository.analizarComprobante(
         bytes: file.bytes,
         filename: file.filename,
         sedeId: widget.venta.sedeId,
@@ -120,6 +121,18 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
             .cancelarComprobanteAnalisis(analysis.id)
             .catchError((_) {});
         return;
+      }
+      if (analysis.requiereIngresoManual) {
+        analysis =
+            await completeManualReceipt(
+              context,
+              analysis: analysis,
+              wallets: _etiquetas,
+              repository: _repository,
+              selectedWallet: _etiquetaId,
+            ) ??
+            analysis;
+        if (!mounted || token != _voucherRequestToken) return;
       }
       setState(() {
         _comprobanteAnalisis = analysis;
@@ -218,8 +231,8 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
             widget.venta.id,
             estado: _estado,
             etiquetaId: _estado == 'BILLETERA' ? _etiquetaId : null,
-            comprobanteAnalisisIds: _estado == 'BILLETERA' &&
-                    allAnalysisIds.isNotEmpty
+            comprobanteAnalisisIds:
+                _estado == 'BILLETERA' && allAnalysisIds.isNotEmpty
                 ? allAnalysisIds
                 : null,
             pagoRestoEfectivo: _estado == 'BILLETERA' && _pagoRestoEfectivo
@@ -232,7 +245,9 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
       widget.onDone();
       AppFeedback.success(
         context,
-        _estado == 'EFECTIVO' ? 'Marcada como efectivo' : 'Pago digital registrado',
+        _estado == 'EFECTIVO'
+            ? 'Marcada como efectivo'
+            : 'Pago digital registrado',
       );
       Navigator.pop(context);
     } catch (e) {
@@ -361,10 +376,10 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                       onChanged: _saving
                           ? null
                           : (v) => setState(() {
-                                if (_etiquetaId != v) _clearVoucherAnalysis();
-                                _etiquetaId = v;
-                                _error = null;
-                              }),
+                              if (_etiquetaId != v) _clearVoucherAnalysis();
+                              _etiquetaId = v;
+                              _error = null;
+                            }),
                     ),
                   ),
                 ),
@@ -476,7 +491,10 @@ class _ConciliarVentaScreenState extends ConsumerState<ConciliarVentaScreen> {
                 if (_comprobanteAnalisis?.esApto == true && !_saving) ...[
                   const SizedBox(height: 4),
                   TextButton.icon(
-                    icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                    icon: const Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 16,
+                    ),
                     label: const Text('Agregar otro comprobante'),
                     onPressed: () {
                       setState(() {
@@ -609,15 +627,15 @@ class _MethodChip extends StatelessWidget {
         color: !enabled
             ? context.colors.backgroundAlt.withValues(alpha: 0.4)
             : selected
-                ? AppColors.primary.withValues(alpha: 0.08)
-                : context.colors.backgroundAlt,
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : context.colors.backgroundAlt,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: !enabled
               ? context.colors.borderLight.withValues(alpha: 0.4)
               : selected
-                  ? AppColors.primary
-                  : context.colors.borderLight,
+              ? AppColors.primary
+              : context.colors.borderLight,
         ),
       ),
       child: Row(
@@ -629,8 +647,8 @@ class _MethodChip extends StatelessWidget {
             color: !enabled
                 ? context.colors.textSecondary.withValues(alpha: 0.4)
                 : selected
-                    ? AppColors.primary
-                    : context.colors.textSecondary,
+                ? AppColors.primary
+                : context.colors.textSecondary,
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -641,8 +659,8 @@ class _MethodChip extends StatelessWidget {
                 color: !enabled
                     ? context.colors.textSecondary.withValues(alpha: 0.4)
                     : selected
-                        ? AppColors.primary
-                        : context.colors.textSecondary,
+                    ? AppColors.primary
+                    : context.colors.textSecondary,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,

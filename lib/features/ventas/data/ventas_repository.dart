@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import 'models/venta_models.dart';
+import '../../../core/offline/offline_store.dart';
+import '../../../core/errors/app_exception.dart';
 
 const _uuid = Uuid();
 
@@ -25,8 +27,59 @@ class VentasRepository {
   /// [idempotencyKey] se genera con [generateIdempotencyKey()].
   /// El backend calcula precios y totales; el cliente solo envía productoId + cantidad.
   Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
-    final response = await _api.post(ApiConstants.ventas, data: payload.json);
-    return Venta.fromJson(Map<String, dynamic>.from(response.data as Map));
+    final store = OfflineStore.instance;
+    final scope = await store.scope();
+    Map<String, dynamic> recovery = payload.json;
+    if (scope != null) {
+      final previous = (await store.sales(
+        scope,
+      )).where((record) => record['id'] == payload.idempotencyKey).firstOrNull;
+      if (previous != null) {
+        recovery = Map<String, dynamic>.from(previous['payload'] as Map);
+      } else {
+        final box = await _api.get(
+          '/caja/responsable',
+          queryParameters: {'sedeId': ?payload.json['sedeId']},
+        );
+        recovery = {
+          ...payload.json,
+          '_originalCajaId': (box.data as Map?)?['id'],
+        };
+      }
+      if (previous != null &&
+          previous['status'] != 'SYNCED' &&
+          payload.json['estadoConciliacion'] != 'PENDIENTE') {
+        final box = await _api.get(
+          '/caja/responsable',
+          queryParameters: {'sedeId': ?payload.json['sedeId']},
+        );
+        if (recovery['_originalCajaId'] == null ||
+            recovery['_originalCajaId'] != (box.data as Map?)?['id']) {
+          throw const AppException(
+            message:
+                'La caja original cambió. Revisa la venta con un administrador antes de registrarla en otra caja.',
+          );
+        }
+      }
+      await store.record(scope, recovery, 'PENDING');
+    }
+    try {
+      final response = await _api.post(ApiConstants.ventas, data: payload.json);
+      final sale = Venta.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+      if (scope != null) await store.record(scope, recovery, 'SYNCED');
+      return sale;
+    } catch (error) {
+      if (scope != null)
+        await store.record(
+          scope,
+          recovery,
+          error is NetworkException ? 'PENDING' : 'REVIEW',
+          error: '$error',
+        );
+      rethrow;
+    }
   }
 
   Future<ComprobanteAnalisis> analizarComprobante({
@@ -54,6 +107,35 @@ class VentasRepository {
 
   Future<void> cancelarComprobanteAnalisis(String id) =>
       _api.delete(ApiConstants.comprobanteAnalisis(id));
+
+  Future<ComprobanteAnalisis> completarComprobanteManual(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _api.patch(
+      '/ventas/comprobantes/$id/manual',
+      data: payload,
+    );
+    return ComprobanteAnalisis.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<void> validarClaveSuperadmin(String pin) async {
+    await _api.post('/ventas/validar-clave', data: {'superadminPin': pin});
+  }
+
+  Future<Venta> crearVentaHistorica(
+    String cajaId,
+    String fecha,
+    CreateVentaPayload payload,
+  ) async {
+    final response = await _api.post(
+      '/ventas/sin-luz/$cajaId',
+      data: {...payload.json, 'fechaVenta': fecha},
+    );
+    return Venta.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
 
   /// Lista todas las ventas de la sede (CAJERO, ADMIN, SUPERADMIN).
   Future<({List<Venta> data, int total, int totalPaginas})> listVentas({
@@ -170,11 +252,7 @@ class VentasRepository {
   }) async {
     final response = await _api.post(
       ApiConstants.autorizarPrecio,
-      data: {
-        'productoId': productoId,
-        'precioNuevo': precioNuevo,
-        'pin': pin,
-      },
+      data: {'productoId': productoId, 'precioNuevo': precioNuevo, 'pin': pin},
     );
     final data = Map<String, dynamic>.from(response.data as Map);
     return data['token'] as String;

@@ -49,6 +49,7 @@ Map<String, dynamic> cajaMovimientoPayload({
   String? concepto,
   String? etiquetaId,
   String? personalUsuarioId,
+  String? cuentaId,
 }) {
   final trimmed = concepto?.trim();
   return {
@@ -59,6 +60,7 @@ Map<String, dynamic> cajaMovimientoPayload({
     if (trimmed != null && trimmed.isNotEmpty) 'concepto': trimmed,
     if (etiquetaId != null) 'etiquetaId': etiquetaId,
     if (personalUsuarioId != null) 'personalUsuarioId': personalUsuarioId,
+    'cuentaId': ?cuentaId,
   };
 }
 
@@ -102,6 +104,7 @@ class CajaResumenV2 {
   final double otrosGastos;
   final double utilidadNeta;
   final double margenNeto;
+  final double saldoYapeEsperado;
   final List<Map<String, dynamic>> porVendedora;
   final List<Map<String, dynamic>> resumenProductos;
   final List<Map<String, dynamic>> porBilletera;
@@ -123,6 +126,7 @@ class CajaResumenV2 {
     this.otrosGastos = 0,
     this.utilidadNeta = 0,
     this.margenNeto = 0,
+    this.saldoYapeEsperado = 0,
     this.porVendedora = const [],
     this.resumenProductos = const [],
     this.porBilletera = const [],
@@ -146,6 +150,7 @@ class CajaResumenV2 {
     otrosGastos: (json['otrosGastos'] as num?)?.toDouble() ?? 0,
     utilidadNeta: (json['utilidadNeta'] as num?)?.toDouble() ?? 0,
     margenNeto: (json['margenNeto'] as num?)?.toDouble() ?? 0,
+    saldoYapeEsperado: (json['saldoYapeEsperado'] as num?)?.toDouble() ?? 0,
     porVendedora: (json['porVendedora'] as List? ?? [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
@@ -216,6 +221,7 @@ class CajaSesion {
   final String sedeId;
   final String sede;
   final double montoApertura;
+  final double saldoInicialYape;
   final double? saldoActual;
   final DateTime abiertaAt;
   final DateTime? cerradaAt;
@@ -246,6 +252,7 @@ class CajaSesion {
     required this.sedeId,
     required this.sede,
     required this.montoApertura,
+    this.saldoInicialYape = 0,
     this.saldoActual,
     required this.abiertaAt,
     required this.usuarioApertura,
@@ -279,6 +286,7 @@ class CajaSesion {
         ? (json['sede'] as Map)['nombre'] as String? ?? ''
         : json['sede'] as String? ?? '',
     montoApertura: (json['montoApertura'] as num?)?.toDouble() ?? 0,
+    saldoInicialYape: (json['saldoInicialYape'] as num?)?.toDouble() ?? 0,
     saldoActual: _number(json['saldoActual']),
     // abiertaAt puede ser null en sesiones muy antiguas — fallback a epoch
     abiertaAt: json['abiertaAt'] is String
@@ -565,11 +573,13 @@ class CajaRepository {
   Future<CajaSesion> abrir(
     Map<double, int> cantidades, {
     String? sedeId,
+    double saldoInicialYape = 0,
   }) async {
     final response = await _api.post(
       '/caja/apertura',
       data: {
         'denominaciones': cajaDenominacionesPayload(cantidades),
+        'saldoInicialYape': saldoInicialYape,
         'sedeId': ?sedeId,
       },
     );
@@ -583,6 +593,7 @@ class CajaRepository {
     String? concepto,
     String? etiquetaId,
     String? personalUsuarioId,
+    String? cuentaId,
   }) async {
     await _api.post(
       '/caja/$id/movimientos',
@@ -592,6 +603,7 @@ class CajaRepository {
         concepto: concepto,
         etiquetaId: etiquetaId,
         personalUsuarioId: personalUsuarioId,
+        cuentaId: cuentaId,
       ),
     );
   }
