@@ -23,14 +23,24 @@ import '../../data/models/venta_models.dart';
 import '../../data/ventas_repository.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/carrito_venta_sheet.dart';
+import '../widgets/seller_authorization.dart';
+import '../widgets/manual_receipt_form.dart';
+import '../../../../core/widgets/operation_form.dart';
 
 String _fmt(double v) => FormatUtils.currency(v);
 
 /// Vista de creación de una nueva venta (catálogo + carrito).
 class NuevaVentaView extends ConsumerStatefulWidget {
   final Future<List<Producto>> Function()? productsLoader;
+  final String? historicalCajaId;
+  final String? historicalDate;
 
-  const NuevaVentaView({super.key, this.productsLoader});
+  const NuevaVentaView({
+    super.key,
+    this.productsLoader,
+    this.historicalCajaId,
+    this.historicalDate,
+  });
   @override
   ConsumerState<NuevaVentaView> createState() => _NuevaVentaViewState();
 }
@@ -55,6 +65,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   String? _recargoMotivo;
   Cuenta? _cuenta;
   double? _cuentaMonto;
+  final List<CuentaChargeSelection> _additionalAccounts = [];
   Venta? _completedSale;
   String? _refreshWarning;
   Uint8List? _voucherBytes;
@@ -711,6 +722,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     _voucherRequestToken++;
     setState(() {
       _carrito.clear();
+      _cuenta = null;
+      _cuentaMonto = null;
+      _additionalAccounts.clear();
       _frozen = false;
       _submitError = null;
       _retryPayload = null;
@@ -735,6 +749,53 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   double get _subtotal => _carrito.fold(0.0, (sum, i) => sum + i.subtotal);
   double get _total => _subtotal + (_recargoMonto ?? 0);
 
+  List<Map<String, dynamic>> get _accountCharges => [
+    if (_cuenta != null && _cuentaMonto != null)
+      {'cuentaId': _cuenta!.id, 'monto': _cuentaMonto!},
+    ..._additionalAccounts.map(
+      (item) => <String, dynamic>{
+        'cuentaId': item.cuenta.id,
+        'monto': item.monto,
+      },
+    ),
+  ];
+
+  Future<void> _editItemSurcharge(
+    CarritoItem item,
+    VoidCallback refresh,
+  ) async {
+    if (_frozen || ref.read(recargoControlProvider).oculto) return;
+    final amount = TextEditingController(text: '${item.recargoMonto ?? 0}');
+    final reason = TextEditingController(text: item.recargoMotivo);
+    await OperationForm.show(
+      context,
+      OperationForm(
+        title: 'Recargo por producto',
+        fields: (_) => [
+          Text(item.nombre),
+          const Text(
+            'Monto fijo para este renglón, independientemente de la cantidad.',
+          ),
+          operationText(amount, 'Recargo (S/)', money: true, allowZero: true),
+          operationText(reason, 'Motivo', required: false, maxLength: 100),
+        ],
+        onSave: () async {
+          final value = moneyValue(amount.text);
+          if (value > 0 && reason.text.trim().isEmpty)
+            throw const AppException(message: 'Ingresa el motivo del recargo.');
+          setState(() {
+            item.recargoMonto = value == 0 ? null : value;
+            item.recargoMotivo = value == 0 ? null : reason.text.trim();
+          });
+          _invalidateAnalysisIfAmountChanged();
+          refresh();
+        },
+      ),
+    );
+    amount.dispose();
+    reason.dispose();
+  }
+
   Future<void> _pickVoucher(VoidCallback refresh) async {
     final token = ++_voucherRequestToken;
     try {
@@ -755,7 +816,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _analizandoComprobante = true;
       });
       refresh();
-      final analysis = await _repository.analizarComprobante(
+      var analysis = await _repository.analizarComprobante(
         bytes: file.bytes,
         filename: file.filename,
         sedeId: auth.user?.isSuperAdmin == true ? sedeId : null,
@@ -765,6 +826,18 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             .cancelarComprobanteAnalisis(analysis.id)
             .catchError((_) {});
         return;
+      }
+      if (analysis.requiereIngresoManual) {
+        analysis =
+            await completeManualReceipt(
+              context,
+              analysis: analysis,
+              wallets: _etiquetas,
+              repository: _repository,
+              selectedWallet: _etiquetaId,
+            ) ??
+            analysis;
+        if (!mounted || token != _voucherRequestToken) return;
       }
       setState(() {
         _comprobanteAnalisis = analysis;
@@ -1337,6 +1410,79 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                 _recargoMonto == null ? 'Ajustar total' : 'Editar ajuste',
               ),
             ),
+          if (!recargoOculto)
+            for (final item in _carrito)
+              TextButton.icon(
+                onPressed: _frozen
+                    ? null
+                    : () => _editItemSurcharge(item, refresh),
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: Text(
+                  '${item.nombre}: recargo ${_fmt(item.recargoMonto ?? 0)}',
+                ),
+              ),
+          for (final charge in _additionalAccounts)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(charge.cuenta.nombre),
+              subtitle: Text(_fmt(charge.monto)),
+              trailing: IconButton(
+                tooltip: 'Quitar cuenta',
+                onPressed: _frozen
+                    ? null
+                    : () => update(() => _additionalAccounts.remove(charge)),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          if (_cuenta != null)
+            TextButton.icon(
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text('Repartir con otra cuenta'),
+              onPressed: _frozen
+                  ? null
+                  : () async {
+                      final sede = ref.read(globalSedeIdProvider);
+                      if (sede == null) return;
+                      final assigned = _accountCharges.fold<double>(
+                        0,
+                        (sum, item) => sum + (item['monto'] as num).toDouble(),
+                      );
+                      final receipts = _payment == EstadoConciliacion.billetera
+                          ? (_comprobanteAnalisis?.monto ?? 0) +
+                                _comprobantesAdicionales.fold<double>(
+                                  0,
+                                  (sum, receipt) => sum + (receipt.monto ?? 0),
+                                )
+                          : 0.0;
+                      final remaining = _total - assigned - receipts;
+                      if (remaining <= 0) {
+                        AppFeedback.error(
+                          context,
+                          'Reduce el cargo de la primera cuenta para repartir el saldo.',
+                        );
+                        return;
+                      }
+                      final charge = await showCuentaChargeDialog(
+                        context,
+                        repository: ref.read(cuentasRepositoryProvider),
+                        sedeId: sede,
+                        total: remaining,
+                        canCreate: auth.hasPermission('cuentas:crear'),
+                      );
+                      if (charge != null && mounted) {
+                        if (_accountCharges.any(
+                          (item) => item['cuentaId'] == charge.cuenta.id,
+                        )) {
+                          AppFeedback.error(
+                            context,
+                            'Esta cuenta ya está incluida.',
+                          );
+                          return;
+                        }
+                        update(() => _additionalAccounts.add(charge));
+                      }
+                    },
+            ),
         ],
       ),
     );
@@ -1571,6 +1717,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                 'productoId': i.productoId,
                 'cantidad': i.cantidad,
                 'precioVenta': i.precio,
+                'recargoMonto': ?i.recargoMonto,
+                'recargoMotivo': ?i.recargoMotivo,
               },
             )
             .toList(),
@@ -1587,8 +1735,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             : null,
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
-        cuentaId: _cuenta?.id,
-        cuentaMonto: _cuentaMonto,
+        cuentaId: _additionalAccounts.isEmpty ? _cuenta?.id : null,
+        cuentaMonto: _additionalAccounts.isEmpty ? _cuentaMonto : null,
+        cuentaCargos: _additionalAccounts.isEmpty ? null : _accountCharges,
         pagoRestoEfectivo:
             _payment == EstadoConciliacion.billetera && _pagoRestoEfectivo
             ? true
@@ -1608,13 +1757,58 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   }
 
   Future<void> _executePayload(CreateVentaPayload payload) async {
+    if (ref.read(recargoControlProvider).oculto &&
+        (payload.json['items'] as List).any(
+          (item) => (item['recargoMonto'] as num? ?? 0) > 0,
+        )) {
+      setState(
+        () => _submitError =
+            'Los recargos por producto están ocultos. Actualiza el carrito antes de continuar.',
+      );
+      return;
+    }
     setState(() {
       _submitting = true;
       _submitError = null;
     });
     try {
+      final charges = (payload.json['cuentaCargos'] as List? ?? [])
+          .fold<double>(
+            0,
+            (sum, item) => sum + (item['monto'] as num).toDouble(),
+          );
+      final accountTotal = charges + (payload.json['cuentaMonto'] as num? ?? 0);
+      final walletTotal = payload.json['estadoConciliacion'] == 'BILLETERA'
+          ? (_comprobanteAnalisis?.monto ?? 0) +
+                _comprobantesAdicionales.fold<double>(
+                  0,
+                  (sum, receipt) => sum + (receipt.monto ?? 0),
+                )
+          : 0.0;
+      if (((accountTotal + walletTotal) * 100).round() > (_total * 100).round())
+        throw const AppException(
+          message:
+              'Los comprobantes y cargos a cuentas superan el total de la venta.',
+        );
       final repo = ref.read(ventasRepositoryProvider);
-      final sale = await repo.crearVenta(payload: payload);
+      var request = payload;
+      if (ref.read(authProvider).user?.rol == 'VENDEDORA') {
+        final pin = await requestSellerAuthorization(context);
+        if (!mounted) return;
+        if (pin == null) {
+          setState(() => _submitting = false);
+          return;
+        }
+        await repo.validarClaveSuperadmin(pin);
+        request = payload.withEphemeralPin(pin);
+      }
+      final sale = widget.historicalCajaId == null
+          ? await repo.crearVenta(payload: request)
+          : await repo.crearVentaHistorica(
+              widget.historicalCajaId!,
+              widget.historicalDate!,
+              request,
+            );
       invalidateSaleSideEffects(ref);
       ref.invalidate(ventasListProvider(false));
       ref.invalidate(ventasListProvider(true));
@@ -1637,6 +1831,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         _recargoMotivo = null;
         _cuenta = null;
         _cuentaMonto = null;
+        _additionalAccounts.clear();
         _payment = EstadoConciliacion.efectivo;
         _voucherBytes = null;
         _voucherFilename = null;
@@ -1675,6 +1870,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   /// Guarda la venta como PENDIENTE sin clasificar método de pago.
   Future<void> _submitPending() async {
     if (_submitting || _carrito.isEmpty) return;
+    if (_retryPayload != null) {
+      await _executePayload(_retryPayload!);
+      return;
+    }
     if (_blockHiddenRecargo(_recargoMonto)) return;
     final auth = ref.read(authProvider);
     final sedeId = auth.user?.isSuperAdmin == true
@@ -1699,6 +1898,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                 'productoId': i.productoId,
                 'cantidad': i.cantidad,
                 'precioVenta': i.precio,
+                'recargoMonto': ?i.recargoMonto,
+                'recargoMotivo': ?i.recargoMotivo,
               },
             )
             .toList(),
@@ -1710,8 +1911,10 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             : 'EFECTIVO',
         recargoMonto: _recargoMonto,
         recargoMotivo: _recargoMotivo,
-        cuentaId: _cuenta?.id,
-        cuentaMonto: _cuentaMonto,
+        cuentaId: _additionalAccounts.isEmpty ? _cuenta?.id : null,
+        cuentaMonto: _additionalAccounts.isEmpty ? _cuentaMonto : null,
+        cuentaCargos: _additionalAccounts.isEmpty ? null : _accountCharges,
+        precioAuthTokens: _precioAuthTokens.values.toList(),
       );
       await _executePayload(payload);
     } catch (e) {

@@ -11,6 +11,8 @@ class CarritoItem {
   final String codigo;
   double precio;
   int cantidad;
+  double? recargoMonto;
+  String? recargoMotivo;
 
   CarritoItem({
     required this.productoId,
@@ -20,7 +22,7 @@ class CarritoItem {
     this.cantidad = 1,
   });
 
-  double get subtotal => precio * cantidad;
+  double get subtotal => precio * cantidad + (recargoMonto ?? 0);
 }
 
 /// Bottom sheet que muestra el carrito actual de la venta.
@@ -241,128 +243,128 @@ class CarritoVentaSheet extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'TOTAL',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'TOTAL',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _fmtCurrency(total),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                        Text(
+                          _fmtCurrency(total),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (saleDetails != null) ...[
+                      const SizedBox(height: 8),
+                      saleDetails!,
+                    ],
+                    if (error != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              error!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.error,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            GestureDetector(
+                              onTap: onRetry,
+                              child: Text(
+                                'Reintentar',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.error,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                  if (saleDetails != null) ...[
-                    const SizedBox(height: 8),
-                    saleDetails!,
-                  ],
-                  if (error != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            error!,
+                    const SizedBox(height: 12),
+                    // DEJAR PDTE. — guarda sin clasificar
+                    if (onSavePending != null) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton(
+                          onPressed: submitting ? null : onSavePending,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.warning,
+                            side: BorderSide(
+                              color: AppColors.warning.withValues(alpha: 0.6),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'DEJAR PDTE.',
                             style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.error,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              fontSize: 13,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          GestureDetector(
-                            onTap: onRetry,
-                            child: Text(
-                              'Reintentar',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.error,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  // DEJAR PDTE. — guarda sin clasificar
-                  if (onSavePending != null) ...[
+                      const SizedBox(height: 8),
+                    ],
                     SizedBox(
                       width: double.infinity,
-                      height: 44,
-                      child: OutlinedButton(
-                        onPressed: submitting ? null : onSavePending,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.warning,
-                          side: BorderSide(
-                            color: AppColors.warning.withValues(alpha: 0.6),
-                          ),
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: submitting ? null : onConfirm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brand,
+                          foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                        ),
-                        child: const Text(
-                          'DEJAR PDTE.',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                            fontSize: 13,
+                          disabledBackgroundColor: AppColors.primary.withValues(
+                            alpha: 0.5,
                           ),
                         ),
+                        child: submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'CONFIRMAR VENTA',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                       ),
                     ),
-                    const SizedBox(height: 8),
                   ],
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: submitting ? null : onConfirm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.brand,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        disabledBackgroundColor: AppColors.primary.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
-                      child: submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'CONFIRMAR VENTA',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                    ),
-                  ),
-                ],
                 ),
               ),
             ),

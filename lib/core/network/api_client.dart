@@ -6,6 +6,9 @@ import '../constants/api_constants.dart';
 import '../errors/app_exception.dart';
 import '../storage/secure_storage.dart';
 import 'http_header_utils.dart';
+import '../offline/offline_store.dart';
+
+final offlineDataNotice = ValueNotifier<bool>(false);
 
 class ApiClient {
   ApiClient._();
@@ -92,14 +95,47 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   }) async {
     final h = await _headers(path);
-    return _execute(
-      () => _dio.get<T>(
+    try {
+      final response = await _execute(
+        () => _dio.get<T>(
+          path,
+          queryParameters: queryParameters,
+          options: _opts(h),
+        ),
         path,
-        queryParameters: queryParameters,
-        options: _opts(h),
-      ),
-      path,
-    );
+      );
+      if (h != null && OfflineStore.canCache(path)) {
+        try {
+          await OfflineStore.instance.cache(
+            path,
+            queryParameters,
+            response.data,
+            authorization: h['Authorization'] as String?,
+          );
+        } catch (_) {
+          /* Cache failure must not fail a live read. */
+        }
+      }
+      return response;
+    } on NetworkException {
+      if (h != null && OfflineStore.canCache(path)) {
+        final cached = await OfflineStore.instance.cached(
+          path,
+          queryParameters,
+          authorization: h['Authorization'] as String?,
+        );
+        if (cached != null) {
+          offlineDataNotice.value = true;
+          return Response<T>(
+            data: cached as T,
+            requestOptions: RequestOptions(path: path),
+            statusCode: 200,
+            extra: {'offline': true},
+          );
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<Uint8List> getBytes(
@@ -140,11 +176,7 @@ class ApiClient {
   }
 
   Future<Response<T>> post<T>(String path, {dynamic data}) async {
-    final h = await _headers(path);
-    return _execute(
-      () => _dio.post<T>(path, data: data, options: _opts(h)),
-      path,
-    );
+    return _mutation<T>('POST', path, data);
   }
 
   Future<Response<T>> postMultipart<T>(
@@ -168,27 +200,86 @@ class ApiClient {
   }
 
   Future<Response<T>> patch<T>(String path, {dynamic data}) async {
-    final h = await _headers(path);
-    return _execute(
-      () => _dio.patch<T>(path, data: data, options: _opts(h)),
-      path,
-    );
+    return _mutation<T>('PATCH', path, data);
   }
 
   Future<Response<T>> put<T>(String path, {dynamic data}) async {
-    final h = await _headers(path);
-    return _execute(
-      () => _dio.put<T>(path, data: data, options: _opts(h)),
-      path,
-    );
+    return _mutation<T>('PUT', path, data);
   }
 
   Future<Response<T>> delete<T>(String path, {dynamic data}) async {
-    final h = await _headers(path);
-    return _execute(
-      () => _dio.delete<T>(path, data: data, options: _opts(h)),
-      path,
+    return _mutation<T>('DELETE', path, data);
+  }
+
+  Future<void> replayCommand(Map<String, dynamic> command) async {
+    if (!OfflineStore.canQueue(
+      command['method'] as String,
+      command['path'] as String,
+    )) {
+      throw const AppException(
+        message:
+            'Esta operación requiere realizarse desde su pantalla original.',
+      );
+    }
+    await _mutation<dynamic>(
+      command['method'] as String,
+      command['path'] as String,
+      command['data'],
+      command: command,
     );
+  }
+
+  Future<Response<T>> _mutation<T>(
+    String method,
+    String path,
+    dynamic data, {
+    Map<String, dynamic>? command,
+  }) async {
+    final h = await _headers(path);
+    final store = OfflineStore.instance;
+    final scope = h == null || !OfflineStore.canQueue(method, path)
+        ? null
+        : OfflineStore.scopeForToken(
+            (h['Authorization'] as String?)?.replaceFirst('Bearer ', ''),
+          );
+    if (scope != null)
+      command ??= await store.stageCommand(scope, method, path, data);
+    try {
+      final response = await _execute(
+        () => _dio.request<T>(
+          path,
+          data: data,
+          options: Options(
+            method: method,
+            headers: {
+              ...?h,
+              if (command != null)
+                'x-idempotency-key': command['idempotencyKey'],
+            },
+          ),
+        ),
+        path,
+      );
+      if (scope != null && command != null)
+        await store.record(scope, command, 'SYNCED');
+      return response;
+    } catch (error) {
+      if (scope != null && command != null) {
+        await store.record(
+          scope,
+          command,
+          error is NetworkException ? 'PENDING' : 'REVIEW',
+          error: '$error',
+        );
+        if (error is NetworkException) {
+          throw const NetworkException(
+            message:
+                'Operación guardada en el dispositivo. Reintenta o sincroniza desde Alertas y revisiones; todavía no está confirmada por el servidor.',
+          );
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<Response<T>> _execute<T>(

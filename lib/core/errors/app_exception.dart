@@ -27,11 +27,9 @@ class SessionExpiredException extends AppException {
 }
 
 class NetworkException extends AppException {
-  const NetworkException()
-    : super(
-        message: 'Sin conexion. Verifica tu red e intenta nuevamente.',
-        code: 'NETWORK_ERROR',
-      );
+  const NetworkException({
+    String message = 'Sin conexion. Verifica tu red e intenta nuevamente.',
+  }) : super(message: message, code: 'NETWORK_ERROR');
 }
 
 class ServerException extends AppException {

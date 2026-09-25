@@ -1,14 +1,15 @@
 import 'dart:typed_data';
 import '../../../core/constants/api_constants.dart';
-import '../../../core/files/file_artifact_service.dart' show mimeTypeForFilename;
+import '../../../core/files/file_artifact_service.dart'
+    show mimeTypeForFilename;
 import '../../../core/network/api_client.dart';
 import '../../../core/network/http_header_utils.dart';
 import 'models/respaldo_models.dart';
 
 typedef Json = Map<String, dynamic>;
 typedef BackupGetRequest = Future<Object?> Function(String path);
-typedef BackupGetWithQueryRequest = Future<Object?> Function(
-    String path, Json query);
+typedef BackupGetWithQueryRequest =
+    Future<Object?> Function(String path, Json query);
 typedef BackupPutRequest = Future<Object?> Function(String path, Json body);
 typedef BackupBytesRequest = Future<Uint8List> Function(String path);
 
@@ -34,6 +35,12 @@ class RespaldosRepository {
     return BackupSchedule.fromJson(data as Json);
   }
 
+  Future<BackupRun> createRun() async => BackupRun.fromJson(
+    Map<String, dynamic>.from(
+      (await _api!.post(ApiConstants.backupRuns)).data as Map,
+    ),
+  );
+
   Future<BackupSchedule> updateSchedule(BackupSchedule schedule) async {
     final body = schedule.toUpdateJson();
     final data = putRequest != null
@@ -46,9 +53,10 @@ class RespaldosRepository {
     final query = <String, dynamic>{'page': page, 'limit': limit};
     final data = getWithQueryRequest != null
         ? await getWithQueryRequest!(ApiConstants.backupRuns, query)
-        : (await _api!.get(ApiConstants.backupRuns,
-                queryParameters: query))
-            .data;
+        : (await _api!.get(
+            ApiConstants.backupRuns,
+            queryParameters: query,
+          )).data;
     return BackupRunsPage.fromJson(data as Json);
   }
 
@@ -66,18 +74,20 @@ class RespaldosRepository {
     } else {
       final response = await _api!.getBytesResponse(path);
       bytes = response.bytes;
-      serverFilename =
-          parseContentDispositionFilename(response.contentDisposition);
+      serverFilename = parseContentDispositionFilename(
+        response.contentDisposition,
+      );
       serverContentType = response.contentType;
     }
     if (expectedSha256 != null) {
       final actual = sha256HexOf(bytes);
       if (actual != expectedSha256) {
         throw BackupIntegrityException(
-            'SHA-256 mismatch: expected $expectedSha256 got $actual');
+          'SHA-256 mismatch: expected $expectedSha256 got $actual',
+        );
       }
     }
-    final ext = format.toLowerCase();
+    final ext = format == 'PG_DUMP' ? 'dump' : format.toLowerCase();
     final shortId = runId.length >= 8 ? runId.substring(0, 8) : runId;
     return BackupDownloadResult(
       bytes: bytes,

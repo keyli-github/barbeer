@@ -1525,7 +1525,6 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
 
   Future<void> _save() async {
     final min = double.tryParse(_minCtrl.text.trim());
-    final max = double.tryParse(_maxCtrl.text.trim());
     if (_productoId == null || _productoId!.isEmpty) {
       setState(() => _error = 'Selecciona un producto.');
       return;
@@ -1538,13 +1537,6 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
       setState(() => _error = 'El stock mínimo debe ser mayor o igual a 0.');
       return;
     }
-    if (max == null || max < 0 || (max != 0 && max < min)) {
-      setState(
-        () =>
-            _error = 'El objetivo debe ser 0 o mayor o igual al stock mínimo.',
-      );
-      return;
-    }
 
     setState(() {
       _saving = true;
@@ -1555,7 +1547,6 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
         productoId: _productoId!,
         sedeId: _isSuperAdmin ? _sedeId : null,
         stockMin: min,
-        stockMax: max,
         ubicacion: _locationCtrl.text.trim(),
       );
       if (mounted) {
@@ -1581,7 +1572,7 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
       dialogWidth: 640,
       dialogHeight: 580,
       title: item == null ? 'Agregar al inventario' : 'Configurar inventario',
-      subtitle: 'Mínimos, objetivo y ubicación',
+      subtitle: 'Stock mínimo y ubicación',
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -1650,19 +1641,6 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(labelText: 'Stock mínimo'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _maxCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Objetivo de reposición',
-                    helperText: '0 = sin objetivo',
-                  ),
                 ),
               ),
             ],

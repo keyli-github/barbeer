@@ -17,7 +17,7 @@ class RecargoControlSheet extends ConsumerStatefulWidget {
 class _RecargoControlSheetState extends ConsumerState<RecargoControlSheet> {
   final keyController = TextEditingController();
   final configKeyController = TextEditingController();
-  final responsables = <String, String>{};
+  final responsables = <String, List<String>>{};
 
   @override
   void initState() {
@@ -41,7 +41,7 @@ class _RecargoControlSheetState extends ConsumerState<RecargoControlSheet> {
       return const SizedBox.shrink();
     }
     for (final sede in state.data.sedes) {
-      responsables.putIfAbsent(sede.id, () => sede.responsableId ?? '');
+      responsables.putIfAbsent(sede.id, () => [...sede.responsableIds]);
     }
 
     return ConstrainedBox(
@@ -121,7 +121,7 @@ class _RecargoControlSheetState extends ConsumerState<RecargoControlSheet> {
                       context,
                       title: 'Configuración',
                       description:
-                          'Define la clave y el responsable de cada sede.',
+                          'Define la clave y los responsables de cada sede.',
                       children: [
                         TextField(
                           key: const Key('recargo-config-key'),
@@ -135,26 +135,26 @@ class _RecargoControlSheetState extends ConsumerState<RecargoControlSheet> {
                         ),
                         for (final sede in state.data.sedes) ...[
                           const SizedBox(height: 12),
-                          DropdownButtonFormField<String>(
-                            key: ValueKey('recargo-responsable-${sede.id}'),
-                            initialValue:
-                                responsables[sede.id]?.isNotEmpty == true
-                                ? responsables[sede.id]
-                                : null,
-                            decoration: InputDecoration(
-                              labelText: 'Responsable de ${sede.nombre}',
-                            ),
-                            hint: const Text('Selecciona un responsable'),
-                            items: sede.usuarios
+                          Text('Responsables de ${sede.nombre}'),
+                          Wrap(
+                            spacing: 8,
+                            children: sede.usuarios
                                 .map(
-                                  (user) => DropdownMenuItem(
-                                    value: user.id,
-                                    child: Text(user.username),
+                                  (user) => FilterChip(
+                                    label: Text(user.username),
+                                    selected: responsables[sede.id]!.contains(
+                                      user.id,
+                                    ),
+                                    onSelected: (selected) => setState(() {
+                                      selected
+                                          ? responsables[sede.id]!.add(user.id)
+                                          : responsables[sede.id]!.remove(
+                                              user.id,
+                                            );
+                                    }),
                                   ),
                                 )
                                 .toList(),
-                            onChanged: (value) =>
-                                responsables[sede.id] = value ?? '',
                           ),
                         ],
                         const SizedBox(height: 16),

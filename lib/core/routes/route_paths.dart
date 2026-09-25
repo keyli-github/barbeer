@@ -26,4 +26,9 @@ class RoutePaths {
   static const String reportes = '/reportes';
   static const String respaldos = '/respaldos';
   static const String importaciones = '/importaciones';
+  static const String pagos = '/pagos';
+  static const String notificaciones = '/notificaciones';
+  static const String ventasSinLuz = '/ventas-sin-luz';
+  static const String gastosInternos = '/gastos-internos';
+  static const String productosInternos = '/productos-internos';
 }

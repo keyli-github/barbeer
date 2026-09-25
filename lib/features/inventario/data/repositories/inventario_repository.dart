@@ -75,7 +75,6 @@ class InventarioRepository {
         'productoId': productoId,
         if (sedeId != null && sedeId.isNotEmpty) 'sedeId': sedeId,
         'stockMin': stockMin,
-        'stockMax': stockMax,
         'ubicacion': ubicacion.trim(),
       },
     );

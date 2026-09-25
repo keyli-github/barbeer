@@ -166,6 +166,8 @@ class _EstadoBadge extends StatelessWidget {
     final conc = venta.conciliacion;
     if (conc == null) return const SizedBox.shrink();
     switch (conc.estado) {
+      case EstadoConciliacion.multiple:
+        return _badge('Pago mixto', AppColors.primary);
       case EstadoConciliacion.pendiente:
         return _badge('Pendiente', AppColors.warning);
       case EstadoConciliacion.efectivo:

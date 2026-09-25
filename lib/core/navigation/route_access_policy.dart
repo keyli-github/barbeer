@@ -28,6 +28,13 @@ class RouteAccessPolicy {
     RoutePaths.changePassword: RouteAccessRule(),
     RoutePaths.seguridad: RouteAccessRule(),
     RoutePaths.asistencia: RouteAccessRule(),
+    RoutePaths.pagos: RouteAccessRule(),
+    RoutePaths.notificaciones: RouteAccessRule.any({'notificaciones:leer'}),
+    RoutePaths.ventasSinLuz: RouteAccessRule.role({'SUPERADMIN'}),
+    RoutePaths.gastosInternos: RouteAccessRule.any({'gastos-internos:leer'}),
+    RoutePaths.productosInternos: RouteAccessRule.any({
+      'productos-internos:leer',
+    }),
     RoutePaths.ventas: RouteAccessRule.any({
       'ventas:leer',
       'ventas:leer-propias',

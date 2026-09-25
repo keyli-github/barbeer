@@ -32,6 +32,11 @@ import '../theme/app_colors.dart';
 import '../widgets/barbeer_wordmark.dart';
 import 'route_paths.dart';
 import 'router_refresh_notifier.dart';
+import '../../features/pagos/presentation/pagos_screen.dart';
+import '../../features/offline/presentation/offline_sales_screen.dart';
+import '../../features/ventas/presentation/screens/historical_sales_screen.dart';
+import '../../features/gastos_internos/presentation/gastos_internos_screen.dart';
+import '../../features/productos_internos/presentation/productos_internos_screen.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
@@ -96,6 +101,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state, child) =>
             ShellScreen(currentPath: state.matchedLocation, child: child),
         routes: [
+          GoRoute(
+            path: RoutePaths.pagos,
+            builder: (_, __) => const PagosScreen(),
+            routes: [
+              GoRoute(
+                path: 'detalle/:userId',
+                builder: (_, state) =>
+                    PagoDetalleScreen(userId: state.pathParameters['userId']!),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: RoutePaths.notificaciones,
+            builder: (_, __) => const OfflineSalesScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.ventasSinLuz,
+            builder: (_, __) => const HistoricalSalesScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.gastosInternos,
+            builder: (_, __) => const GastosInternosScreen(),
+          ),
+          GoRoute(
+            path: RoutePaths.productosInternos,
+            builder: (_, __) => const ProductosInternosScreen(),
+          ),
           GoRoute(
             path: RoutePaths.dashboard,
             builder: (_, __) => const DashboardScreen(),

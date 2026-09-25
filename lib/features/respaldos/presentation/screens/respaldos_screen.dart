@@ -146,6 +146,7 @@ class RespaldosScreen extends ConsumerStatefulWidget {
 }
 
 class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
+  bool _creatingRun = false;
   bool _enabled = false;
   String _frequency = 'DAILY';
   final Set<String> _formats = {'XLSX'};
@@ -274,6 +275,44 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _creatingRun
+                            ? null
+                            : () async {
+                                setState(() => _creatingRun = true);
+                                try {
+                                  await RespaldosRepository(
+                                    ApiClient.instance,
+                                  ).createRun();
+                                  if (!mounted) return;
+                                  await ref
+                                      .read(_notifierProvider.notifier)
+                                      .refreshRuns();
+                                  if (context.mounted)
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Respaldo solicitado. Actualiza el historial para ver su estado.',
+                                        ),
+                                      ),
+                                    );
+                                } catch (error) {
+                                  if (context.mounted)
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('$error')),
+                                    );
+                                } finally {
+                                  if (mounted)
+                                    setState(() => _creatingRun = false);
+                                }
+                              },
+                        icon: const Icon(Icons.backup_outlined),
+                        label: Text(
+                          _creatingRun
+                              ? 'Solicitando…'
+                              : 'Crear respaldo ahora',
+                        ),
+                      ),
                       _ScheduleCard(
                         schedule: state.schedule,
                         loading: state.scheduleLoading,
@@ -443,6 +482,7 @@ class _ScheduleCard extends StatelessWidget {
               ('XLSX', 'Excel (.xlsx)'),
               ('JSON', 'JSON (.json)'),
               ('TXT', 'Texto (.txt)'),
+              ('PG_DUMP', 'PostgreSQL (.dump)'),
             ].map(
               (f) => CheckboxListTile(
                 contentPadding: EdgeInsets.zero,

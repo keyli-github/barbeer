@@ -12,6 +12,8 @@ import '../../../ventas/data/models/venta_models.dart';
 import '../../../ventas/presentation/providers/ventas_provider.dart';
 import '../../../ventas/presentation/widgets/comprobante_analysis_panel.dart';
 import '../providers/cuentas_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/widgets/operation_form.dart';
 
 class CuentasScreen extends ConsumerStatefulWidget {
   const CuentasScreen({super.key});
@@ -20,6 +22,52 @@ class CuentasScreen extends ConsumerStatefulWidget {
 }
 
 class _CuentasScreenState extends ConsumerState<CuentasScreen> {
+  Future<void> _createAccount() async {
+    final name = TextEditingController();
+    final document = TextEditingController();
+    final phone = TextEditingController();
+    String type = 'CLIENTE';
+    await OperationForm.show(
+      context,
+      OperationForm(
+        title: 'Nueva cuenta',
+        fields: (refresh) => [
+          operationText(name, 'Nombre', maxLength: 100),
+          DropdownButtonFormField<String>(
+            initialValue: type,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Tipo de cuenta'),
+            items: const [
+              DropdownMenuItem(value: 'CLIENTE', child: Text('Cliente')),
+              DropdownMenuItem(value: 'PERSONAL', child: Text('Personal')),
+              DropdownMenuItem(value: 'SOCIO', child: Text('Socio')),
+            ],
+            onChanged: (value) {
+              type = value!;
+              refresh();
+            },
+          ),
+          operationText(document, 'Documento', maxLength: 20, required: false),
+          operationText(phone, 'Teléfono', maxLength: 20, required: false),
+        ],
+        onSave: () async {
+          await ref
+              .read(cuentasRepositoryProvider)
+              .create(
+                nombre: name.text,
+                tipo: type,
+                documento: document.text,
+                telefono: phone.text,
+              );
+          ref.invalidate(cuentasProvider);
+        },
+      ),
+    );
+    name.dispose();
+    document.dispose();
+    phone.dispose();
+  }
+
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
@@ -49,6 +97,14 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
     );
 
     return Scaffold(
+      floatingActionButton:
+          ref.watch(authProvider).hasPermission('cuentas:crear')
+          ? FloatingActionButton.extended(
+              onPressed: _createAccount,
+              icon: const Icon(Icons.add),
+              label: const Text('Nueva cuenta'),
+            )
+          : null,
       backgroundColor: context.colors.background,
       body: MediaQuery.sizeOf(context).width >= 1024
           ? _buildDesktop(context, state, notifier, deudores, totalDeuda)
@@ -135,7 +191,7 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
                   ),
                   title: Text(account.nombre),
                   subtitle: Text(
-                    '${account.cantidadPendientes ?? 0} venta(s) pendiente(s)',
+                    '${account.tipo} · ${account.cantidadPendientes ?? 0} venta(s) pendiente(s)\nEfectivo en caja: ${FormatUtils.currency(account.saldoEfectivoCaja)}',
                   ),
                   trailing: Text(
                     FormatUtils.currency(account.saldo),
@@ -160,163 +216,157 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
     CuentasNotifier notifier,
     int deudores,
     double totalDeuda,
-  ) =>
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final contentWidth = constraints.maxWidth - 48;
-          final masterWidth = (contentWidth * .28).clamp(280.0, 380.0);
-          final availableHeight = constraints.maxHeight - 198;
-          final workspaceHeight =
-              availableHeight < 520.0 ? 520.0 : availableHeight;
+  ) => LayoutBuilder(
+    builder: (context, constraints) {
+      final contentWidth = constraints.maxWidth - 48;
+      final masterWidth = (contentWidth * .28).clamp(280.0, 380.0);
+      final availableHeight = constraints.maxHeight - 198;
+      final workspaceHeight = availableHeight < 520.0 ? 520.0 : availableHeight;
 
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: notifier.load,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(24, 10, 24, 28),
-              child: Column(
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: notifier.load,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 10, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _CobrosMark(),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Cobros',
-                              style: TextStyle(
-                                color: context.colors.textPrimary,
-                                fontSize: 28,
-                                height: 1.08,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Clientes con saldo pendiente y detalle de las ventas cargadas a su cuenta.',
-                              style: TextStyle(
-                                color: context.colors.textTertiary,
-                                fontSize: 14,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  SizedBox(
-                    width: 568,
-                    child: Row(
+                  const _CobrosMark(),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _DesktopSummaryCard(
-                            label: 'Clientes con deuda',
-                            value: '$deudores',
+                        Text(
+                          'Cobros',
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontSize: 28,
+                            height: 1.08,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _DesktopSummaryCard(
-                            label: 'Total por cobrar',
-                            value: FormatUtils.currency(totalDeuda),
-                            accent: true,
+                        const SizedBox(height: 6),
+                        Text(
+                          'Clientes con saldo pendiente y detalle de las ventas cargadas a su cuenta.',
+                          style: TextStyle(
+                            color: context.colors.textTertiary,
+                            fontSize: 14,
+                            height: 1.35,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: workspaceHeight,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: masterWidth,
-                          child: _desktopMaster(context, state, notifier),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                            child: _desktopDetail(context, state, notifier)),
                       ],
                     ),
                   ),
                 ],
               ),
-            ),
-          );
-        },
+              const SizedBox(height: 15),
+              SizedBox(
+                width: 568,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _DesktopSummaryCard(
+                        label: 'Clientes con deuda',
+                        value: '$deudores',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _DesktopSummaryCard(
+                        label: 'Total por cobrar',
+                        value: FormatUtils.currency(totalDeuda),
+                        accent: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: workspaceHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: masterWidth,
+                      child: _desktopMaster(context, state, notifier),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(child: _desktopDetail(context, state, notifier)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       );
+    },
+  );
 
   Widget _desktopMaster(
     BuildContext context,
     CuentasState state,
     CuentasNotifier notifier,
-  ) =>
-      Container(
-        key: const Key('cuentas-desktop-master'),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.colors.border),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                border:
-                    Border(bottom: BorderSide(color: context.colors.border)),
+  ) => Container(
+    key: const Key('cuentas-desktop-master'),
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: context.colors.border)),
+          ),
+          child: TextField(
+            key: const Key('cuentas-search'),
+            controller: _searchCtrl,
+            onChanged: _onSearchChanged,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (value) {
+              _debounce?.cancel();
+              notifier.load(search: value.trim());
+            },
+            style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: context.colors.background,
+              hintText: 'Buscar cliente…',
+              hintStyle: TextStyle(color: context.colors.textTertiary),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 18,
+                color: context.colors.textTertiary,
               ),
-              child: TextField(
-                key: const Key('cuentas-search'),
-                controller: _searchCtrl,
-                onChanged: _onSearchChanged,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (value) {
-                  _debounce?.cancel();
-                  notifier.load(search: value.trim());
-                },
-                style:
-                    TextStyle(color: context.colors.textPrimary, fontSize: 14),
-                decoration: InputDecoration(
-                  isDense: true,
-                  filled: true,
-                  fillColor: context.colors.background,
-                  hintText: 'Buscar cliente…',
-                  hintStyle: TextStyle(color: context.colors.textTertiary),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    size: 18,
-                    color: context.colors.textTertiary,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 11,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: context.colors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 11,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: context.colors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.primary),
               ),
             ),
-            Expanded(child: _desktopList(context, state, notifier)),
-          ],
+          ),
         ),
-      );
+        Expanded(child: _desktopList(context, state, notifier)),
+      ],
+    ),
+  );
 
   Widget _desktopList(
     BuildContext context,
@@ -358,10 +408,7 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
             onTap: () => notifier.select(account.id),
             hoverColor: context.colors.surfaceAlt,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Row(
                 children: [
                   Container(
@@ -440,33 +487,31 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
     BuildContext context,
     CuentasState state,
     CuentasNotifier notifier,
-  ) =>
-      Container(
-        key: const Key('cuentas-desktop-detail'),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.colors.border),
-        ),
-        child: switch (state.detailState) {
-          null => const _DesktopNoSelection(),
-          OperationLoading<CuentaDetalle>() => const AppLoading(
-              message: 'Cargando detalle...',
-            ),
-          OperationRecoverableError<CuentaDetalle>(:final error) =>
-            AppErrorState(
-              message: error.message,
-              onRetry: () => notifier.select(state.selectedId!),
-            ),
-          OperationContent<CuentaDetalle>(:final data) => _AccountDetail(
-              data,
-              notifier,
-              desktop: true,
-            ),
-          _ => const _DesktopNoSelection(),
-        },
-      );
+  ) => Container(
+    key: const Key('cuentas-desktop-detail'),
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: switch (state.detailState) {
+      null => const _DesktopNoSelection(),
+      OperationLoading<CuentaDetalle>() => const AppLoading(
+        message: 'Cargando detalle...',
+      ),
+      OperationRecoverableError<CuentaDetalle>(:final error) => AppErrorState(
+        message: error.message,
+        onRetry: () => notifier.select(state.selectedId!),
+      ),
+      OperationContent<CuentaDetalle>(:final data) => _AccountDetail(
+        data,
+        notifier,
+        desktop: true,
+      ),
+      _ => const _DesktopNoSelection(),
+    },
+  );
 
   Widget _detailState(
     BuildContext context,
@@ -508,36 +553,36 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: color,
-                      ),
-                    ),
-                    Text(
-                      label,
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                  ],
+    elevation: 2,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 class _CobrosMark extends StatelessWidget {
@@ -545,13 +590,13 @@ class _CobrosMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.only(top: 1),
-        child: Icon(
-          Icons.volunteer_activism_outlined,
-          size: 25,
-          color: AppColors.primary,
-        ),
-      );
+    padding: EdgeInsets.only(top: 1),
+    child: Icon(
+      Icons.volunteer_activism_outlined,
+      size: 25,
+      color: AppColors.primary,
+    ),
+  );
 }
 
 class _DesktopSummaryCard extends StatelessWidget {
@@ -567,40 +612,40 @@ class _DesktopSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        height: 82,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: context.colors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.colors.border),
+    height: 82,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    decoration: BoxDecoration(
+      color: context.colors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: context.colors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: context.colors.textTertiary,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: .8,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                color: context.colors.textTertiary,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: .8,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                color: accent
-                    ? const Color(0xFFFF126B)
-                    : context.colors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            color: accent
+                ? const Color(0xFFFF126B)
+                : context.colors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _DesktopNoSelection extends StatelessWidget {
@@ -608,32 +653,31 @@ class _DesktopNoSelection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.person_outline_rounded,
-              size: 38,
-              color: context.colors.textDisabled,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Selecciona un cliente',
-              style: TextStyle(
-                color: context.colors.textSecondary,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              'Aquí aparecerán todas sus ventas pendientes.',
-              style:
-                  TextStyle(color: context.colors.textTertiary, fontSize: 13),
-            ),
-          ],
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.person_outline_rounded,
+          size: 38,
+          color: context.colors.textDisabled,
         ),
-      );
+        const SizedBox(height: 14),
+        Text(
+          'Selecciona un cliente',
+          style: TextStyle(
+            color: context.colors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          'Aquí aparecerán todas sus ventas pendientes.',
+          style: TextStyle(color: context.colors.textTertiary, fontSize: 13),
+        ),
+      ],
+    ),
+  );
 }
 
 // ── Account detail ────────────────────────────────────────────────────────────
@@ -646,172 +690,211 @@ class _AccountDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
-        margin: desktop ? EdgeInsets.zero : const EdgeInsets.only(top: 12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    margin: desktop ? EdgeInsets.zero : const EdgeInsets.only(top: 12),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('CUENTA DE CLIENTE',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: context.colors.textTertiary)),
-                        const SizedBox(height: 4),
-                        Text(detail.nombre,
-                            style: Theme.of(context).textTheme.titleLarge),
-                      ],
-                    ),
-                  ),
-                  if (notifier.canCollect && detail.saldo > 0) ...[
-                    FilledButton.icon(
-                      key: const Key('collection-open'),
-                      icon: const Icon(Icons.volunteer_activism_outlined,
-                          size: 17),
-                      label: const Text('Pagar'),
-                      style: FilledButton.styleFrom(
-                          backgroundColor: Colors.orange),
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => _CollectionDialog(detail),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'CUENTA DE CLIENTE',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.textTertiary,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(height: 4),
+                    Text(
+                      detail.nombre,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                   ],
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Saldo total pendiente',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: context.colors.textTertiary)),
-                      Text(FormatUtils.currency(detail.saldo),
-                          style: const TextStyle(
-                              color: AppColors.error,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900)),
-                    ],
+                ),
+              ),
+              if (notifier.canCollect && detail.saldo > 0) ...[
+                FilledButton.icon(
+                  key: const Key('collection-open'),
+                  icon: const Icon(Icons.volunteer_activism_outlined, size: 17),
+                  label: const Text('Pagar'),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => _CollectionDialog(detail),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Saldo total pendiente',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.colors.textTertiary,
+                    ),
+                  ),
+                  Text(
+                    FormatUtils.currency(detail.saldo),
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ],
               ),
-              const Divider(height: 28),
-              if (detail.pendientes.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: context.colors.successLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.colors.successBorder),
-                  ),
-                  child: Text('Esta cuenta no tiene ventas pendientes de pago.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: context.colors.success)),
-                )
-              else
-                for (final pending in detail.pendientes) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: context.colors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: context.colors.border),
-                    ),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.receipt_long_outlined,
-                                  size: 18, color: AppColors.primary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(pending.codigo,
-                                        style: const TextStyle(
-                                            fontFamily: 'monospace',
-                                            fontWeight: FontWeight.w700)),
-                                    Text(
-                                        '${FormatUtils.dateTime(DateTime.parse(pending.fecha).toLocal())} · ${pending.sede.nombre}',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            color:
-                                                context.colors.textTertiary)),
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('PENDIENTE',
-                                      style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          color: context.colors.textTertiary)),
-                                  Text(
-                                      FormatUtils.currency(
-                                          pending.montoPendiente),
-                                      style: const TextStyle(
-                                          color: AppColors.error,
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900)),
-                                ],
-                              ),
-                            ],
+            ],
+          ),
+          const Divider(height: 28),
+          for (final charge in detail.cargosPendientes)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.receipt_outlined),
+              title: Text(
+                '${charge['concepto'] ?? charge['referencia'] ?? 'Cargo pendiente'}',
+              ),
+              subtitle: Text('Saldo pendiente: S/ ${charge['saldoPendiente']}'),
+            ),
+          if (detail.pendientes.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: context.colors.successLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.colors.successBorder),
+              ),
+              child: Text(
+                'Esta cuenta no tiene ventas pendientes de pago.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.colors.success),
+              ),
+            )
+          else
+            for (final pending in detail.pendientes) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: context.colors.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.colors.border),
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 18,
+                            color: AppColors.primary,
                           ),
-                        ),
-                        Divider(height: 1, color: context.colors.border),
-                        for (final item in pending.items)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            child: Row(
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(item.producto.nombre,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600)),
-                                      Text(
-                                          '${item.producto.codigo} · ${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color:
-                                                  context.colors.textTertiary)),
-                                    ],
+                                Text(
+                                  pending.codigo,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                Text(FormatUtils.currency(item.subtotal),
-                                    style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontWeight: FontWeight.w600)),
+                                Text(
+                                  '${FormatUtils.dateTime(DateTime.parse(pending.fecha).toLocal())} · ${pending.sede.nombre}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: context.colors.textTertiary,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                      ],
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'PENDIENTE',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: context.colors.textTertiary,
+                                ),
+                              ),
+                              Text(
+                                FormatUtils.currency(pending.montoPendiente),
+                                style: const TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    Divider(height: 1, color: context.colors.border),
+                    for (final item in pending.items)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.producto.nombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${item.producto.codigo} · ${item.cantidad} × ${FormatUtils.currency(item.precioUnitario)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: context.colors.textTertiary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              FormatUtils.currency(item.subtotal),
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
-          ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Collection dialog ─────────────────────────────────────────────────────────
@@ -863,12 +946,13 @@ class _CollectionDialogState extends ConsumerState<_CollectionDialog> {
         localError = null;
         analyzing = true;
       });
-      final result =
-          await ref.read(ventasRepositoryProvider).analizarComprobante(
-                bytes: file.bytes,
-                filename: file.filename,
-                sedeId: ref.read(cuentasProvider.notifier).sedeId,
-              );
+      final result = await ref
+          .read(ventasRepositoryProvider)
+          .analizarComprobante(
+            bytes: file.bytes,
+            filename: file.filename,
+            sedeId: ref.read(cuentasProvider.notifier).sedeId,
+          );
       if (!mounted || token != analysisToken) {
         await _cancelAnalysis(result);
         return;
@@ -1016,8 +1100,9 @@ class _CollectionDialogState extends ConsumerState<_CollectionDialog> {
                             FormatUtils.currency(_remaining),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color:
-                                  _remaining > 0 ? Colors.orange : Colors.green,
+                              color: _remaining > 0
+                                  ? Colors.orange
+                                  : Colors.green,
                             ),
                           ),
                         ],
@@ -1052,13 +1137,16 @@ class _CollectionDialogState extends ConsumerState<_CollectionDialog> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.add_photo_alternate_outlined),
-                label: Text(analyzing
-                    ? 'Analizando comprobante...'
-                    : analysis == null
-                        ? 'Seleccionar comprobante'
-                        : 'Cambiar comprobante'),
+                label: Text(
+                  analyzing
+                      ? 'Analizando comprobante...'
+                      : analysis == null
+                      ? 'Seleccionar comprobante'
+                      : 'Cambiar comprobante',
+                ),
               ),
               if (voucherBytes != null || analysis != null) ...[
                 const SizedBox(height: 8),
@@ -1115,8 +1203,9 @@ class _CollectionDialogState extends ConsumerState<_CollectionDialog> {
                   await notifier.collect(
                     monto: value,
                     medioPago: method,
-                    comprobanteAnalisisId:
-                        method == 'TRANSFERENCIA' ? analysis?.id : null,
+                    comprobanteAnalisisId: method == 'TRANSFERENCIA'
+                        ? analysis?.id
+                        : null,
                   );
                   if (!mounted) return;
                   setState(() => submitting = false);
@@ -1125,11 +1214,15 @@ class _CollectionDialogState extends ConsumerState<_CollectionDialog> {
                     final remaining = _remaining;
                     final messenger = ScaffoldMessenger.of(this.context);
                     Navigator.pop(this.context);
-                    messenger.showSnackBar(SnackBar(
-                      content: Text(remaining > .009
-                          ? 'Pago registrado. Saldo: ${FormatUtils.currency(remaining)}.'
-                          : 'Pago registrado.'),
-                    ));
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          remaining > .009
+                              ? 'Pago registrado. Saldo: ${FormatUtils.currency(remaining)}.'
+                              : 'Pago registrado.',
+                        ),
+                      ),
+                    );
                   }
                 },
           child: Text(busy ? 'Registrando...' : 'Registrar pago'),
