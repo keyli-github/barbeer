@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/offline/offline_store.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/upload_client.dart';
 import '../../../../core/providers/sede_scope_provider.dart';
@@ -15,8 +16,15 @@ import '../../data/ventas_repository.dart';
 
 // ── Repository provider ──────────────────────────────────────────────────────
 
+final offlineStoreProvider = Provider<OfflineStore>(
+  (ref) => OfflineStore.instance,
+);
+
 final ventasRepositoryProvider = Provider<VentasRepository>((ref) {
-  return VentasRepository(ApiClient.instance);
+  return VentasRepository(
+    ApiClient.instance,
+    offlineStore: ref.watch(offlineStoreProvider),
+  );
 });
 
 final uploadClientProvider = Provider<UploadClient>((ref) {

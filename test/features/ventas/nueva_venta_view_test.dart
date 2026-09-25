@@ -136,6 +136,22 @@ class _RetryVentasRepository extends VentasRepository {
   }
 }
 
+class _DraftVentasRepository extends VentasRepository {
+  _DraftVentasRepository() : super(ApiClient.instance);
+
+  final attempts = <CreateVentaPayload>[];
+
+  @override
+  Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
+    attempts.add(payload);
+    throw OfflineSaleDraftSaved(
+      idempotencyKey: payload.idempotencyKey,
+      message:
+          'Borrador guardado para revisión manual. No se recibió confirmación del servidor.',
+    );
+  }
+}
+
 class _RejectedAccountSaleRepository extends VentasRepository {
   _RejectedAccountSaleRepository() : super(ApiClient.instance);
   final attempts = <CreateVentaPayload>[];
@@ -601,6 +617,35 @@ void main() {
       expect(identical(repo.attempts.first, repo.attempts.last), isTrue);
       expect(repo.attempts.last.idempotencyKey, frozenPayload.idempotencyKey);
       await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('manual-review draft is not shown as a confirmed sale', (
+      tester,
+    ) async {
+      final repo = _DraftVentasRepository();
+      await _pumpNuevaVenta(
+        tester,
+        size: const Size(1440, 900),
+        loader: () async => _products,
+        repository: repo,
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('desktop-product-p1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.tap(find.byKey(const Key('desktop-cart-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(repo.attempts, hasLength(1));
+      expect(
+        find.textContaining('Borrador guardado para revisión manual'),
+        findsOneWidget,
+      );
+      expect(find.text('Venta registrada'), findsNothing);
+      expect(find.textContaining('Venta V-'), findsNothing);
+      expect(find.byKey(const ValueKey('desktop-cart-item-p1')), findsNothing);
     });
 
     testWidgets(

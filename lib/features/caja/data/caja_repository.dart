@@ -1,4 +1,7 @@
+import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
+
+typedef CajaPostRequest = Future<Object?> Function(String path);
 
 const cajaDenominaciones = <double>[
   200,
@@ -451,7 +454,8 @@ class CajaPage<T> {
 
 class CajaRepository {
   final ApiClient _api;
-  const CajaRepository(this._api);
+  final CajaPostRequest? postRequest;
+  const CajaRepository(this._api, {this.postRequest});
 
   /// Convierte response.data a Map de forma segura.
   /// Si el backend devuelve String (error HTML/texto), retorna mapa vacío.
@@ -618,6 +622,15 @@ class CajaRepository {
 
   Future<void> reaperturar(String id) async {
     await _api.post('/caja/$id/reapertura');
+  }
+
+  Future<void> reenviarReporte(String id) async {
+    final path = ApiConstants.cajaReporteReenvio(id);
+    if (postRequest != null) {
+      await postRequest!(path);
+      return;
+    }
+    await _api.post(path);
   }
 
   Future<CajaSesion> cerrar(

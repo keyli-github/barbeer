@@ -1,12 +1,11 @@
-import 'dart:async';
-
+import 'package:barbeer/core/constants/api_constants.dart';
 import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/categorias/data/categorias_repository.dart';
-import 'package:barbeer/features/inventario/data/inventario_repository.dart';
 import 'package:barbeer/features/productos/data/productos_repository.dart';
 import 'package:barbeer/features/productos/presentation/screens/productos_screen.dart';
+import 'package:barbeer/features/usuarios/data/usuario_admin_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -64,23 +63,6 @@ class _FakeProductsRepository extends ProductosRepository {
   ];
 }
 
-class _FakeInventoryRepository extends InventarioRepository {
-  _FakeInventoryRepository() : super(ApiClient.instance);
-
-  final response = Completer<InventarioPage>();
-
-  @override
-  Future<InventarioPage> list({
-    int pagina = 1,
-    int limite = 25,
-    String? q,
-    String? categoriaId,
-    String? estado,
-    String? sedeId,
-    String? productoId,
-  }) => response.future;
-}
-
 class _TestAuthNotifier extends AuthNotifier {
   _TestAuthNotifier(super.repository, AuthState value) {
     state = value;
@@ -106,7 +88,9 @@ const _user = UserProfile(
 Future<void> _pumpProducts(
   WidgetTester tester,
   Size size, {
-  InventarioRepository? inventoryRepository,
+  UserProfile? user = _user,
+  AuthStatus status = AuthStatus.authenticated,
+  UsuarioAdminRepository? stockRepository,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -119,14 +103,14 @@ Future<void> _pumpProducts(
         productosCatalogRepositoryProvider.overrideWithValue(
           _FakeProductsRepository(),
         ),
-        if (inventoryRepository != null)
-          productosInventarioRepositoryProvider.overrideWithValue(
-            inventoryRepository,
+        if (stockRepository != null)
+          productoStockAdjustmentRepositoryProvider.overrideWithValue(
+            stockRepository,
           ),
         authProvider.overrideWith(
           (ref) => _TestAuthNotifier(
             ref.read(authRepositoryProvider),
-            const AuthState(status: AuthStatus.authenticated, user: _user),
+            AuthState(status: status, user: user),
           ),
         ),
       ],
@@ -175,52 +159,165 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stock adjustment dialog opens before inventory request ends', (
+  testWidgets('product stock action uses the PIN-authorized product endpoint', (
     tester,
   ) async {
-    final inventory = _FakeInventoryRepository();
+    final operations = <(String, Map<String, dynamic>)>[];
+    final repository = UsuarioAdminRepository(
+      ApiClient.instance,
+      postRequest: (path, body) async {
+        operations.add((path, Map<String, dynamic>.from(body)));
+        if (path == ApiConstants.validatePin) {
+          return {'success': true, 'username': 'superadmin'};
+        }
+        return {
+          'productoId': 'product-1',
+          'sedeId': 'branch-1',
+          'stock': 23,
+          'tipo': body['tipo'],
+          'cantidad': body['cantidad'],
+        };
+      },
+    );
     await _pumpProducts(
       tester,
       const Size(1440, 900),
-      inventoryRepository: inventory,
+      stockRepository: repository,
     );
 
-    await tester.tap(find.text('Ingreso'));
-    await tester.pump();
-
-    expect(find.byType(Dialog), findsOneWidget);
-    expect(find.text('Ingreso de stock'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-    inventory.response.complete(
-      const InventarioPage(
-        data: [
-          InventarioItem(
-            id: 'inventory-1',
-            productoId: 'product-1',
-            sedeId: 'branch-1',
-            codigo: 'AGU-1',
-            producto: 'Agua',
-            categoria: 'Bebidas',
-            unidad: 'unidad',
-            ubicacion: '',
-            estado: 'OK',
-            stock: 20,
-            min: 5,
-            max: 50,
-            costo: 2,
-            updatedAt: '2026-09-04',
-          ),
-        ],
-        total: 1,
-        pagina: 1,
-        totalPaginas: 1,
-      ),
-    );
+    await tester.tap(find.byKey(const Key('product-stock-in-product-1')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cantidad'), findsOneWidget);
-    expect(find.text('Agua · Stock 20.0'), findsOneWidget);
+    expect(find.byKey(const Key('product-stock-adjust-dialog')), findsOneWidget);
+    expect(find.text('Ingreso de stock'), findsOneWidget);
+    expect(find.byKey(const Key('stock-pin')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('stock-cantidad')), '3');
+    await tester.tap(find.text('Confirmar ajuste'));
+    await tester.pumpAndSettle();
+    expect(find.text('La referencia es obligatoria.'), findsOneWidget);
+    expect(operations, isEmpty);
+
+    await tester.enterText(
+      find.byKey(const Key('stock-referencia')),
+      'Restock',
+    );
+    await tester.enterText(find.byKey(const Key('stock-pin')), '1234');
+    await tester.tap(find.text('Confirmar ajuste'));
+    await tester.pumpAndSettle();
+
+    expect(operations.map((operation) => operation.$1), [
+      ApiConstants.validatePin,
+      ApiConstants.productStock('product-1'),
+    ]);
+    expect(operations.last.$2, {
+      'tipo': 'ENTRADA',
+      'cantidad': 3.0,
+      'referencia': 'Restock',
+      'superadminPin': '1234',
+    });
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Superadmin product adjustment skips PIN and validation', (
+    tester,
+  ) async {
+    final requests = <(String, Map<String, dynamic>)>[];
+    final repository = UsuarioAdminRepository(
+      ApiClient.instance,
+      postRequest: (path, body) async {
+        requests.add((path, Map<String, dynamic>.from(body)));
+        return {
+          'productoId': 'product-1',
+          'sedeId': 'branch-1',
+          'stock': 23,
+          'tipo': body['tipo'],
+          'cantidad': body['cantidad'],
+        };
+      },
+    );
+    const superAdmin = UserProfile(
+      id: 'root-1',
+      username: 'root',
+      rol: 'SUPERADMIN',
+      nivel: 100,
+      sedeId: 'branch-1',
+      createdAt: '2026-09-01',
+      permisos: [],
+    );
+    await _pumpProducts(
+      tester,
+      const Size(1440, 900),
+      user: superAdmin,
+      stockRepository: repository,
+    );
+
+    await tester.tap(find.byKey(const Key('product-stock-out-product-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Salida de stock'), findsOneWidget);
+    expect(find.byKey(const Key('stock-pin')), findsNothing);
+    await tester.enterText(find.byKey(const Key('stock-cantidad')), '2');
+    await tester.tap(find.text('Confirmar ajuste'));
+    await tester.pumpAndSettle();
+
+    expect(requests, hasLength(1));
+    expect(requests.single.$1, ApiConstants.productStock('product-1'));
+    expect(requests.single.$2, {
+      'sedeId': 'branch-1',
+      'tipo': 'SALIDA',
+      'cantidad': 2.0,
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('product stock adjustment opens as a mobile page', (
+    tester,
+  ) async {
+    await _pumpProducts(tester, const Size(390, 844));
+
+    await tester.tap(find.byKey(const Key('product-stock-in-product-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ingreso de stock'), findsOneWidget);
+    expect(find.byKey(const Key('stock-cantidad')), findsOneWidget);
+    expect(find.byKey(const Key('stock-referencia')), findsOneWidget);
+    expect(find.byKey(const Key('stock-pin')), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('VENDEDORA cannot use the direct product stock action', (
+    tester,
+  ) async {
+    const seller = UserProfile(
+      id: 'seller-1',
+      username: 'seller',
+      rol: 'VENDEDORA',
+      nivel: 10,
+      sedeId: 'branch-1',
+      createdAt: '2026-09-01',
+      permisos: ['productos:leer'],
+    );
+    await _pumpProducts(
+      tester,
+      const Size(390, 844),
+      user: seller,
+    );
+
+    expect(find.byKey(const Key('product-stock-in-product-1')), findsNothing);
+    expect(find.byKey(const Key('product-stock-out-product-1')), findsNothing);
+  });
+
+  testWidgets('unauthenticated users do not see direct product stock actions', (
+    tester,
+  ) async {
+    await _pumpProducts(
+      tester,
+      const Size(390, 844),
+      user: null,
+      status: AuthStatus.unauthenticated,
+    );
+
+    expect(find.byKey(const Key('product-stock-in-product-1')), findsNothing);
+    expect(find.byKey(const Key('product-stock-out-product-1')), findsNothing);
   });
 }

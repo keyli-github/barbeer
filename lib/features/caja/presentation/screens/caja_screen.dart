@@ -1456,6 +1456,7 @@ class _DetailSheet extends ConsumerStatefulWidget {
 
 class _DetailSheetState extends ConsumerState<_DetailSheet> {
   bool _reopening = false;
+  bool _resendingReport = false;
   // Movimientos de la sesión
   List<CajaMovimiento> _movimientos = [];
   bool _movLoading = false;
@@ -1514,9 +1515,9 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
 
         final resumen = session.resumen;
         final v2 = resumen?.v2;
-        final canExportCaja = ref
-            .read(authProvider)
-            .canAccess(RoutePaths.reportes);
+        final auth = ref.watch(authProvider);
+        final canExportCaja = auth.canAccess(RoutePaths.reportes);
+        final canResendCloseReport = auth.hasPermission('caja:cerrar');
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -1846,14 +1847,42 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
               ),
             ],
 
+            if (session.isCerrada && canResendCloseReport) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const Key('caja-resend-close-report'),
+                  onPressed: _resendingReport
+                      ? null
+                      : () => _resendCloseReport(session.id),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  icon: _resendingReport
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 18),
+                  label: Text(
+                    _resendingReport
+                        ? 'Reenviando…'
+                        : 'Reenviar reporte de cierre',
+                  ),
+                ),
+              ),
+            ],
+
             // ── Exportar ventas del turno (Scenario 44) ───────────────────
-            if (canExportCaja) ...[
+            if (session.isCerrada && canExportCaja) ...[
               const SizedBox(height: 14),
               OutlinedButton.icon(
                 key: const Key('caja-export'),
                 onPressed: () => ref
                     .read(reportesProvider.notifier)
-                    .exportCajaReport(session.id, formato: 'XLSX'),
+                    .exportCajaReport(session.id, formato: 'xlsx'),
                 icon: const Icon(Icons.download_outlined, size: 18),
                 label: const Text('Exportar ventas del turno'),
               ),
@@ -1864,6 +1893,24 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
       },
     ),
   );
+
+  Future<void> _resendCloseReport(String id) async {
+    if (_resendingReport) return;
+    setState(() => _resendingReport = true);
+    try {
+      await ref.read(cajaRepositoryProvider).reenviarReporte(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reporte de cierre enviado a la cola de correo.'),
+        ),
+      );
+    } catch (error) {
+      if (mounted) _sheetError(context, error);
+    } finally {
+      if (mounted) setState(() => _resendingReport = false);
+    }
+  }
 
   Future<void> _reopen() async {
     final confirmed = await showDialog<bool>(

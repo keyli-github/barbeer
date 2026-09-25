@@ -17,15 +17,16 @@ void main() {
   // ── Scenario 43: notifier method exists and routes to canonical endpoint ────
 
   group('Scenario 43 — exportCajaReport notifier caller exists', () {
-    test(
-        'authorized exportCajaReport calls the canonical caja export endpoint',
+    test('authorized cash-close exports use the canonical endpoint and lowercase formats',
         () async {
       const sessionId = 'session-caja-abc';
       final capturedPaths = <String>[];
+      final capturedFormats = <String>[];
       final repo = ReportesRepository(
         ApiClient.instance,
-        bytesRequest: (path, _) async {
+        bytesRequest: (path, query) async {
           capturedPaths.add(path);
+          capturedFormats.add(query['formato'] as String);
           return ReporteExportado(
             bytes: Uint8List(0),
             contentType:
@@ -36,10 +37,15 @@ void main() {
       );
 
       final notifier = ReportesNotifier(repo, authorized: true);
-      await notifier.exportCajaReport(sessionId, formato: 'XLSX');
+      await notifier.exportCajaReport(sessionId, formato: 'xlsx');
+      await notifier.exportCajaReport(sessionId, formato: 'json');
 
       // Must hit the canonical caja export path
-      expect(capturedPaths.single, ApiConstants.reportCajaExport(sessionId));
+      expect(capturedPaths, [
+        ApiConstants.reportCajaExport(sessionId),
+        ApiConstants.reportCajaExport(sessionId),
+      ]);
+      expect(capturedFormats, ['xlsx', 'json']);
     });
 
     test('unauthorized exportCajaReport sets 403 error state without transport call',
@@ -58,7 +64,7 @@ void main() {
       );
 
       final notifier = ReportesNotifier(repo, authorized: false);
-      await notifier.exportCajaReport('s-1', formato: 'XLSX');
+      await notifier.exportCajaReport('s-1', formato: 'xlsx');
 
       expect(transportCalled, isFalse,
           reason: 'transport must not be called when unauthorized');
@@ -91,7 +97,7 @@ void main() {
       );
 
       final notifier = ReportesNotifier(repo, authorized: true);
-      await notifier.exportCajaReport(sessionId, formato: 'XLSX');
+      await notifier.exportCajaReport(sessionId, formato: 'xlsx');
 
       expect(notifier.state.exportBusy, isFalse);
       final exportState = notifier.state.exportState;

@@ -460,19 +460,35 @@ class VendedorVenta {
 /// Immutable value retained after ambiguous failures for an exact retry.
 class CreateVentaPayload {
   final Map<String, dynamic> json;
+  final List<Map<String, dynamic>> manualReviewItems;
 
-  CreateVentaPayload._(Map<String, dynamic> value)
-    : json = Map.unmodifiable(value);
-  factory CreateVentaPayload.fromRecovery(Map<String, dynamic> value) =>
-      CreateVentaPayload._(
-        Map<String, dynamic>.from(value)
-          ..remove('superadminPin')
-          ..remove('_originalCajaId'),
-      );
+  CreateVentaPayload._(
+    Map<String, dynamic> value, {
+    List<Map<String, dynamic>> manualReviewItems = const [],
+  }) : json = Map.unmodifiable(value),
+       manualReviewItems = List.unmodifiable(
+         manualReviewItems.map(
+           (item) => Map<String, dynamic>.unmodifiable(item),
+         ),
+       );
+
+  factory CreateVentaPayload.fromRecovery(Map<String, dynamic> value) {
+    final recovered = Map<String, dynamic>.from(value);
+    final reviewItems = (recovered.remove('_manualReviewItems') as List? ?? [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    recovered
+      ..remove('superadminPin')
+      ..remove('_originalCajaId');
+    return CreateVentaPayload._(recovered, manualReviewItems: reviewItems);
+  }
 
   /// Only the transient network copy may contain this authorization secret.
-  CreateVentaPayload withEphemeralPin(String pin) =>
-      CreateVentaPayload._({...json, 'superadminPin': pin});
+  CreateVentaPayload withEphemeralPin(String pin) => CreateVentaPayload._({
+    ...json,
+    'superadminPin': pin,
+  }, manualReviewItems: manualReviewItems);
 
   CreateVentaPayload({
     required String idempotencyKey,
@@ -498,7 +514,14 @@ class CreateVentaPayload {
     bool? pagoRestoEfectivo,
     // Tokens de autorización para precios customizados por no-SUPERADMIN.
     List<String>? precioAuthTokens,
-  }) : json = Map.unmodifiable({
+    // Local-only names retained for manual review; never included in json.
+    List<Map<String, dynamic>>? manualReviewItems,
+  }) : manualReviewItems = List.unmodifiable(
+         (manualReviewItems ?? const []).map(
+           (item) => Map<String, dynamic>.unmodifiable(item),
+         ),
+       ),
+       json = Map.unmodifiable({
          'idempotencyKey': idempotencyKey,
          'items': List.unmodifiable(
            items.map((item) => Map<String, dynamic>.unmodifiable(item)),

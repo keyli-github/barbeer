@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:barbeer/core/constants/api_constants.dart';
+import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/features/inventario/data/inventario_repository.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
@@ -126,6 +128,34 @@ void main() {
       expect(page.pagina, 3);
       expect(page.totalPaginas, 3);
       expect(page.total, 75);
+    });
+  });
+
+  test('stock adjustment uses PATCH /inventario/:id/ajuste', () async {
+    String? path;
+    Map<String, dynamic>? body;
+    final repository = InventarioRepository(
+      ApiClient.instance,
+      patchRequest: (requestPath, requestBody) async {
+        path = requestPath;
+        body = requestBody;
+        return {'id': 'inv-1', 'stock': 12};
+      },
+    );
+
+    await repository.ajustar(
+      'inv-1',
+      tipo: 'AJUSTE',
+      cantidad: 0,
+      referencia: '  Physical count  ',
+    );
+
+    expect(path, ApiConstants.inventoryAdjust('inv-1'));
+    expect(path, '/inventario/inv-1/ajuste');
+    expect(body, {
+      'tipo': 'AJUSTE',
+      'cantidad': 0.0,
+      'referencia': 'Physical count',
     });
   });
 

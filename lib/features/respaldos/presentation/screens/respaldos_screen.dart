@@ -160,21 +160,26 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
   }
 
   void _syncFromSchedule(BackupSchedule s) {
+    final role = ref.read(authProvider).user?.rol;
+    final allowedFormats = filterBackupFormatsForRole(s.formats, role);
+    if (allowedFormats.isEmpty) allowedFormats.add('XLSX');
     setState(() {
       _enabled = s.enabled;
       _frequency = s.frequency;
       _formats
         ..clear()
-        ..addAll(s.formats);
+        ..addAll(allowedFormats);
     });
   }
 
   Future<void> _saveSchedule() async {
-    if (_formats.isEmpty) return;
+    final role = ref.read(authProvider).user?.rol;
+    final formats = filterBackupFormatsForRole(_formats, role);
+    if (formats.isEmpty) return;
     final draft = BackupSchedule(
       enabled: _enabled,
       frequency: _frequency,
-      formats: _formats.toList(),
+      formats: formats,
       timezone: ref.read(_notifierProvider).schedule?.timezone ?? 'UTC',
     );
     final err = await ref.read(_notifierProvider.notifier).saveSchedule(draft);
@@ -255,6 +260,9 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
 
     final canManage =
         auth.user?.permisos.contains('respaldos:gestionar') ?? false;
+    final allowedFormats = allowedBackupFormatsForRole(
+      auth.user?.rol,
+    ).toSet();
 
     return Scaffold(
       body: SafeArea(
@@ -320,6 +328,7 @@ class _RespaldosScreenState extends ConsumerState<RespaldosScreen> {
                         enabled: _enabled,
                         frequency: _frequency,
                         formats: _formats,
+                        allowedFormats: allowedFormats,
                         error: state.scheduleError,
                         onEnabledChanged: (v) => setState(() => _enabled = v),
                         onFrequencyChanged: (v) =>
@@ -385,6 +394,7 @@ class _ScheduleCard extends StatelessWidget {
   final bool enabled;
   final String frequency;
   final Set<String> formats;
+  final Set<String> allowedFormats;
   final String? error;
   final ValueChanged<bool> onEnabledChanged;
   final ValueChanged<String> onFrequencyChanged;
@@ -398,6 +408,7 @@ class _ScheduleCard extends StatelessWidget {
     required this.enabled,
     required this.frequency,
     required this.formats,
+    required this.allowedFormats,
     this.error,
     required this.onEnabledChanged,
     required this.onFrequencyChanged,
@@ -483,7 +494,7 @@ class _ScheduleCard extends StatelessWidget {
               ('JSON', 'JSON (.json)'),
               ('TXT', 'Texto (.txt)'),
               ('PG_DUMP', 'PostgreSQL (.dump)'),
-            ].map(
+            ].where((format) => allowedFormats.contains(format.$1)).map(
               (f) => CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(f.$2),

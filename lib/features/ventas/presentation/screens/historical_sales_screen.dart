@@ -23,16 +23,25 @@ final historicalBoxesProvider = FutureProvider.autoDispose
           );
     });
 final historicalSalesProvider = FutureProvider.autoDispose
-    .family<OperationsPage, (String, int)>(
-      (ref, query) => ref
+    .family<OperationsPage, (String, int)>((ref, query) {
+      final auth = ref.watch(authProvider);
+      final path = auth.user?.isSuperAdmin == true ? '/ventas' : '/ventas/mias';
+      return ref
           .watch(operationsRepositoryProvider)
           .list(
-            '/ventas',
+            path,
             sedeId: ref.watch(globalSedeIdProvider),
             page: query.$2,
             filters: {'cajaSesionId': query.$1},
-          ),
-    );
+          );
+    });
+
+bool _canCreateHistoricalSale(AuthState auth) =>
+    auth.user?.isSuperAdmin == true ||
+    (auth.hasPermission('ventas:crear') &&
+        auth.hasPermission('ventas:sin-luz'));
+
+bool _isSuperadmin(AuthState auth) => auth.user?.isSuperAdmin == true;
 
 class HistoricalSalesScreen extends ConsumerStatefulWidget {
   const HistoricalSalesScreen({super.key});
@@ -45,6 +54,7 @@ class _HistoricalSalesScreenState extends ConsumerState<HistoricalSalesScreen> {
   int _page = 1;
   String? _date;
   Future<void> _create() async {
+    if (!_isSuperadmin(ref.read(authProvider))) return;
     final sede = ref.read(globalSedeIdProvider);
     if (sede == null) {
       ScaffoldMessenger.of(
@@ -89,6 +99,7 @@ class _HistoricalSalesScreenState extends ConsumerState<HistoricalSalesScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(globalSedeIdProvider, (_, _) => setState(() => _page = 1));
+    final auth = ref.watch(authProvider);
     final selected = ref.watch(globalSedeIdProvider);
     final result = ref.watch(historicalBoxesProvider((_page, _date)));
     return OperationPage(
@@ -100,7 +111,7 @@ class _HistoricalSalesScreenState extends ConsumerState<HistoricalSalesScreen> {
       pages: result.valueOrNull?.pages ?? 1,
       reload: () async => ref.invalidate(historicalBoxesProvider),
       onPage: (page) => setState(() => _page = page),
-      onCreate: selected == null ? null : _create,
+      onCreate: !_isSuperadmin(auth) || selected == null ? null : _create,
       filters: [
         const SedeScopeSelector(),
         Wrap(
@@ -186,6 +197,7 @@ class _HistoricalBoxScreenState extends ConsumerState<_HistoricalBoxScreen> {
   }
 
   Future<void> _count() async {
+    if (!_isSuperadmin(ref.read(authProvider))) return;
     final amount = TextEditingController();
     final reason = TextEditingController();
     String type = 'APERTURA';
@@ -227,6 +239,7 @@ class _HistoricalBoxScreenState extends ConsumerState<_HistoricalBoxScreen> {
   }
 
   Future<void> _annul(OperationJson sale) async {
+    if (!_isSuperadmin(ref.read(authProvider))) return;
     final reason = TextEditingController();
     await OperationForm.show(
       context,
@@ -249,6 +262,7 @@ class _HistoricalBoxScreenState extends ConsumerState<_HistoricalBoxScreen> {
   }
 
   Future<void> _sale() async {
+    if (!_canCreateHistoricalSale(ref.read(authProvider))) return;
     final day = businessDate(DateTime.parse('${widget.box['abiertaAt']}'));
     final time = await showTimePicker(
       context: context,
@@ -271,25 +285,31 @@ class _HistoricalBoxScreenState extends ConsumerState<_HistoricalBoxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+    final isSuperadmin = _isSuperadmin(auth);
+    final canCreateSale = _canCreateHistoricalSale(auth);
     final result = ref.watch(historicalSalesProvider((_id, _page)));
     return Scaffold(
       appBar: AppBar(title: const Text('Caja histórica')),
       body: OperationPage(
         title: 'Ventas registradas',
-        subtitle: 'Las correcciones recalculan el cuadre original.',
+        subtitle: isSuperadmin
+            ? 'Las correcciones recalculan el cuadre original.'
+            : 'Ventas que registraste en esta caja histórica.',
         loading: result.isLoading,
         error: result.error,
         page: _page,
         pages: result.valueOrNull?.pages ?? 1,
         reload: () async => _reload(),
         onPage: (page) => setState(() => _page = page),
-        onCreate: _sale,
+        onCreate: canCreateSale ? _sale : null,
         filters: [
-          OutlinedButton.icon(
-            onPressed: _count,
-            icon: const Icon(Icons.edit_note),
-            label: const Text('Corregir conteo'),
-          ),
+          if (isSuperadmin)
+            OutlinedButton.icon(
+              onPressed: _count,
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Corregir conteo'),
+            ),
         ],
         cards: (result.valueOrNull?.items ?? [])
             .map(
@@ -297,7 +317,7 @@ class _HistoricalBoxScreenState extends ConsumerState<_HistoricalBoxScreen> {
                 child: ListTile(
                   title: Text('${sale['codigo']} · ${soles(sale['total'])}'),
                   subtitle: Text('${sale['estado']}'),
-                  trailing: sale['estado'] == 'ANULADA'
+                  trailing: !isSuperadmin || sale['estado'] == 'ANULADA'
                       ? null
                       : IconButton(
                           tooltip: 'Anular venta',

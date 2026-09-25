@@ -3,6 +3,21 @@ import 'package:crypto/crypto.dart';
 
 typedef Json = Map<String, dynamic>;
 
+List<String> allowedBackupFormatsForRole(String? role) => [
+  'XLSX',
+  'JSON',
+  'TXT',
+  if (role == 'SUPERADMIN') 'PG_DUMP',
+];
+
+List<String> filterBackupFormatsForRole(
+  Iterable<String> formats,
+  String? role,
+) {
+  final allowed = allowedBackupFormatsForRole(role).toSet();
+  return formats.where(allowed.contains).toList();
+}
+
 class BackupSchedule {
   final bool enabled;
   final String frequency;

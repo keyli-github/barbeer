@@ -63,6 +63,7 @@ const appDestinations = <AppDestination>[
     icon: Icons.history,
     activeIcon: Icons.history,
     section: AppDestinationSection.operations,
+    permissions: ['ventas:crear', 'ventas:sin-luz', 'ventas:leer-propias'],
   ),
   AppDestination(
     path: RoutePaths.notificaciones,

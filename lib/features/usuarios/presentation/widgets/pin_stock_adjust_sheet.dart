@@ -4,13 +4,14 @@ import '../../../../core/errors/app_exception.dart';
 import '../../data/models/usuario_permission_models.dart';
 import '../../data/usuario_admin_repository.dart';
 
-/// PIN-authorized stock adjustment. Validates PIN via [UsuarioAdminRepository.validatePin]
-/// before [UsuarioAdminRepository.adjustStock]. Handles 429/incorrect/success.
+/// Product stock adjustment. Non-Superadmin users validate a PIN before the
+/// direct product endpoint; Superadmin users do not need a PIN.
 class PinStockAdjustSheet extends StatefulWidget {
   final String productId, productName;
-  final double currentStock;
+  final double? currentStock;
   final String? sedeId;
   final bool isSuperAdmin;
+  final String initialType;
   final UsuarioAdminRepository repo;
   final VoidCallback onSaved;
   final bool showHeader;
@@ -20,11 +21,19 @@ class PinStockAdjustSheet extends StatefulWidget {
     required this.currentStock,
     required this.sedeId,
     required this.isSuperAdmin,
+    this.initialType = 'ENTRADA',
     required this.repo,
     required this.onSaved,
     this.showHeader = true,
     super.key,
   });
+
+  String get currentStockLabel {
+    final stock = currentStock;
+    if (stock == null) return 'Stock actual: No disponible';
+    return 'Stock actual: ${stock.toStringAsFixed(stock % 1 == 0 ? 0 : 1)}';
+  }
+
   @override
   State<PinStockAdjustSheet> createState() => _PinStockState();
 }
@@ -38,6 +47,12 @@ class _PinStockState extends State<PinStockAdjustSheet> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _tipo = widget.initialType;
+  }
+
+  @override
   void dispose() {
     _cantCtrl.dispose();
     _refCtrl.dispose();
@@ -46,7 +61,7 @@ class _PinStockState extends State<PinStockAdjustSheet> {
   }
 
   Future<void> _confirm() async {
-    final cant = double.tryParse(_cantCtrl.text);
+    final cant = double.tryParse(_cantCtrl.text.replaceAll(',', '.'));
     if (cant == null || cant <= 0) {
       setState(() => _error = 'Cantidad debe ser positiva.');
       return;
@@ -57,7 +72,7 @@ class _PinStockState extends State<PinStockAdjustSheet> {
       return;
     }
     final pin = _pinCtrl.text.trim();
-    if (pin.length != 4) {
+    if (!widget.isSuperAdmin && pin.length != 4) {
       setState(() => _error = 'Ingresa un PIN de 4 dígitos.');
       return;
     }
@@ -66,24 +81,26 @@ class _PinStockState extends State<PinStockAdjustSheet> {
       _error = null;
     });
     try {
-      final pinResult = await widget.repo.validatePin(pin);
-      if (!pinResult.success) {
-        if (mounted) {
-          setState(() {
-            _saving = false;
-            _error = 'PIN incorrecto. Intenta de nuevo.';
-          });
+      if (!widget.isSuperAdmin) {
+        final pinResult = await widget.repo.validatePin(pin);
+        if (!pinResult.success) {
+          if (mounted) {
+            setState(() {
+              _saving = false;
+              _error = 'PIN incorrecto. Intenta de nuevo.';
+            });
+          }
+          return;
         }
-        return;
       }
       await widget.repo.adjustStock(
         widget.productId,
         StockAdjustPayload(
-          sedeId: widget.sedeId,
+          sedeId: widget.isSuperAdmin ? widget.sedeId : null,
           tipo: _tipo,
           cantidad: cant,
           referencia: ref.isEmpty ? null : ref,
-          superadminPin: pin,
+          superadminPin: widget.isSuperAdmin ? null : pin,
         ),
       );
       if (!mounted) return;
@@ -119,7 +136,7 @@ class _PinStockState extends State<PinStockAdjustSheet> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         Text(
-          'Stock actual: ${widget.currentStock}',
+          widget.currentStockLabel,
           style: const TextStyle(fontSize: 13, color: Colors.grey),
         ),
         const SizedBox(height: 12),
@@ -168,6 +185,9 @@ class _PinStockState extends State<PinStockAdjustSheet> {
           key: const Key('stock-cantidad'),
           controller: _cantCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d*([.,]\d{0,2})?$')),
+          ],
           decoration: const InputDecoration(labelText: 'Cantidad'),
         ),
         const SizedBox(height: 10),
@@ -178,23 +198,26 @@ class _PinStockState extends State<PinStockAdjustSheet> {
             labelText: widget.isSuperAdmin
                 ? 'Referencia (opcional)'
                 : 'Referencia (obligatoria)',
+            counterText: '',
           ),
+          maxLength: 200,
         ),
         const SizedBox(height: 10),
-        TextField(
-          key: const Key('stock-pin'),
-          controller: _pinCtrl,
-          obscureText: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(4),
-          ],
-          decoration: const InputDecoration(
-            labelText: 'PIN de autorización',
-            hintText: '• • • •',
+        if (!widget.isSuperAdmin)
+          TextField(
+            key: const Key('stock-pin'),
+            controller: _pinCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'PIN de autorización',
+              hintText: '• • • •',
+            ),
           ),
-        ),
         if (_error != null) ...[
           const SizedBox(height: 8),
           Text(

@@ -110,6 +110,8 @@ class ApiConstants {
   static String cajaMovimientos(String id) => '/caja/$id/movimientos';
   static String cajaPrecuadre(String id) => '/caja/$id/precuadre';
   static String cajaCierre(String id) => '/caja/$id/cierre';
+  static String cajaReporteReenvio(String id) =>
+      '/caja/$id/reporte/reenvio';
 
   // ── Ventas (NUEVO - Fase 2B) ────────────────────────────────────────────
   static const String ventas = '/ventas';

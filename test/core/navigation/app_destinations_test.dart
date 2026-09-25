@@ -14,6 +14,18 @@ AuthState _authWith(List<String> permissions) => AuthState(
   ),
 );
 
+AuthState _authWithRole(String role, List<String> permissions) => AuthState(
+  status: AuthStatus.authenticated,
+  user: UserProfile(
+    id: 'test-id',
+    username: 'test',
+    rol: role,
+    nivel: 10,
+    createdAt: '2026-01-01',
+    permisos: permissions,
+  ),
+);
+
 void main() {
   group('destination permissions', () {
     test('productos uses the read permission', () {
@@ -35,6 +47,37 @@ void main() {
         expect(_authWith([permission]).canAccess('/ventas'), isTrue);
       }
       expect(_authWith([]).canAccess('/ventas'), isFalse);
+    });
+
+    test('historical sales requires both sale gates and own-sales access', () {
+      const permissions = [
+        'ventas:crear',
+        'ventas:sin-luz',
+        'ventas:leer-propias',
+      ];
+
+      expect(
+        _authWithRole('VENDEDORA', permissions).canAccess('/ventas-sin-luz'),
+        isTrue,
+      );
+      for (final missing in permissions) {
+        expect(
+          _authWithRole(
+            'VENDEDORA',
+            permissions.where((permission) => permission != missing).toList(),
+          ).canAccess('/ventas-sin-luz'),
+          isFalse,
+          reason: 'Missing $missing must hide the historical sales route',
+        );
+      }
+      expect(
+        _authWithRole('ADMIN', permissions).canAccess('/ventas-sin-luz'),
+        isTrue,
+      );
+      expect(
+        _authWithRole('ADMIN', ['ventas:crear']).canAccess('/ventas-sin-luz'),
+        isFalse,
+      );
     });
 
     test('nested destination paths inherit their route permission', () {

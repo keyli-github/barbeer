@@ -80,6 +80,27 @@ void main() {
     );
   });
 
+  test('historical sales requires every seller capability or SUPERADMIN', () {
+    const required = {'ventas:crear', 'ventas:sin-luz', 'ventas:leer-propias'};
+
+    expect(
+      _can(RoutePaths.ventasSinLuz, role: 'VENDEDORA', permissions: required),
+      isTrue,
+    );
+    for (final missing in required) {
+      expect(
+        _can(
+          RoutePaths.ventasSinLuz,
+          role: 'VENDEDORA',
+          permissions: required.difference({missing}),
+        ),
+        isFalse,
+        reason: 'Missing $missing must block the historical sales route',
+      );
+    }
+    expect(_can(RoutePaths.ventasSinLuz, role: 'SUPERADMIN'), isTrue);
+  });
+
   testWidgets('widget deep-link matrix blocks unauthorized content flashes', (
     tester,
   ) async {
