@@ -9,7 +9,7 @@ abstract class FileArtifactService {
   Future<FileArtifactResult> open(String savedPath);
 }
 
-const Set<String> kAllowedFileExtensions = {'xlsx', 'json', 'txt'};
+const Set<String> kAllowedFileExtensions = {'xlsx', 'json', 'txt', 'dump'};
 
 const Set<String> _kBlockedFilenames = {'requirements.txt', 'cmakelists.txt'};
 
@@ -17,6 +17,7 @@ const Map<String, String> _kExtensionMimeTypes = {
   'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'json': 'application/json',
   'txt': 'text/plain',
+  'dump': 'application/vnd.postgresql.dump',
 };
 
 /// Returns null if valid; returns a rejection reason if invalid.

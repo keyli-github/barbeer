@@ -1,6 +1,6 @@
 class ApiConstants {
   ApiConstants._();
-  static const String localBaseUrl = 'http://127.0.0.1:3001/api';
+  static const String localBaseUrl = 'https://hia-server.tail99b0ec.ts.net/backend-bar/api';
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONFIGURACIÓN DE URL
@@ -110,6 +110,8 @@ class ApiConstants {
   static String cajaMovimientos(String id) => '/caja/$id/movimientos';
   static String cajaPrecuadre(String id) => '/caja/$id/precuadre';
   static String cajaCierre(String id) => '/caja/$id/cierre';
+  static String cajaReporteReenvio(String id) =>
+      '/caja/$id/reporte/reenvio';
 
   // ── Ventas (NUEVO - Fase 2B) ────────────────────────────────────────────
   static const String ventas = '/ventas';

@@ -222,7 +222,7 @@ class CategoriasScreen extends ConsumerWidget {
                         _showForm(context, ref, categoria: categoria);
                       } else if (value == 'toggle') {
                         _toggle(context, ref, categoria);
-                      } else {
+                      } else if (value == 'delete') {
                         _delete(context, ref, categoria);
                       }
                     },
@@ -236,11 +236,16 @@ class CategoriasScreen extends ConsumerWidget {
                         PopupMenuItem(
                           value: 'toggle',
                           child: Text(
-                            categoria.activo ? 'Desactivar' : 'Activar',
+                            categoria.activo
+                                ? 'Desactivar (cambiar estado)'
+                                : 'Activar (cambiar estado)',
                           ),
                         ),
-                      // 'delete' (baja lógica) es idéntico a desactivar:
-                      // se omite para evitar la opción duplicada.
+                      if (auth.hasPermission('categorias:eliminar'))
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Dar de baja'),
+                        ),
                     ],
                   ),
               ],
@@ -330,16 +335,16 @@ class CategoriasScreen extends ConsumerWidget {
   ) async {
     final confirmed = await ConfirmDialog.show(
       context: context,
-      title: 'Desactivar categoria',
+      title: 'Dar de baja categoría',
       description:
-          'La categoria "${categoria.nombre}" dejara de estar disponible para nuevos productos.',
-      confirmLabel: 'Desactivar',
+          'La baja lógica retirará la categoría "${categoria.nombre}" del catálogo disponible para nuevos productos.',
+      confirmLabel: 'Dar de baja',
       isDanger: true,
     );
     if (!confirmed || !context.mounted) return;
     try {
       await ref.read(categoriasProvider.notifier).delete(categoria.id);
-      if (context.mounted) _message(context, 'Categoria desactivada');
+      if (context.mounted) _message(context, 'Categoría dada de baja');
     } catch (error) {
       if (context.mounted) _message(context, error.toString(), error: true);
     }
@@ -360,10 +365,7 @@ class CategoriasScreen extends ConsumerWidget {
             activo: !categoria.activo,
           );
       if (context.mounted) {
-        _message(
-          context,
-          categoria.activo ? 'Categoria desactivada' : 'Categoria activada',
-        );
+        _message(context, 'Estado de la categoría actualizado');
       }
     } catch (error) {
       if (context.mounted) _message(context, error.toString(), error: true);

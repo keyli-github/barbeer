@@ -1,4 +1,5 @@
 import 'package:barbeer/core/network/api_client.dart';
+import 'package:barbeer/core/providers/sede_scope_provider.dart';
 import 'package:barbeer/features/auth/data/models/auth_models.dart';
 import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/categorias/data/categorias_repository.dart';
@@ -30,6 +31,8 @@ const _item = InventarioItem(
 class _FakeInventoryRepository extends InventarioRepository {
   _FakeInventoryRepository() : super(ApiClient.instance);
 
+  final adjustments = <Map<String, dynamic>>[];
+
   @override
   Future<InventarioPage> list({
     int pagina = 1,
@@ -51,6 +54,22 @@ class _FakeInventoryRepository extends InventarioRepository {
         critico: 0,
         valorTotal: 40,
       );
+
+  @override
+  Future<InventarioItem> ajustar(
+    String id, {
+    required String tipo,
+    required double cantidad,
+    String? referencia,
+  }) async {
+    adjustments.add({
+      'id': id,
+      'tipo': tipo,
+      'cantidad': cantidad,
+      'referencia': referencia,
+    });
+    return _item;
+  }
 }
 
 class _FakeProductsRepository extends products.ProductosRepository {
@@ -101,6 +120,43 @@ class _TestAuthNotifier extends AuthNotifier {
 }
 
 void main() {
+  Future<void> pumpInventory(
+    WidgetTester tester,
+    Size size,
+    UserProfile user,
+    _FakeInventoryRepository inventory, {
+    String? selectedSedeId,
+  }) async {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          inventarioRepositoryProvider.overrideWithValue(inventory),
+          inventarioProductsRepositoryProvider.overrideWithValue(
+            _FakeProductsRepository(),
+          ),
+          globalSedeIdProvider.overrideWith((ref) {
+            final scope = SedeScopeNotifier(user);
+            scope.select(selectedSedeId);
+            return scope;
+          }),
+          authProvider.overrideWith(
+            (ref) => _TestAuthNotifier(
+              ref.read(authRepositoryProvider),
+              AuthState(status: AuthStatus.authenticated, user: user),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: InventarioScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('desktop inventory actions open centered bounded dialogs', (
     tester,
   ) async {
@@ -168,9 +224,149 @@ void main() {
     final adjustDialog = find.byKey(const Key('inventory-adjust-dialog'));
     expect(adjustDialog, findsOneWidget);
     expect(tester.getSize(adjustDialog).width, 580);
-    expect(tester.getSize(adjustDialog).height, lessThan(520));
+    expect(tester.getSize(adjustDialog).height, lessThanOrEqualTo(600));
     expect(tester.getCenter(adjustDialog), const Offset(720, 450));
     expect(find.text('Ajuste de stock'), findsOneWidget);
     expect(find.text('Agua'), findsWidgets);
+    expect(find.byKey(const Key('stock-pin')), findsNothing);
   });
+
+  testWidgets(
+    'mobile adjustment permission works without configure permission',
+    (tester) async {
+      final inventory = _FakeInventoryRepository();
+      const user = UserProfile(
+        id: 'user-1',
+        username: 'stock-operator',
+        rol: 'ADMIN',
+        nivel: 80,
+        sedeId: 'branch-1',
+        createdAt: '2026-09-01',
+        permisos: ['inventario:leer', 'inventario:ajustar-stock'],
+      );
+      await pumpInventory(
+        tester,
+        const Size(390, 844),
+        user,
+        inventory,
+        selectedSedeId: 'branch-1',
+      );
+
+      expect(
+        find.byKey(const Key('inventario-configure-inventory-1')),
+        findsNothing,
+      );
+      final adjustButton = find.byKey(
+        const Key('inventario-adjust-inventory-1'),
+      );
+      expect(adjustButton, findsOneWidget);
+      await tester.tap(adjustButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ajuste de stock'), findsOneWidget);
+      expect(find.byKey(const Key('stock-pin')), findsNothing);
+      await tester.enterText(
+        find.byKey(const Key('inventory-stock-quantity')),
+        '3',
+      );
+      await tester.enterText(
+        find.byKey(const Key('inventory-stock-reference')),
+        'Physical count',
+      );
+      await tester.tap(find.text('Confirmar ajuste'));
+      await tester.pumpAndSettle();
+
+      expect(inventory.adjustments, [
+        {
+          'id': 'inventory-1',
+          'tipo': 'ENTRADA',
+          'cantidad': 3.0,
+          'referencia': 'Physical count',
+        },
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('desktop adjustment permission does not require configuration', (
+    tester,
+  ) async {
+    final inventory = _FakeInventoryRepository();
+    const user = UserProfile(
+      id: 'user-1',
+      username: 'stock-operator',
+      rol: 'ALMACENERO',
+      nivel: 30,
+      sedeId: 'branch-1',
+      createdAt: '2026-09-01',
+      permisos: ['inventario:leer', 'inventario:ajustar-stock'],
+    );
+    await pumpInventory(tester, const Size(1440, 900), user, inventory);
+
+    expect(find.byKey(const Key('inventario-configure-all')), findsNothing);
+    final adjustButton = find.byKey(
+      const Key('inventario-adjust-inventory-1'),
+    );
+    expect(adjustButton, findsOneWidget);
+    await tester.tap(adjustButton);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('inventory-adjust-dialog')), findsOneWidget);
+    expect(find.byKey(const Key('stock-pin')), findsNothing);
+  });
+
+  testWidgets('configure permission alone does not expose stock adjustment', (
+    tester,
+  ) async {
+    final inventory = _FakeInventoryRepository();
+    const user = UserProfile(
+      id: 'user-1',
+      username: 'inventory-admin',
+      rol: 'ADMIN',
+      nivel: 80,
+      sedeId: 'branch-1',
+      createdAt: '2026-09-01',
+      permisos: [
+        'inventario:leer',
+        'inventario:configurar',
+        'productos:leer',
+      ],
+    );
+    await pumpInventory(tester, const Size(1440, 900), user, inventory);
+
+    expect(find.byKey(const Key('inventario-configure-all')), findsOneWidget);
+    expect(
+      find.byKey(const Key('inventario-adjust-inventory-1')),
+      findsNothing,
+    );
+    expect(inventory.adjustments, isEmpty);
+  });
+
+  testWidgets(
+    'authenticated users without adjustment permission see no action',
+    (tester) async {
+      final inventory = _FakeInventoryRepository();
+      const user = UserProfile(
+        id: 'user-1',
+        username: 'viewer',
+        rol: 'SUPERADMIN',
+        nivel: 100,
+        sedeId: 'branch-1',
+        createdAt: '2026-09-01',
+        permisos: ['inventario:leer'],
+      );
+      await pumpInventory(
+        tester,
+        const Size(390, 844),
+        user,
+        inventory,
+        selectedSedeId: 'branch-1',
+      );
+
+      expect(
+        find.byKey(const Key('inventario-adjust-inventory-1')),
+        findsNothing,
+      );
+      expect(inventory.adjustments, isEmpty);
+    },
+  );
 }

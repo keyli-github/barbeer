@@ -11,11 +11,38 @@ import '../../../core/errors/app_exception.dart';
 
 const _uuid = Uuid();
 
+typedef ResponsableCajaRequest =
+    Future<Response<dynamic>> Function(String? sedeId);
+typedef CreateVentaRequest =
+    Future<Response<dynamic>> Function(Map<String, dynamic> payload);
+
+class OfflineSaleDraftSaved implements Exception {
+  final String idempotencyKey;
+  final String message;
+
+  const OfflineSaleDraftSaved({
+    required this.idempotencyKey,
+    required this.message,
+  });
+
+  @override
+  String toString() => message;
+}
+
 /// Repositorio para el módulo de Ventas.
 /// Consume los endpoints del VentasModule y EtiquetasModule del backend.
 class VentasRepository {
   final ApiClient _api;
-  const VentasRepository(this._api);
+  final OfflineStore? offlineStore;
+  final ResponsableCajaRequest? responsableCajaRequest;
+  final CreateVentaRequest? createVentaRequest;
+
+  const VentasRepository(
+    this._api, {
+    this.offlineStore,
+    this.responsableCajaRequest,
+    this.createVentaRequest,
+  });
 
   // ── Ventas ─────────────────────────────────────────────────────────────────
 
@@ -27,59 +54,123 @@ class VentasRepository {
   /// [idempotencyKey] se genera con [generateIdempotencyKey()].
   /// El backend calcula precios y totales; el cliente solo envía productoId + cantidad.
   Future<Venta> crearVenta({required CreateVentaPayload payload}) async {
-    final store = OfflineStore.instance;
+    final store = offlineStore ?? OfflineStore.instance;
     final scope = await store.scope();
-    Map<String, dynamic> recovery = payload.json;
+    Map<String, dynamic> recovery = {
+      ...payload.json,
+      if (payload.manualReviewItems.isNotEmpty)
+        '_manualReviewItems': payload.manualReviewItems,
+    };
     if (scope != null) {
       final previous = (await store.sales(
         scope,
       )).where((record) => record['id'] == payload.idempotencyKey).firstOrNull;
       if (previous != null) {
         recovery = Map<String, dynamic>.from(previous['payload'] as Map);
-      } else {
-        final box = await _api.get(
-          '/caja/responsable',
-          queryParameters: {'sedeId': ?payload.json['sedeId']},
-        );
-        recovery = {
-          ...payload.json,
-          '_originalCajaId': (box.data as Map?)?['id'],
-        };
-      }
-      if (previous != null &&
-          previous['status'] != 'SYNCED' &&
-          payload.json['estadoConciliacion'] != 'PENDIENTE') {
-        final box = await _api.get(
-          '/caja/responsable',
-          queryParameters: {'sedeId': ?payload.json['sedeId']},
-        );
-        if (recovery['_originalCajaId'] == null ||
-            recovery['_originalCajaId'] != (box.data as Map?)?['id']) {
-          throw const AppException(
+        if (previous['status'] == 'SYNCED') {
+          throw const ConflictException(
             message:
-                'La caja original cambió. Revisa la venta con un administrador antes de registrarla en otra caja.',
+                'Esta venta ya fue sincronizada. Revisa el historial antes de registrarla nuevamente.',
           );
         }
+        const reviewMessage =
+            'El intento anterior quedó sin confirmar y no tiene metadata offline verificable. Revisa el historial con un responsable antes de registrarla nuevamente.';
+        if (previous['status'] == 'DRAFT') {
+          throw OfflineSaleDraftSaved(
+            idempotencyKey: payload.idempotencyKey,
+            message: previous['error'] as String? ?? reviewMessage,
+          );
+        }
+        await store.record(scope, recovery, 'DRAFT', error: reviewMessage);
+        throw OfflineSaleDraftSaved(
+          idempotencyKey: payload.idempotencyKey,
+          message: reviewMessage,
+        );
+      }
+
+      Response<dynamic> box;
+      try {
+        box = await _getResponsableCaja(payload.json['sedeId'] as String?);
+      } on NetworkException {
+        return _saveManualReviewDraft(
+          store: store,
+          scope: scope,
+          payload: recovery,
+          idempotencyKey: payload.idempotencyKey,
+          message:
+              'No se pudo verificar la caja original sin conexión. El borrador requiere revisión manual y no se enviará automáticamente.',
+        );
+      }
+      recovery = {
+        ...payload.json,
+        if (payload.manualReviewItems.isNotEmpty)
+          '_manualReviewItems': payload.manualReviewItems,
+        '_originalCajaId': (box.data as Map?)?['id'],
+      };
+      if (box.extra['offline'] == true) {
+        return _saveManualReviewDraft(
+          store: store,
+          scope: scope,
+          payload: recovery,
+          idempotencyKey: payload.idempotencyKey,
+          message:
+              'La sesión de caja en caché no incluye metadata verificable de dispositivo y hora. El borrador requiere revisión manual y no se enviará automáticamente.',
+        );
       }
       await store.record(scope, recovery, 'PENDING');
     }
     try {
-      final response = await _api.post(ApiConstants.ventas, data: payload.json);
+      final response = await _postVenta(payload.json);
       final sale = Venta.fromJson(
         Map<String, dynamic>.from(response.data as Map),
       );
       if (scope != null) await store.record(scope, recovery, 'SYNCED');
       return sale;
     } catch (error) {
-      if (scope != null)
-        await store.record(
-          scope,
-          recovery,
-          error is NetworkException ? 'PENDING' : 'REVIEW',
-          error: '$error',
+      if (scope != null && error is NetworkException) {
+        return _saveManualReviewDraft(
+          store: store,
+          scope: scope,
+          payload: recovery,
+          idempotencyKey: payload.idempotencyKey,
+          message:
+              'No se recibió confirmación del servidor y falta metadata offline verificable para repetir la venta. Revisa el historial antes de registrarla nuevamente.',
         );
+      }
+      if (scope != null) {
+        await store.record(scope, recovery, 'REVIEW', error: '$error');
+      }
       rethrow;
     }
+  }
+
+  Future<Response<dynamic>> _getResponsableCaja(String? sedeId) {
+    final request = responsableCajaRequest;
+    if (request != null) return request(sedeId);
+    return _api.get<dynamic>(
+      '/caja/responsable',
+      queryParameters: {'sedeId': ?sedeId},
+    );
+  }
+
+  Future<Response<dynamic>> _postVenta(Map<String, dynamic> payload) {
+    final request = createVentaRequest;
+    if (request != null) return request(payload);
+    return _api.post<dynamic>(ApiConstants.ventas, data: payload);
+  }
+
+  Future<Never> _saveManualReviewDraft({
+    required OfflineStore store,
+    required String scope,
+    required Map<String, dynamic> payload,
+    required String idempotencyKey,
+    required String message,
+  }) async {
+    await store.record(scope, payload, 'DRAFT', error: message);
+    throw OfflineSaleDraftSaved(
+      idempotencyKey: idempotencyKey,
+      message: message,
+    );
   }
 
   Future<ComprobanteAnalisis> analizarComprobante({

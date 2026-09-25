@@ -17,7 +17,8 @@ import '../../../../core/widgets/responsive_form.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categorias/data/categorias_repository.dart';
-import '../../../inventario/data/inventario_repository.dart';
+import '../../../usuarios/data/usuario_admin_repository.dart';
+import '../../../usuarios/presentation/widgets/pin_stock_adjust_sheet.dart';
 import '../../data/productos_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
@@ -26,8 +27,9 @@ final productosCatalogRepositoryProvider = Provider<ProductosRepository>(
   (ref) => ProductosRepository(ApiClient.instance),
 );
 
-final productosInventarioRepositoryProvider = Provider<InventarioRepository>(
-  (ref) => InventarioRepository(ApiClient.instance),
+final productoStockAdjustmentRepositoryProvider =
+    Provider<UsuarioAdminRepository>(
+      (ref) => UsuarioAdminRepository(ApiClient.instance),
 );
 
 final _categoriasProvider = FutureProvider<List<Categoria>>((ref) async {
@@ -203,7 +205,9 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     final canCreate = auth.hasPermission('productos:crear');
     final canEdit = auth.hasPermission('productos:editar');
     final canDelete = auth.hasPermission('productos:eliminar');
-    final canAdjustStock = auth.user != null;
+    final role = auth.user?.rol.toUpperCase();
+    final canAdjustStock =
+        auth.isAuthenticated && auth.user != null && role != 'VENDEDORA';
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return Scaffold(
@@ -338,9 +342,13 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
                           .clamp(1, 8);
                   final cardWidth =
                       (availableWidth - gap * (columns - 1)) / columns;
-                  // The body and stock actions fit in 180 logical pixels.
+                  // Mobile stock actions use two full-width buttons.
                   final imageHeight = cardWidth * .75;
-                  final infoHeight = desktop ? 180.0 : 160.0;
+                  final infoHeight = desktop
+                      ? 180.0
+                      : canAdjustStock
+                      ? 260.0
+                      : 160.0;
                   final cardHeight = imageHeight + infoHeight;
                   return SliverPadding(
                     padding: EdgeInsets.fromLTRB(
@@ -483,21 +491,36 @@ class _ProductosScreenState extends ConsumerState<ProductosScreen> {
     Producto product,
     String type,
   ) async {
-    final repository = ref.read(productosInventarioRepositoryProvider);
-    await showDialog<void>(
+    final auth = ref.read(authProvider);
+    final user = auth.user;
+    if (!auth.isAuthenticated ||
+        user == null ||
+        user.rol.toUpperCase() == 'VENDEDORA') {
+      return;
+    }
+    final isSuperAdmin = user.isSuperAdmin;
+    await ResponsiveForm.show<void>(
       context: context,
-      useRootNavigator: true,
-      builder: (_) => _StockAdjustmentDialog(
-        itemFuture: repository
-            .list(
-              limite: 1,
-              productoId: product.id,
-              sedeId: ref.read(globalSedeIdProvider),
-            )
-            .then((page) => page.data.firstOrNull),
-        initialType: type,
-        repository: repository,
-        onSaved: () => ref.read(_productosNotifier.notifier).load(),
+      builder: (dialogMode) => ResponsiveFormScaffold(
+        dialogMode: dialogMode,
+        dialogKey: const ValueKey('product-stock-adjust-dialog'),
+        dialogWidth: 580,
+        dialogHeight: 580,
+        title: type == 'ENTRADA' ? 'Ingreso de stock' : 'Salida de stock',
+        subtitle: product.nombre,
+        body: PinStockAdjustSheet(
+          productId: product.id,
+          productName: product.nombre,
+          currentStock: product.stockDisponible?.toDouble(),
+          sedeId: isSuperAdmin
+              ? ref.read(globalSedeIdProvider) ?? user.sedeId
+              : null,
+          isSuperAdmin: isSuperAdmin,
+          initialType: type,
+          repo: ref.read(productoStockAdjustmentRepositoryProvider),
+          onSaved: () => ref.read(_productosNotifier.notifier).load(),
+          showHeader: false,
+        ),
       ),
     );
   }
@@ -1283,6 +1306,34 @@ class _ProductCard extends StatelessWidget {
         : (product.margin ?? -1) >= 20
         ? AppColors.warning
         : AppColors.error;
+    final ingresoButton = OutlinedButton.icon(
+      key: ValueKey('product-stock-in-${product.id}'),
+      onPressed: onIngreso,
+      icon: const Icon(Icons.arrow_circle_down_outlined, size: 16),
+      label: const Text('Ingreso'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.success,
+        minimumSize: Size(0, desktop ? 38.0 : 44.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        side: BorderSide(color: AppColors.success.withValues(alpha: .35)),
+      ),
+    );
+    final salidaButton = OutlinedButton.icon(
+      key: ValueKey('product-stock-out-${product.id}'),
+      onPressed: onSalida,
+      icon: const Icon(Icons.arrow_circle_up_outlined, size: 16),
+      label: const Text('Salida'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.error,
+        minimumSize: Size(0, desktop ? 38.0 : 44.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        side: BorderSide(color: AppColors.error.withValues(alpha: .35)),
+      ),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -1493,7 +1544,7 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
           ),
-          if (desktop && canAdjustStock)
+          if (canAdjustStock)
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Column(
@@ -1523,57 +1574,22 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onIngreso,
-                          icon: const Icon(
-                            Icons.arrow_circle_down_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Ingreso'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.success,
-                            minimumSize: const Size(0, 38),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            side: BorderSide(
-                              color: AppColors.success.withValues(alpha: .35),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onSalida,
-                          icon: const Icon(
-                            Icons.arrow_circle_up_outlined,
-                            size: 16,
-                          ),
-                          label: const Text('Salida'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            minimumSize: const Size(0, 38),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            side: BorderSide(
-                              color: AppColors.error.withValues(alpha: .35),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  if (desktop)
+                    Row(
+                      children: [
+                        Expanded(child: ingresoButton),
+                        const SizedBox(width: 8),
+                        Expanded(child: salidaButton),
+                      ],
+                    )
+                  else
+                    Column(
+                      children: [
+                        SizedBox(width: double.infinity, child: ingresoButton),
+                        const SizedBox(height: 6),
+                        SizedBox(width: double.infinity, child: salidaButton),
+                      ],
+                    ),
                 ],
               ),
             )
@@ -1614,142 +1630,6 @@ class _ProductCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _StockAdjustmentDialog extends StatefulWidget {
-  final Future<InventarioItem?> itemFuture;
-  final String initialType;
-  final InventarioRepository repository;
-  final VoidCallback onSaved;
-
-  const _StockAdjustmentDialog({
-    required this.itemFuture,
-    required this.initialType,
-    required this.repository,
-    required this.onSaved,
-  });
-
-  @override
-  State<_StockAdjustmentDialog> createState() => _StockAdjustmentDialogState();
-}
-
-class _StockAdjustmentDialogState extends State<_StockAdjustmentDialog> {
-  final _quantity = TextEditingController();
-  final _reference = TextEditingController();
-  bool _saving = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _quantity.dispose();
-    _reference.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit(InventarioItem item) async {
-    final amount = double.tryParse(_quantity.text.replaceAll(',', '.'));
-    if (amount == null || amount <= 0) {
-      setState(() => _error = 'Ingresa una cantidad válida.');
-      return;
-    }
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    try {
-      await widget.repository.ajustar(
-        item.id,
-        tipo: widget.initialType,
-        cantidad: amount,
-        referencia: _reference.text.trim().isEmpty
-            ? null
-            : _reference.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.pop(context);
-      widget.onSaved();
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _saving = false;
-          _error = error.toString();
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<InventarioItem?>(
-    future: widget.itemFuture,
-    builder: (context, snapshot) {
-      final item = snapshot.data;
-      final loading = snapshot.connectionState != ConnectionState.done;
-      final unavailable = !loading && (snapshot.hasError || item == null);
-      return AlertDialog(
-        title: Text(
-          widget.initialType == 'ENTRADA'
-              ? 'Ingreso de stock'
-              : 'Salida de stock',
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: loading
-              ? const SizedBox(
-                  width: 420,
-                  height: 120,
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : unavailable
-              ? Text(
-                  snapshot.hasError
-                      ? 'No se pudo cargar el inventario. Intenta nuevamente.'
-                      : 'Configura este producto en Inventario antes de ajustar stock.',
-                )
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${item!.producto} · Stock ${item.stock}'),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: _quantity,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(labelText: 'Cantidad'),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _reference,
-                      decoration: const InputDecoration(
-                        labelText: 'Referencia',
-                      ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ],
-                  ],
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          if (!unavailable)
-            FilledButton(
-              onPressed: loading || _saving ? null : () => _submit(item!),
-              child: Text(_saving ? 'Guardando...' : 'Confirmar'),
-            ),
-        ],
-      );
-    },
-  );
 }
 
 // ─── Subpantalla: Detalle de Producto ────────────────────────────────────────

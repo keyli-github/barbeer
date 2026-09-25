@@ -17,6 +17,10 @@ const _category = Categoria(
 );
 
 class _FakeCategoriesRepository extends CategoriasRepository {
+  String? deletedId;
+  String? updatedId;
+  bool? updatedActivo;
+
   @override
   Future<CategoriasPage> list({
     int pagina = 1,
@@ -30,6 +34,43 @@ class _FakeCategoriesRepository extends CategoriasRepository {
     limite: 25,
     totalPaginas: 1,
   );
+
+  @override
+  Future<void> delete(String id) async {
+    deletedId = id;
+  }
+
+  @override
+  Future<Categoria> update(
+    String id, {
+    required String nombre,
+    required String descripcion,
+    required bool activo,
+  }) async {
+    updatedId = id;
+    updatedActivo = activo;
+    return Categoria(
+      id: id,
+      nombre: nombre,
+      descripcion: descripcion,
+      activo: activo,
+      productosCount: _category.productosCount,
+    );
+  }
+}
+
+class _StaticCategoriesNotifier extends CategoriasNotifier {
+  _StaticCategoriesNotifier(CategoriasRepository repository)
+    : super(repository) {
+    state = const CategoriasState(
+      categorias: [_category],
+      total: 1,
+      totalPaginas: 1,
+    );
+  }
+
+  @override
+  Future<void> load({int? pagina}) async {}
 }
 
 class _TestAuthNotifier extends AuthNotifier {
@@ -90,5 +131,149 @@ void main() {
     expect(find.byKey(const Key('category-form-dialog')), findsOneWidget);
     expect(find.text('Editar categoria'), findsOneWidget);
     expect(find.text('Agua'), findsWidgets);
+  });
+
+  testWidgets('mobile category delete action is shown only with permission', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = _FakeCategoriesRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          categoriasProvider.overrideWith(
+            (ref) => _StaticCategoriesNotifier(repository),
+          ),
+          authProvider.overrideWith(
+            (ref) => _TestAuthNotifier(
+              ref.read(authRepositoryProvider),
+              const AuthState(
+                status: AuthStatus.authenticated,
+                user: UserProfile(
+                  id: 'user-1',
+                  username: 'admin',
+                  rol: 'ADMIN',
+                  nivel: 80,
+                  createdAt: '2026-09-01',
+                  permisos: ['categorias:leer', 'categorias:eliminar'],
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: CategoriasScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Dar de baja'), findsOneWidget);
+    expect(find.text('Desactivar (cambiar estado)'), findsNothing);
+    await tester.tap(find.text('Dar de baja'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dar de baja categoría'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Dar de baja'));
+    await tester.pumpAndSettle();
+    expect(repository.deletedId, 'category-1');
+  });
+
+  testWidgets(
+    'mobile category state toggle and semantic deactivation are distinct',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final repository = _FakeCategoriesRepository();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            categoriasProvider.overrideWith(
+              (ref) => _StaticCategoriesNotifier(repository),
+            ),
+            authProvider.overrideWith(
+              (ref) => _TestAuthNotifier(
+                ref.read(authRepositoryProvider),
+                const AuthState(
+                  status: AuthStatus.authenticated,
+                  user: UserProfile(
+                    id: 'user-1',
+                    username: 'admin',
+                    rol: 'ADMIN',
+                    nivel: 80,
+                    createdAt: '2026-09-01',
+                    permisos: [
+                      'categorias:leer',
+                      'categorias:editar',
+                      'categorias:eliminar',
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: CategoriasScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('Desactivar (cambiar estado)'), findsOneWidget);
+      expect(find.text('Dar de baja'), findsOneWidget);
+      expect(find.text('Desactivar'), findsNothing);
+
+      await tester.tap(find.text('Desactivar (cambiar estado)'));
+      await tester.pumpAndSettle();
+      expect(repository.updatedId, 'category-1');
+      expect(repository.updatedActivo, isFalse);
+      expect(repository.deletedId, isNull);
+    },
+  );
+
+  testWidgets('mobile category delete action is absent without permission', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          categoriasProvider.overrideWith(
+            (ref) => _StaticCategoriesNotifier(_FakeCategoriesRepository()),
+          ),
+          authProvider.overrideWith(
+            (ref) => _TestAuthNotifier(
+              ref.read(authRepositoryProvider),
+              const AuthState(
+                status: AuthStatus.authenticated,
+                user: UserProfile(
+                  id: 'user-1',
+                  username: 'admin',
+                  rol: 'ADMIN',
+                  nivel: 80,
+                  createdAt: '2026-09-01',
+                  permisos: ['categorias:leer'],
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: CategoriasScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
   });
 }

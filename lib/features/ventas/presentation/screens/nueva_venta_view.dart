@@ -714,10 +714,12 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     });
   }
 
-  void _clearCart() {
-    _cancelAnalysis(_comprobanteAnalisis);
-    for (final a in _comprobantesAdicionales) {
-      _cancelAnalysis(a);
+  void _clearCart({bool cancelAnalysis = true}) {
+    if (cancelAnalysis) {
+      _cancelAnalysis(_comprobanteAnalisis);
+      for (final a in _comprobantesAdicionales) {
+        _cancelAnalysis(a);
+      }
     }
     _voucherRequestToken++;
     setState(() {
@@ -1722,6 +1724,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
               },
             )
             .toList(),
+        manualReviewItems: _carrito
+            .map(
+              (item) => <String, dynamic>{
+                'productId': item.productoId,
+                'productName': item.nombre,
+                'quantity': item.cantidad,
+              },
+            )
+            .toList(),
         sedeId: auth.user?.isSuperAdmin == true ? sedeId : null,
         vendedoraId: _vendedoraId ?? auth.user?.id,
         estadoConciliacion: _payment,
@@ -1845,6 +1856,19 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       });
     } catch (e) {
       if (!mounted) return;
+      if (e is OfflineSaleDraftSaved) {
+        _clearCart(cancelAnalysis: false);
+        if (!mounted) return;
+        setState(() {
+          _completedSale = null;
+          _refreshWarning = null;
+          _submitting = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+        return;
+      }
       final error = _friendlySubmitError(e);
       final isAmbiguous = _isAmbiguousError(e);
       setState(() {
@@ -1900,6 +1924,15 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                 'precioVenta': i.precio,
                 'recargoMonto': ?i.recargoMonto,
                 'recargoMotivo': ?i.recargoMotivo,
+              },
+            )
+            .toList(),
+        manualReviewItems: _carrito
+            .map(
+              (item) => <String, dynamic>{
+                'productId': item.productoId,
+                'productName': item.nombre,
+                'quantity': item.cantidad,
               },
             )
             .toList(),

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/navigation/app_nav.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/providers/sede_scope_provider.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -17,8 +16,6 @@ import '../../../../core/widgets/responsive_form.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../categorias/data/categorias_repository.dart' show Categoria;
 import '../../../productos/data/productos_repository.dart' as products;
-import '../../../usuarios/data/usuario_admin_repository.dart';
-import '../../../usuarios/presentation/widgets/pin_stock_adjust_sheet.dart';
 import '../../data/inventario_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
@@ -203,7 +200,8 @@ class InventarioScreen extends ConsumerWidget {
         auth.hasPermission('productos:leer') &&
         (auth.user?.isSuperAdmin != true ||
             auth.hasPermission('establecimientos:leer'));
-    final canAjustarStock = auth.hasPermission('inventario:ajustar-stock');
+    final canAjustarStock =
+        auth.isAuthenticated && auth.hasPermission('inventario:ajustar-stock');
     final selectedSedeId = ref.watch(globalSedeIdProvider);
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
@@ -283,7 +281,6 @@ class InventarioScreen extends ConsumerWidget {
                     for (final item in state.items)
                       _InventarioTile(
                         item: item,
-                        canEdit: canConfigure,
                         canConfigure: canConfigure,
                         canAdjust:
                             canAjustarStock &&
@@ -308,13 +305,17 @@ class InventarioScreen extends ConsumerWidget {
 
   void _showAdjust(BuildContext context, WidgetRef ref, InventarioItem item) {
     final auth = ref.read(authProvider);
+    final selectedSedeId = ref.read(globalSedeIdProvider);
+    if (!auth.isAuthenticated ||
+        !auth.hasPermission('inventario:ajustar-stock') ||
+        (auth.user?.isSuperAdmin == true && selectedSedeId == null)) {
+      return;
+    }
     ResponsiveForm.show<void>(
       context: context,
-      builder: (dialogMode) => _PinAdjustWrapper(
+      builder: (dialogMode) => _AdjustSheet(
         item: item,
         dialogMode: dialogMode,
-        isSuperAdmin: auth.user?.isSuperAdmin == true,
-        sedeId: ref.read(globalSedeIdProvider),
         onSaved: () => ref.read(_invProvider.notifier).load(),
         repo: ref.read(inventarioRepositoryProvider),
       ),
@@ -905,47 +906,6 @@ class _InventoryStatusBadge extends StatelessWidget {
   }
 }
 
-// ─── PIN-authorized stock adjustment wrapper ─────────────────────────────────
-
-class _PinAdjustWrapper extends StatelessWidget {
-  final InventarioItem item;
-  final bool dialogMode;
-  final bool isSuperAdmin;
-  final String? sedeId;
-  final VoidCallback onSaved;
-  final InventarioRepository repo;
-
-  const _PinAdjustWrapper({
-    required this.item,
-    required this.dialogMode,
-    required this.isSuperAdmin,
-    required this.sedeId,
-    required this.onSaved,
-    required this.repo,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ResponsiveFormScaffold(
-      dialogMode: dialogMode,
-      dialogKey: const ValueKey('inventory-adjust-dialog'),
-      dialogWidth: 580,
-      dialogHeight: 520,
-      title: 'Ajuste de stock',
-      body: PinStockAdjustSheet(
-        productId: item.productoId,
-        productName: item.producto,
-        currentStock: item.stock,
-        sedeId: item.sedeId.isNotEmpty ? item.sedeId : sedeId,
-        isSuperAdmin: isSuperAdmin,
-        repo: UsuarioAdminRepository(ApiClient.instance),
-        onSaved: onSaved,
-        showHeader: false,
-      ),
-    );
-  }
-}
-
 // ─── Barra de búsqueda + filtros ──────────────────────────────────────────────
 
 class _SearchBar extends StatefulWidget {
@@ -1260,11 +1220,10 @@ class _Chip extends StatelessWidget {
 
 class _InventarioTile extends StatelessWidget {
   final InventarioItem item;
-  final bool canEdit, canConfigure, canAdjust;
+  final bool canConfigure, canAdjust;
   final VoidCallback onConfigure, onAdjust;
   const _InventarioTile({
     required this.item,
-    required this.canEdit,
     required this.canConfigure,
     required this.canAdjust,
     required this.onConfigure,
@@ -1382,7 +1341,7 @@ class _InventarioTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                if (canEdit)
+                if (canConfigure || canAdjust)
                   Column(
                     children: [
                       if (canConfigure)
@@ -1390,10 +1349,12 @@ class _InventarioTile extends StatelessWidget {
                           onPressed: onConfigure,
                           child: const Text('Configurar'),
                         ),
-                      TextButton(
-                        onPressed: canAdjust ? onAdjust : null,
-                        child: const Text('Ajustar'),
-                      ),
+                      if (canAdjust)
+                        TextButton(
+                          key: ValueKey('inventario-adjust-${item.id}'),
+                          onPressed: onAdjust,
+                          child: const Text('Ajustar'),
+                        ),
                     ],
                   ),
               ],
@@ -1685,10 +1646,12 @@ class _InventoryConfigScreenState extends State<_InventoryConfigScreen> {
 
 class _AdjustSheet extends StatefulWidget {
   final InventarioItem item;
+  final bool dialogMode;
   final VoidCallback onSaved;
   final InventarioRepository repo;
   const _AdjustSheet({
     required this.item,
+    required this.dialogMode,
     required this.onSaved,
     required this.repo,
   });
@@ -1712,7 +1675,7 @@ class _AdjustSheetState extends State<_AdjustSheet> {
   }
 
   Future<void> _confirm() async {
-    final cant = double.tryParse(_cantCtrl.text);
+    final cant = double.tryParse(_cantCtrl.text.replaceAll(',', '.'));
     if (cant == null ||
         (_tipo != 'AJUSTE' && cant <= 0) ||
         (_tipo == 'AJUSTE' && cant < 0)) {
@@ -1743,176 +1706,177 @@ class _AdjustSheetState extends State<_AdjustSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: context.colors.surface,
-      appBar: SubPageAppBar(
-        title: 'Ajuste de stock',
-        subtitle: '${widget.item.producto} · Stock: ${widget.item.stock}',
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Resumen del producto ────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: context.colors.backgroundAlt,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: context.colors.borderLight),
-              ),
-              child: Row(
-                children: [
-                  DSProductImageSquare(
-                    imageUrl: widget.item.imagenUrl,
-                    size: 52,
-                    radius: 12,
-                    productName: widget.item.producto,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.item.producto,
-                          style: AppTextStyles.titleMedium,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${widget.item.codigo} · ${widget.item.categoria}',
-                          style: AppTextStyles.labelSmall,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Stock actual: ${widget.item.stock.toStringAsFixed(widget.item.stock % 1 == 0 ? 0 : 1)} ${widget.item.unidad} · '
-                          'Min ${widget.item.min.toStringAsFixed(0)} · '
-                          '${widget.item.max > 0 ? 'Max ${widget.item.max.toStringAsFixed(0)}' : 'Sin objetivo'}',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+  Widget build(BuildContext context) => ResponsiveFormScaffold(
+    dialogMode: widget.dialogMode,
+    dialogKey: const ValueKey('inventory-adjust-dialog'),
+    dialogWidth: 580,
+    dialogHeight: 600,
+    title: 'Ajuste de stock',
+    subtitle:
+        '${widget.item.producto} · Stock actual: ${widget.item.stock.toStringAsFixed(widget.item.stock % 1 == 0 ? 0 : 1)}',
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Inventory adjustments use the permission-guarded /inventario endpoint.
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.colors.backgroundAlt,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: context.colors.borderLight),
             ),
-            const SizedBox(height: 14),
-            // ── Selector de tipo de ajuste ──────────────────────────────────
-            Row(
+            child: Row(
               children: [
-                for (final t in [
-                  ('ENTRADA', 'Entrada'),
-                  ('SALIDA', 'Salida'),
-                  ('AJUSTE', 'Conteo'),
-                ])
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(right: t.$1 == 'AJUSTE' ? 0 : 8),
-                      child: GestureDetector(
-                        onTap: () => setState(() {
-                          _tipo = t.$1;
-                          _error = null;
-                        }),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          decoration: BoxDecoration(
-                            color: _tipo == t.$1
-                                ? context.colors.primarySurface
-                                : context.colors.backgroundAlt,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: _tipo == t.$1
-                                  ? context.colors.primaryBorder
-                                  : context.colors.border,
-                            ),
+                DSProductImageSquare(
+                  imageUrl: widget.item.imagenUrl,
+                  size: 52,
+                  radius: 12,
+                  productName: widget.item.producto,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.item.producto,
+                        style: AppTextStyles.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${widget.item.codigo} · ${widget.item.categoria}',
+                        style: AppTextStyles.labelSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Stock actual: ${widget.item.stock.toStringAsFixed(widget.item.stock % 1 == 0 ? 0 : 1)} ${widget.item.unidad} · '
+                        'Min ${widget.item.min.toStringAsFixed(0)} · '
+                        '${widget.item.max > 0 ? 'Max ${widget.item.max.toStringAsFixed(0)}' : 'Sin objetivo'}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (final type in [
+                ('ENTRADA', 'Entrada'),
+                ('SALIDA', 'Salida'),
+                ('AJUSTE', 'Conteo'),
+              ])
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: type.$1 == 'AJUSTE' ? 0 : 8,
+                    ),
+                    child: GestureDetector(
+                      onTap: _saving
+                          ? null
+                          : () => setState(() {
+                              _tipo = type.$1;
+                              _error = null;
+                            }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: BoxDecoration(
+                          color: _tipo == type.$1
+                              ? context.colors.primarySurface
+                              : context.colors.backgroundAlt,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _tipo == type.$1
+                                ? context.colors.primaryBorder
+                                : context.colors.border,
                           ),
-                          child: Text(
-                            t.$2,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: _tipo == t.$1
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: _tipo == t.$1
-                                  ? AppColors.primary
-                                  : context.colors.textSecondary,
-                            ),
+                        ),
+                        child: Text(
+                          type.$2,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: _tipo == type.$1
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: _tipo == type.$1
+                                ? AppColors.primary
+                                : context.colors.textSecondary,
                           ),
                         ),
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // ── Cantidad ────────────────────────────────────────────────────
-            TextField(
-              controller: _cantCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-              decoration: InputDecoration(
-                hintText: '0',
-                hintStyle: TextStyle(
-                  fontSize: 22,
-                  color: context.colors.textDisabled,
                 ),
-                labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // ── Referencia ──────────────────────────────────────────────────
-            TextField(
-              controller: _refCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Referencia (opcional)',
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: const TextStyle(color: AppColors.error, fontSize: 13),
-              ),
             ],
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _saving ? null : _confirm,
-                child: _saving
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Confirmar ajuste'),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const Key('inventory-stock-quantity'),
+            controller: _cantCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              hintText: '0',
+              hintStyle: TextStyle(
+                fontSize: 22,
+                color: context.colors.textDisabled,
               ),
+              labelText: _tipo == 'AJUSTE' ? 'Conteo físico' : 'Cantidad',
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const Key('inventory-stock-reference'),
+            controller: _refCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Referencia (opcional)',
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: const TextStyle(color: AppColors.error, fontSize: 13),
             ),
           ],
-        ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _confirm,
+              child: _saving
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Confirmar ajuste'),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }

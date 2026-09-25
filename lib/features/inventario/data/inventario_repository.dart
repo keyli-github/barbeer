@@ -1,4 +1,8 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/constants/api_constants.dart';
+
+typedef InventoryPatchRequest =
+    Future<Object?> Function(String path, Map<String, dynamic> body);
 
 class InventarioItem {
   final String id,
@@ -84,7 +88,9 @@ class InventarioPage {
 
 class InventarioRepository {
   final ApiClient _api;
-  const InventarioRepository(this._api);
+  final InventoryPatchRequest? patchRequest;
+
+  const InventarioRepository(this._api, {this.patchRequest});
 
   Future<InventarioPage> list({
     int pagina = 1,
@@ -153,15 +159,16 @@ class InventarioRepository {
     required double cantidad,
     String? referencia,
   }) async {
-    final r = await _api.patch(
-      '/inventario/$id/ajuste',
-      data: {
-        'tipo': tipo,
-        'cantidad': cantidad,
-        if (referencia?.trim().isNotEmpty ?? false)
-          'referencia': referencia!.trim(),
-      },
-    );
-    return InventarioItem.fromJson(Map<String, dynamic>.from(r.data as Map));
+    final path = ApiConstants.inventoryAdjust(id);
+    final body = {
+      'tipo': tipo,
+      'cantidad': cantidad,
+      if (referencia?.trim().isNotEmpty ?? false)
+        'referencia': referencia!.trim(),
+    };
+    final data = patchRequest != null
+        ? await patchRequest!(path, body)
+        : (await _api.patch(path, data: body)).data;
+    return InventarioItem.fromJson(Map<String, dynamic>.from(data as Map));
   }
 }

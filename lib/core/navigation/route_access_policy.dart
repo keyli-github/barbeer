@@ -3,19 +3,42 @@ import '../routes/route_paths.dart';
 class RouteAccessRule {
   final Set<String> roles;
   final Set<String> anyPermissions;
+  final Set<String> allPermissions;
+  final bool roleIsAlternative;
 
   const RouteAccessRule({
     this.roles = const {},
     this.anyPermissions = const {},
+    this.allPermissions = const {},
+    this.roleIsAlternative = false,
   });
-  const RouteAccessRule.any(this.anyPermissions) : roles = const {};
-  const RouteAccessRule.role(this.roles) : anyPermissions = const {};
-  const RouteAccessRule.both(this.roles, this.anyPermissions);
+  const RouteAccessRule.any(this.anyPermissions)
+    : roles = const {},
+      allPermissions = const {},
+      roleIsAlternative = false;
+  const RouteAccessRule.role(this.roles)
+    : anyPermissions = const {},
+      allPermissions = const {},
+      roleIsAlternative = false;
+  const RouteAccessRule.both(this.roles, this.anyPermissions)
+    : allPermissions = const {},
+      roleIsAlternative = false;
+  const RouteAccessRule.roleOrAllPermissions(this.roles, this.allPermissions)
+    : anyPermissions = const {},
+      roleIsAlternative = true;
 
   bool allows({required String role, required Iterable<String> permissions}) {
     final normalizedRole = role.toUpperCase();
+    final grantedPermissions = permissions.toSet();
+    final permissionAccess =
+        (anyPermissions.isEmpty ||
+            grantedPermissions.any(anyPermissions.contains)) &&
+        grantedPermissions.containsAll(allPermissions);
+    if (roleIsAlternative) {
+      return roles.contains(normalizedRole) || permissionAccess;
+    }
     return (roles.isEmpty || roles.contains(normalizedRole)) &&
-        (anyPermissions.isEmpty || permissions.any(anyPermissions.contains));
+        permissionAccess;
   }
 }
 
@@ -30,7 +53,10 @@ class RouteAccessPolicy {
     RoutePaths.asistencia: RouteAccessRule(),
     RoutePaths.pagos: RouteAccessRule(),
     RoutePaths.notificaciones: RouteAccessRule.any({'notificaciones:leer'}),
-    RoutePaths.ventasSinLuz: RouteAccessRule.role({'SUPERADMIN'}),
+    RoutePaths.ventasSinLuz: RouteAccessRule.roleOrAllPermissions(
+      {'SUPERADMIN'},
+      {'ventas:crear', 'ventas:sin-luz', 'ventas:leer-propias'},
+    ),
     RoutePaths.gastosInternos: RouteAccessRule.any({'gastos-internos:leer'}),
     RoutePaths.productosInternos: RouteAccessRule.any({
       'productos-internos:leer',

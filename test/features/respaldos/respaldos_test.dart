@@ -4,6 +4,28 @@ import 'package:barbeer/features/respaldos/data/models/respaldo_models.dart';
 import 'package:barbeer/features/respaldos/data/respaldos_repository.dart';
 
 void main() {
+  group('backup format permissions', () {
+    test('only the exact SUPERADMIN role can select PG_DUMP', () {
+      expect(allowedBackupFormatsForRole('SUPERADMIN'), contains('PG_DUMP'));
+      expect(allowedBackupFormatsForRole('ADMIN'), isNot(contains('PG_DUMP')));
+      expect(
+        allowedBackupFormatsForRole('superadmin'),
+        isNot(contains('PG_DUMP')),
+      );
+    });
+
+    test('filters a global dump out of non-superadmin schedule formats', () {
+      expect(
+        filterBackupFormatsForRole(['PG_DUMP', 'JSON'], 'ADMIN'),
+        ['JSON'],
+      );
+      expect(
+        filterBackupFormatsForRole(['PG_DUMP', 'JSON'], 'SUPERADMIN'),
+        ['PG_DUMP', 'JSON'],
+      );
+    });
+  });
+
   // ── DTO mapping ──────────────────────────────────────────────────────────
   group('BackupSchedule DTO', () {
     test('parses full schedule', () {
@@ -186,6 +208,18 @@ void main() {
       expect(result.filename, 'respaldo-run-abc1.xlsx');
       expect(result.contentType,
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    });
+
+    test('downloadArtifact maps PG_DUMP to its .dump filename and MIME', () async {
+      final repo = RespaldosRepository(
+        null,
+        bytesRequest: (path) async => Uint8List.fromList([1]),
+      );
+
+      final result = await repo.downloadArtifact('run-abc123', 'PG_DUMP');
+
+      expect(result.filename, 'respaldo-run-abc1.dump');
+      expect(result.contentType, 'application/vnd.postgresql.dump');
     });
   });
 

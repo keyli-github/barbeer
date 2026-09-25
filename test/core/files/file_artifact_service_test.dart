@@ -25,6 +25,18 @@ void main() {
     test('allows notes.txt with text/plain',
         () => expect(validateArtifact(_art(name: 'notes.txt', mime: 'text/plain')), isNull));
 
+    test('allows PostgreSQL dump with the backend content type', () => expect(
+        validateArtifact(_art(
+            name: 'yacare-database.dump',
+            mime: 'application/vnd.postgresql.dump')),
+        isNull));
+
+    test('rejects PostgreSQL dump with a mismatched content type', () => expect(
+        validateArtifact(_art(
+            name: 'yacare-database.dump',
+            mime: 'application/octet-stream')),
+        contains('does not match')));
+
     test('rejects README.sh — .sh not in allowlist', () =>
         expect(validateArtifact(_art(name: 'README.sh', mime: 'text/plain')),
             contains('.sh is not allowed')));
@@ -68,6 +80,23 @@ void main() {
       expect(capName, 'data.json');
     });
 
+    test('save PostgreSQL dump accepts the backend artifact on Android', () async {
+      String? savedFilename;
+      final service = AndroidFileArtifactService(
+        saveBridge: (filename, _) async {
+          savedFilename = filename;
+          return 'content://downloads/yacare-database.dump';
+        },
+      );
+      final result = await service.save(_art(
+        name: 'yacare-database.dump',
+        mime: 'application/vnd.postgresql.dump',
+      ));
+
+      expect(result, isA<FileArtifactSaved>());
+      expect(savedFilename, 'yacare-database.dump');
+    });
+
     test('save returns cancelled when bridge returns null', () async {
       final service = AndroidFileArtifactService(saveBridge: (_, __) async => null);
       expect(await service.save(_art()), isA<FileArtifactCancelled>());
@@ -100,6 +129,23 @@ void main() {
       expect(result, isA<FileArtifactSaved>());
       expect((result as FileArtifactSaved).savedPath, r'C:\Users\u\Downloads\data.json');
       expect(capName, 'data.json');
+    });
+
+    test('save PostgreSQL dump accepts the backend artifact on Windows', () async {
+      String? savedFilename;
+      final service = WindowsFileArtifactService(
+        saveBridge: (filename, _) async {
+          savedFilename = filename;
+          return r'C:\Downloads\yacare-database.dump';
+        },
+      );
+      final result = await service.save(_art(
+        name: 'yacare-database.dump',
+        mime: 'application/vnd.postgresql.dump',
+      ));
+
+      expect(result, isA<FileArtifactSaved>());
+      expect(savedFilename, 'yacare-database.dump');
     });
 
     test('save returns cancelled when bridge returns null', () async {

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../widgets/shift_schedule_editor.dart';
 import '../../../../core/utils/business_time.dart';
@@ -26,7 +28,7 @@ import '../../data/asistencia_repository.dart';
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-final _asistenciaRepoProvider = Provider<AsistenciaRepository>(
+final asistenciaRepositoryProvider = Provider<AsistenciaRepository>(
   (ref) => AsistenciaRepository(ApiClient.instance),
 );
 
@@ -189,7 +191,7 @@ class _AsistenciaNotifier extends StateNotifier<_AsistenciaState> {
 final _asistenciaProvider =
     StateNotifierProvider<_AsistenciaNotifier, _AsistenciaState>(
       (ref) => _AsistenciaNotifier(
-        ref.watch(_asistenciaRepoProvider),
+        ref.watch(asistenciaRepositoryProvider),
         ref.watch(globalSedeIdProvider),
       ),
     );
@@ -1627,7 +1629,7 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
       _error = null;
     });
     try {
-      final repo = ref.read(_asistenciaRepoProvider);
+      final repo = ref.read(asistenciaRepositoryProvider);
       final qr = await repo.qrKiosco(sedeId: widget.sedeId);
       if (!mounted) return;
       setState(() {
@@ -1685,13 +1687,16 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Escanea para marcar',
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.primary,
+              Expanded(
+                child: Text(
+                  'Escanea para marcar',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.titleMedium.copyWith(
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (_qr != null)
                 Text(
                   '${_secondsLeft}s',
@@ -1809,7 +1814,7 @@ class _QrKioscoTabState extends ConsumerState<_QrKioscoTab> {
   }
 }
 
-// ─── Asistencia de empleado: solo escáner ────────────────────────────────────
+// ─── Asistencia de empleado: marcaje desde el móvil ──────────────────────────
 
 class _EmployeeAttendanceView extends StatelessWidget {
   final String username;
@@ -1817,86 +1822,108 @@ class _EmployeeAttendanceView extends StatelessWidget {
   const _EmployeeAttendanceView({required this.username});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: context.colors.background,
-    body: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 120),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hola, $username',
-              style: AppTextStyles.headlineLarge.copyWith(
-                color: context.colors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Registra tu entrada diaria con el QR de tu sede. La salida se registra automáticamente al finalizar el turno.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: context.colors.textTertiary,
-              ),
-            ),
-            const Spacer(),
-            Center(
-              child: Container(
-                width: 224,
-                height: 224,
-                decoration: BoxDecoration(
-                  color: context.colors.surface,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: context.colors.border),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      Icons.qr_code_scanner_rounded,
-                      size: 112,
-                      color: AppColors.brand.withValues(alpha: 0.9),
-                    ),
-                    Positioned(
-                      bottom: 20,
-                      child: Text(
-                        'ENTRADA DIARIA',
-                        style: AppTextStyles.labelSmall.copyWith(
-                          color: context.colors.textTertiary,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
+  Widget build(BuildContext context) {
+    final isWindows = defaultTargetPlatform == TargetPlatform.windows;
+
+    return Scaffold(
+      backgroundColor: context.colors.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 120),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hola, $username',
+                style: AppTextStyles.headlineLarge.copyWith(
+                  color: context.colors.textPrimary,
                 ),
               ),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: () => _openScanner(context),
-                icon: const Icon(Icons.camera_alt_outlined, size: 19),
-                label: const Text('ESCANEAR QR DE ASISTENCIA'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                'El QR debe pertenecer a tu sede y estar vigente.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.labelSmall.copyWith(
+              const SizedBox(height: 4),
+              Text(
+                'Registra tu entrada diaria con el QR de tu sede. La salida se registra automáticamente al finalizar el turno.',
+                style: AppTextStyles.bodyMedium.copyWith(
                   color: context.colors.textTertiary,
                 ),
               ),
-            ),
-          ],
+              const Spacer(),
+              Center(
+                child: Container(
+                  width: 224,
+                  height: 224,
+                  decoration: BoxDecoration(
+                    color: context.colors.surface,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: context.colors.border),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        isWindows
+                            ? Icons.smartphone_rounded
+                            : Icons.qr_code_scanner_rounded,
+                        size: 112,
+                        color: AppColors.brand.withValues(alpha: 0.9),
+                      ),
+                      Positioned(
+                        bottom: 20,
+                        child: Text(
+                          'ENTRADA DIARIA',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: context.colors.textTertiary,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (isWindows)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'Para marcar tu asistencia, usa la app móvil en tu teléfono y escanea el QR del kiosco de tu sede.',
+                    key: const Key('attendance-phone-guidance'),
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: context.colors.textSecondary,
+                    ),
+                  ),
+                )
+              else ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    key: const Key('attendance-scan-qr'),
+                    onPressed: () => _openScanner(context),
+                    icon: const Icon(Icons.camera_alt_outlined, size: 19),
+                    label: const Text('ESCANEAR QR DE ASISTENCIA'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    'El QR debe pertenecer a tu sede y estar vigente.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: context.colors.textTertiary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Future<void> _openScanner(BuildContext context) async {
+    if (defaultTargetPlatform == TargetPlatform.windows) return;
     final status = await Permission.camera.request();
     if (!context.mounted) return;
     if (status.isGranted) {
@@ -2190,7 +2217,7 @@ class _QrScannerScreenState extends ConsumerState<_QrScannerScreen> {
     HapticFeedback.mediumImpact();
 
     try {
-      final repo = ref.read(_asistenciaRepoProvider);
+      final repo = ref.read(asistenciaRepositoryProvider);
       final result = await repo.marcar(barcode.rawValue!);
       if (!mounted) return;
       setState(() {
