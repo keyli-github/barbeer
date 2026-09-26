@@ -30,6 +30,11 @@ class OfflineStore {
             RegExp(r'^/pagos/recargos/[^/]+$').hasMatch(path))) {
       return false;
     }
+    // Cash balance payouts must be completed against the active Caja session.
+    if (method == 'POST' &&
+        RegExp(r'^/cuentas/[^/]+/saldo-a-favor/pagos$').hasMatch(path)) {
+      return false;
+    }
     if (path == '/asistencia/marcar' ||
         path.endsWith('/stock') ||
         path.contains('/sin-luz') ||

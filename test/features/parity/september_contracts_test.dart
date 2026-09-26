@@ -173,4 +173,15 @@ void main() {
       expect(OfflineStore.canCache('/asistencia/qr-kiosco'), isFalse);
     },
   );
+  test(
+    'cash balance payouts cannot enter the offline mutation queue',
+    () {
+      expect(
+        OfflineStore.canQueue('POST', '/cuentas/c1/saldo-a-favor/pagos'),
+        isFalse,
+      );
+      expect(OfflineStore.canQueue('POST', '/cuentas/c1/pagos'), isTrue);
+      expect(OfflineStore.canQueue('POST', '/gastos-internos'), isTrue);
+    },
+  );
 }
