@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -13,6 +12,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/anular_venta_dialog.dart';
+import '../widgets/venta_timestamps.dart';
 import 'conciliar_venta_screen.dart';
 
 class HistorialVentasView extends ConsumerStatefulWidget {
@@ -289,7 +289,6 @@ class _VentaCardState extends State<VentaHistoryCard> {
   @override
   Widget build(BuildContext context) {
     final venta = widget.venta;
-    final date = DateTime.tryParse(venta.createdAt)?.toLocal();
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return AnimatedOpacity(
@@ -371,38 +370,37 @@ class _VentaCardState extends State<VentaHistoryCard> {
                     ],
                   ),
                   const SizedBox(height: 5),
-                  // Row 2: username + date (muted)
+                  // Row 2: seller and business timestamps.
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      if (venta.vendedoraUsername != null) ...[
-                        Flexible(
-                          child: Text(
-                            venta.vendedoraUsername!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.colors.textTertiary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (venta.vendedoraUsername != null)
+                              Text(
+                                venta.vendedoraUsername!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.colors.textTertiary,
+                                ),
+                              ),
+                            VentaTimestamps(
+                              venta: venta,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.colors.textTertiary,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 14),
-                      ],
-                      if (date != null)
-                        Flexible(
-                          child: Text(
-                            DateFormat('dd/MM/yy, h:mm a').format(date),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.colors.textTertiary,
-                            ),
-                          ),
-                        ),
+                      ),
                       // Conciliar/corregir action (inline, subtle)
                       if (widget.onConciliar != null) ...[
-                        const Spacer(),
+                        const SizedBox(width: 8),
                         _ActionButton(
                           label: widget.correction ? 'Corregir' : 'Pendiente',
                           icon: Icons.account_balance_wallet_outlined,

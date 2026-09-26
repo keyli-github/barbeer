@@ -338,6 +338,8 @@ class Venta {
   final List<ComprobanteAnalisis> comprobantesAnalisis;
   final List<VentaItem> items;
   final String createdAt;
+  final String? fechaVenta;
+  final String? registradaAt;
 
   const Venta({
     required this.id,
@@ -362,6 +364,8 @@ class Venta {
     this.comprobantesAnalisis = const [],
     required this.items,
     required this.createdAt,
+    this.fechaVenta,
+    this.registradaAt,
   });
 
   factory Venta.fromJson(Map<String, dynamic> j) => Venta(
@@ -423,6 +427,9 @@ class Venta {
         )
         .toList(),
     createdAt: j['createdAt'] as String? ?? '',
+    fechaVenta: j['fechaVenta'] as String? ?? (j['createdAt'] as String? ?? ''),
+    registradaAt:
+        j['registradaAt'] as String? ?? (j['createdAt'] as String? ?? ''),
   );
 
   bool get isAnulada => estado == EstadoVenta.anulada;
