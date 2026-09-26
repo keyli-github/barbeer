@@ -32,12 +32,14 @@ String _fmt(double v) => FormatUtils.currency(v);
 /// Vista de creación de una nueva venta (catálogo + carrito).
 class NuevaVentaView extends ConsumerStatefulWidget {
   final Future<List<Producto>> Function()? productsLoader;
+  final ProductosRepository? productosRepository;
   final String? historicalCajaId;
   final String? historicalDate;
 
   const NuevaVentaView({
     super.key,
     this.productsLoader,
+    this.productosRepository,
     this.historicalCajaId,
     this.historicalDate,
   });
@@ -46,11 +48,21 @@ class NuevaVentaView extends ConsumerStatefulWidget {
 }
 
 class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
+  static const _productsPageSize = 50;
+  static const _productSearchDebounce = Duration(milliseconds: 300);
+
   final _searchCtrl = TextEditingController();
   List<Producto> _productos = [];
   bool _loadingProducts = true;
+  bool _loadingMoreProducts = false;
+  bool _hasMoreProducts = false;
   bool _needsSedeSelection = false;
   String? _errorProducts;
+  String? _errorLoadingMoreProducts;
+  int _productRequestVersion = 0;
+  int _nextProductPage = 2;
+  int _productTotal = 0;
+  Timer? _productSearchTimer;
   final List<CarritoItem> _carrito = [];
   bool _submitting = false;
   String? _submitError;
@@ -77,6 +89,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   int _voucherRequestToken = 0;
   String? _loadedSedeId;
   late final VentasRepository _repository;
+  late final ProductosRepository _productosRepository;
   // Comprobantes adicionales ya confirmados (APTO).
   final List<ComprobanteAnalisis> _comprobantesAdicionales = [];
   // Diferencia de billetera cubierta en efectivo (vuelto).
@@ -93,6 +106,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   void initState() {
     super.initState();
     _repository = ref.read(ventasRepositoryProvider);
+    _productosRepository =
+        widget.productosRepository ?? ProductosRepository(ApiClient.instance);
     _idempotencyKey = ref
         .read(ventasRepositoryProvider)
         .generateIdempotencyKey();
@@ -101,6 +116,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   @override
   void dispose() {
+    _productSearchTimer?.cancel();
+    _productRequestVersion++;
     _voucherRequestToken++;
     _cancelAnalysis(_comprobanteAnalisis);
     for (final a in _comprobantesAdicionales) {
@@ -110,10 +127,19 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadProducts({int? requestVersion}) async {
+    if (requestVersion == null) {
+      _productSearchTimer?.cancel();
+    }
+    final activeRequestVersion = requestVersion ?? ++_productRequestVersion;
+    final query = _searchCtrl.text.trim();
+    String? requestedSedeId;
     setState(() {
       _loadingProducts = true;
+      _loadingMoreProducts = false;
+      _hasMoreProducts = false;
       _errorProducts = null;
+      _errorLoadingMoreProducts = null;
     });
     try {
       final auth = ref.read(authProvider);
@@ -121,44 +147,133 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       final effectiveSedeId = auth.user?.isSuperAdmin == true
           ? selectedSedeId
           : auth.user?.sedeId;
+      requestedSedeId = effectiveSedeId;
       if (widget.productsLoader == null && effectiveSedeId == null) {
-        if (!mounted) return;
+        if (!mounted || activeRequestVersion != _productRequestVersion) return;
         setState(() {
           _productos = [];
           _loadingProducts = false;
+          _productTotal = 0;
+          _nextProductPage = 2;
           _needsSedeSelection = true;
           _loadedSedeId = null;
         });
         return;
       }
-      final products = widget.productsLoader != null
-          ? await widget.productsLoader!()
-          : (await ProductosRepository(ApiClient.instance).list(
+      final previousSedeId = _loadedSedeId;
+      final page = widget.productsLoader == null
+          ? await _productosRepository.list(
               pagina: 1,
-              limite: 100,
+              limite: _productsPageSize,
+              q: query.isEmpty ? null : query,
               activo: 'true',
+              disponiblePos: 'true',
               sedeId: effectiveSedeId,
-            )).data;
-      if (!mounted) return;
+            )
+          : null;
+      final products = page?.data ?? await widget.productsLoader!();
+      if (!mounted || activeRequestVersion != _productRequestVersion) return;
+      final visibleProducts = widget.productsLoader == null
+          ? products
+          : products.where((p) => p.disponiblePos && p.activo).toList();
       setState(() {
-        _productos = products
-            .where((p) => p.disponiblePos && p.activo)
-            .toList();
+        _productos = visibleProducts;
+        _productTotal = page?.total ?? visibleProducts.length;
+        _nextProductPage = (page?.pagina ?? 1) + 1;
+        _hasMoreProducts = page != null && page.pagina < page.totalPaginas;
         _loadingProducts = false;
         _needsSedeSelection = false;
         _loadedSedeId = effectiveSedeId;
       });
-      if (effectiveSedeId != null) {
+      if (effectiveSedeId != null && previousSedeId != effectiveSedeId) {
         await _loadSaleOptions(effectiveSedeId);
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || activeRequestVersion != _productRequestVersion) return;
       setState(() {
         _loadingProducts = false;
         _needsSedeSelection = false;
+        if (widget.productsLoader == null) {
+          _loadedSedeId = requestedSedeId;
+        }
         _errorProducts = e is StateError
             ? e.message.toString()
             : 'No se pudieron cargar los productos';
+      });
+    }
+  }
+
+  void _onProductSearchChanged(String _) {
+    if (widget.productsLoader != null) {
+      setState(() {});
+      return;
+    }
+
+    _productSearchTimer?.cancel();
+    final requestVersion = ++_productRequestVersion;
+    setState(() {
+      _loadingProducts = true;
+      _loadingMoreProducts = false;
+      _hasMoreProducts = false;
+      _errorProducts = null;
+      _errorLoadingMoreProducts = null;
+    });
+    _productSearchTimer = Timer(_productSearchDebounce, () {
+      if (!mounted || requestVersion != _productRequestVersion) return;
+      _loadProducts(requestVersion: requestVersion);
+    });
+  }
+
+  void _clearProductSearch() {
+    if (_searchCtrl.text.isEmpty) return;
+    _searchCtrl.clear();
+    _onProductSearchChanged('');
+  }
+
+  Future<void> _loadMoreProducts() async {
+    if (widget.productsLoader != null ||
+        _loadingProducts ||
+        _loadingMoreProducts ||
+        !_hasMoreProducts ||
+        _loadedSedeId == null) {
+      return;
+    }
+
+    final requestVersion = _productRequestVersion;
+    final pageNumber = _nextProductPage;
+    final query = _searchCtrl.text.trim();
+    final sedeId = _loadedSedeId!;
+    setState(() {
+      _loadingMoreProducts = true;
+      _errorLoadingMoreProducts = null;
+    });
+
+    try {
+      final page = await _productosRepository.list(
+        pagina: pageNumber,
+        limite: _productsPageSize,
+        q: query.isEmpty ? null : query,
+        activo: 'true',
+        disponiblePos: 'true',
+        sedeId: sedeId,
+      );
+      if (!mounted || requestVersion != _productRequestVersion) return;
+      setState(() {
+        final knownIds = _productos.map((product) => product.id).toSet();
+        _productos = [
+          ..._productos,
+          ...page.data.where((product) => knownIds.add(product.id)),
+        ];
+        _productTotal = page.total;
+        _nextProductPage = page.pagina + 1;
+        _hasMoreProducts = page.pagina < page.totalPaginas;
+        _loadingMoreProducts = false;
+      });
+    } catch (_) {
+      if (!mounted || requestVersion != _productRequestVersion) return;
+      setState(() {
+        _loadingMoreProducts = false;
+        _errorLoadingMoreProducts = 'No se pudieron cargar más productos';
       });
     }
   }
@@ -189,6 +304,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
   }
 
   List<Producto> get _filteredProducts {
+    if (widget.productsLoader == null) return _productos;
     final q = _searchCtrl.text.toLowerCase();
     if (q.isEmpty) return _productos;
     return _productos
@@ -2158,6 +2274,8 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
         ? 'Selecciona una sede'
         : _errorProducts != null
         ? 'No disponible'
+        : widget.productsLoader == null && _productTotal > _productos.length
+        ? '${_productos.length} de $_productTotal disponibles'
         : '${_filteredProducts.length} disponibles';
 
     return Container(
@@ -2201,17 +2319,24 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                         color: context.colors.textSecondary,
                       ),
                     ),
+                    IconButton(
+                      key: const Key('desktop-products-refresh'),
+                      tooltip: 'Actualizar catálogo',
+                      onPressed: _loadingProducts ? null : _loadProducts,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 44,
+                        height: 44,
+                      ),
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 DSSearchField(
                   controller: _searchCtrl,
                   placeholder: 'Buscar producto por nombre o código...',
-                  onChanged: (_) => setState(() {}),
-                  onClear: () {
-                    _searchCtrl.clear();
-                    setState(() {});
-                  },
+                  onChanged: _onProductSearchChanged,
+                  onClear: _clearProductSearch,
                 ),
               ],
             ),
@@ -2238,10 +2363,28 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
             AppSpacing.md,
             AppSpacing.xs,
           ),
-          child: DSSearchField(
-            controller: _searchCtrl,
-            placeholder: 'Buscar producto por nombre o código...',
-            onChanged: (_) => setState(() {}),
+          child: Row(
+            children: [
+              Expanded(
+                child: DSSearchField(
+                  controller: _searchCtrl,
+                  placeholder: 'Buscar producto por nombre o código...',
+                  onChanged: _onProductSearchChanged,
+                  onClear: _clearProductSearch,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              IconButton(
+                key: const Key('mobile-products-refresh'),
+                tooltip: 'Actualizar catálogo',
+                onPressed: _loadingProducts ? null : _loadProducts,
+                constraints: const BoxConstraints.tightFor(
+                  width: 44,
+                  height: 44,
+                ),
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ],
           ),
         ),
 
@@ -2298,6 +2441,13 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
       return LayoutBuilder(
         builder: (context, constraints) {
           final columns = (constraints.maxWidth / 220).floor().clamp(2, 5);
+          final itemCount =
+              products.length +
+              (_hasMoreProducts ||
+                      _loadingMoreProducts ||
+                      _errorLoadingMoreProducts != null
+                  ? 1
+                  : 0);
           return RefreshIndicator(
             onRefresh: _loadProducts,
             child: GridView.builder(
@@ -2310,15 +2460,23 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                 crossAxisSpacing: AppSpacing.sm,
                 mainAxisSpacing: AppSpacing.sm,
               ),
-              itemCount: products.length,
-              itemBuilder: (_, i) =>
-                  _buildProductCard(products[i], desktop: true),
+              itemCount: itemCount,
+              itemBuilder: (_, i) => i == products.length
+                  ? _buildLoadMoreProducts(desktop: true)
+                  : _buildProductCard(products[i], desktop: true),
             ),
           );
         },
       );
     }
 
+    final itemCount =
+        products.length +
+        (_hasMoreProducts ||
+                _loadingMoreProducts ||
+                _errorLoadingMoreProducts != null
+            ? 1
+            : 0);
     return RefreshIndicator(
       onRefresh: _loadProducts,
       child: ListView.builder(
@@ -2330,10 +2488,60 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           AppSpacing.md,
           76,
         ),
-        itemCount: products.length,
-        itemBuilder: (_, i) => Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: _buildProductCard(products[i], desktop: false),
+        itemCount: itemCount,
+        itemBuilder: (_, i) => i == products.length
+            ? _buildLoadMoreProducts(desktop: false)
+            : Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: _buildProductCard(products[i], desktop: false),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreProducts({required bool desktop}) {
+    final retrying = _errorLoadingMoreProducts != null;
+    final button = OutlinedButton.icon(
+      key: Key(
+        desktop ? 'desktop-catalog-load-more' : 'mobile-catalog-load-more',
+      ),
+      onPressed: _loadingMoreProducts ? null : _loadMoreProducts,
+      icon: _loadingMoreProducts
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(retrying ? Icons.refresh_rounded : Icons.expand_more_rounded),
+      label: Text(
+        _loadingMoreProducts
+            ? 'Cargando productos...'
+            : retrying
+            ? 'Reintentar'
+            : 'Cargar más productos',
+      ),
+      style: OutlinedButton.styleFrom(minimumSize: const Size(44, 44)),
+    );
+
+    return Padding(
+      padding: EdgeInsets.all(desktop ? AppSpacing.xs : 0),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_errorLoadingMoreProducts != null) ...[
+              Text(
+                _errorLoadingMoreProducts!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.colors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ],
+            SizedBox(width: desktop ? null : double.infinity, child: button),
+          ],
         ),
       ),
     );
@@ -2732,31 +2940,50 @@ class _ProductoCard extends StatelessWidget {
 
 class _QtyBtn extends StatelessWidget {
   final IconData icon;
+  final String label;
   final VoidCallback? onTap;
   final Color? color;
   final double size;
-  const _QtyBtn({required this.icon, this.onTap, this.color, this.size = 34});
+  const _QtyBtn({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.color,
+    this.size = 44,
+  });
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: () {
-      if (onTap != null) {
-        HapticFeedback.selectionClick();
-        onTap!();
-      }
-    },
-    child: Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: (color ?? context.colors.textTertiary).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(
-        icon,
-        size: 18,
-        color: onTap != null
-            ? (color ?? context.colors.textSecondary)
-            : context.colors.textDisabled,
+  Widget build(BuildContext context) => MergeSemantics(
+    child: Semantics(
+      label: label,
+      button: true,
+      child: IconButton(
+        tooltip: label,
+        onPressed: onTap == null
+            ? null
+            : () {
+                HapticFeedback.selectionClick();
+                onTap!();
+              },
+        constraints: BoxConstraints.tightFor(width: size, height: size),
+        padding: EdgeInsets.zero,
+        icon: Container(
+          width: size - 12,
+          height: size - 12,
+          decoration: BoxDecoration(
+            color: (color ?? context.colors.textTertiary).withValues(
+              alpha: 0.1,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: onTap != null
+                ? (color ?? context.colors.textSecondary)
+                : context.colors.textDisabled,
+          ),
+        ),
       ),
     ),
   );
@@ -3291,17 +3518,23 @@ class _DesktopCartItem extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                key: ValueKey('desktop-cart-remove-${item.productoId}'),
-                tooltip: 'Quitar producto',
-                onPressed: frozen ? null : onRemove,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
+              MergeSemantics(
+                child: Semantics(
+                  label: 'Eliminar ${item.nombre} del carrito',
+                  button: true,
+                  child: IconButton(
+                    key: ValueKey('desktop-cart-remove-${item.productoId}'),
+                    tooltip: 'Eliminar ${item.nombre} del carrito',
+                    onPressed: frozen ? null : onRemove,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.close_rounded, size: 17),
+                    color: context.colors.textTertiary,
+                  ),
                 ),
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.close_rounded, size: 17),
-                color: context.colors.textTertiary,
               ),
             ],
           ),
@@ -3309,9 +3542,11 @@ class _DesktopCartItem extends StatelessWidget {
           Row(
             children: [
               _QtyBtn(
+                key: ValueKey('desktop-cart-decrease-${item.productoId}'),
                 icon: Icons.remove_rounded,
+                label: 'Disminuir cantidad de ${item.nombre}',
                 onTap: frozen ? null : onDecrease,
-                size: 28,
+                size: 44,
               ),
               SizedBox(
                 width: 34,
@@ -3326,10 +3561,12 @@ class _DesktopCartItem extends StatelessWidget {
                 ),
               ),
               _QtyBtn(
+                key: ValueKey('desktop-cart-increase-${item.productoId}'),
                 icon: Icons.add_rounded,
+                label: 'Aumentar cantidad de ${item.nombre}',
                 onTap: frozen ? null : onIncrease,
                 color: AppColors.primary,
-                size: 28,
+                size: 44,
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(

@@ -189,7 +189,9 @@ class CarritoVentaSheet extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             _QtyButton(
+                              key: ValueKey('cart-decrease-${item.productoId}'),
                               icon: Icons.remove,
+                              label: 'Disminuir cantidad de ${item.nombre}',
                               onTap: () =>
                                   onChangeQuantity(item.productoId, -1),
                             ),
@@ -207,16 +209,34 @@ class CarritoVentaSheet extends StatelessWidget {
                               ),
                             ),
                             _QtyButton(
+                              key: ValueKey('cart-increase-${item.productoId}'),
                               icon: Icons.add,
+                              label: 'Aumentar cantidad de ${item.nombre}',
                               onTap: () => onChangeQuantity(item.productoId, 1),
                             ),
                             const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () => onRemove(item.productoId),
-                              child: Icon(
-                                Icons.close,
-                                size: 16,
-                                color: context.colors.textTertiary,
+                            MergeSemantics(
+                              child: Semantics(
+                                label: 'Eliminar ${item.nombre} del carrito',
+                                button: true,
+                                child: IconButton(
+                                  key: ValueKey(
+                                    'cart-remove-${item.productoId}',
+                                  ),
+                                  tooltip:
+                                      'Eliminar ${item.nombre} del carrito',
+                                  onPressed: () => onRemove(item.productoId),
+                                  constraints: const BoxConstraints.tightFor(
+                                    width: 44,
+                                    height: 44,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  icon: Icon(
+                                    Icons.close,
+                                    size: 16,
+                                    color: context.colors.textTertiary,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
@@ -377,21 +397,36 @@ class CarritoVentaSheet extends StatelessWidget {
 
 class _QtyButton extends StatelessWidget {
   final IconData icon;
+  final String label;
   final VoidCallback onTap;
-  const _QtyButton({required this.icon, required this.onTap});
+  const _QtyButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 26,
-        height: 26,
-        decoration: BoxDecoration(
-          border: Border.all(color: context.colors.borderLight),
-          borderRadius: BorderRadius.circular(6),
+    return MergeSemantics(
+      child: Semantics(
+        label: label,
+        button: true,
+        child: IconButton(
+          tooltip: label,
+          onPressed: onTap,
+          constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+          padding: EdgeInsets.zero,
+          icon: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              border: Border.all(color: context.colors.borderLight),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 14, color: context.colors.textSecondary),
+          ),
         ),
-        child: Icon(icon, size: 14, color: context.colors.textSecondary),
       ),
     );
   }

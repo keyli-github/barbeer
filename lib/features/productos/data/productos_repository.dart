@@ -97,9 +97,13 @@ class ProductosPage {
   });
 }
 
+typedef ProductosRequest =
+    Future<Object?> Function(String path, Map<String, dynamic> queryParameters);
+
 class ProductosRepository {
   final ApiClient _api;
-  const ProductosRepository(this._api);
+  final ProductosRequest? request;
+  const ProductosRepository(this._api, {this.request});
 
   Future<ProductosPage> list({
     int pagina = 1,
@@ -107,20 +111,22 @@ class ProductosRepository {
     String? q,
     String? categoriaId,
     String? activo,
+    String? disponiblePos,
     String? sedeId,
   }) async {
-    final r = await _api.get(
-      '/productos',
-      queryParameters: {
-        'pagina': pagina,
-        'limite': limite,
-        if (q != null && q.isNotEmpty) 'q': q,
-        'categoriaId': ?categoriaId,
-        'activo': ?activo,
-        'sedeId': ?sedeId,
-      },
-    );
-    final json = Map<String, dynamic>.from(r.data as Map);
+    final queryParameters = {
+      'pagina': pagina,
+      'limite': limite,
+      if (q != null && q.isNotEmpty) 'q': q,
+      'categoriaId': ?categoriaId,
+      'activo': ?activo,
+      'disponiblePos': ?disponiblePos,
+      'sedeId': ?sedeId,
+    };
+    final responseData = request != null
+        ? await request!('/productos', queryParameters)
+        : (await _api.get('/productos', queryParameters: queryParameters)).data;
+    final json = Map<String, dynamic>.from(responseData as Map);
     return ProductosPage(
       data: (json['data'] as List? ?? [])
           .map((e) => Producto.fromJson(Map<String, dynamic>.from(e as Map)))
