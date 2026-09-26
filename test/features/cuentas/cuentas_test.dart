@@ -7,6 +7,8 @@ import 'package:barbeer/core/navigation/route_access_policy.dart';
 import 'package:barbeer/core/network/api_client.dart';
 import 'package:barbeer/core/network/upload_client.dart';
 import 'package:barbeer/core/routes/route_paths.dart';
+import 'package:barbeer/features/auth/data/models/auth_models.dart';
+import 'package:barbeer/features/auth/presentation/providers/auth_provider.dart';
 import 'package:barbeer/features/cuentas/data/cuentas_repository.dart';
 import 'package:barbeer/features/cuentas/data/models/cuenta_models.dart';
 import 'package:barbeer/features/cuentas/presentation/providers/cuentas_provider.dart';
@@ -23,6 +25,8 @@ Map<String, dynamic> account(String id, String name, [double balance = 10]) => {
       'nombre': name,
       'documento': 'DOC-$id',
       'telefono': '999',
+      'tipo': 'CLIENTE',
+      'saldoEfectivoCaja': 0,
       'saldo': balance,
       'activo': true,
       'cantidadPendientes': 1,
@@ -80,6 +84,49 @@ Map<String, dynamic> paidDetail(String id, double balance) => {
       'pendientes':
           balance == 0 ? [] : detail(id, 'Ana', balance)['pendientes'],
     };
+
+class _TestAuthNotifier extends AuthNotifier {
+  _TestAuthNotifier(super.repository, AuthState value) {
+    state = value;
+  }
+}
+
+Future<void> _pumpCuentasScreen(
+  WidgetTester tester, {
+  required CuentasNotifier notifier,
+  required List<String> permissions,
+  String role = 'ADMIN',
+  Size size = const Size(390, 844),
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(() {
+    tester.view.resetDevicePixelRatio();
+    tester.view.resetPhysicalSize();
+  });
+  await tester.pumpWidget(ProviderScope(
+    overrides: [
+      cuentasProvider.overrideWith((_) => notifier),
+      authProvider.overrideWith((ref) => _TestAuthNotifier(
+        ref.read(authRepositoryProvider),
+        AuthState(
+          status: AuthStatus.authenticated,
+          user: UserProfile(
+            id: 'admin-1',
+            username: 'admin',
+            rol: role,
+            nivel: 100,
+            sedeId: 's1',
+            createdAt: '2026-08-01',
+            permisos: permissions,
+          ),
+        ),
+      )),
+    ],
+    child: const MaterialApp(home: CuentasScreen()),
+  ));
+}
+
 void main() {
   test('read repository maps exact list/detail DTOs and query names', () async {
     final calls = <(String, Map<String, dynamic>)>[];
@@ -137,6 +184,43 @@ void main() {
     expect(
         calls.first.$2, isNot(anyOf(contains('pagina'), contains('limite'))));
   });
+
+  test('manual and sale-time account creation use exact endpoints and fields',
+      () async {
+    final calls = <(String, Map<String, dynamic>)>[];
+    final repo = CuentasRepository(ApiClient.instance,
+        request: (_, _) async => [],
+        post: (path, body) async {
+          calls.add((path, body));
+          return account('created', body['nombre'] as String);
+        });
+    await repo.create(
+        nombre: ' Socio ',
+        tipo: 'SOCIO',
+        documento: ' 12345678 ',
+        telefono: ' 987654321 ');
+    await repo.createClienteVenta(
+        nombre: ' Cliente ',
+        documento: ' 87654321 ',
+        telefono: ' 912345678 ');
+
+    expect(calls.map((call) => call.$1), [
+      '/cuentas',
+      '/cuentas/clientes-venta',
+    ]);
+    expect(calls[0].$2, <String, dynamic>{
+      'nombre': 'Socio',
+      'tipo': 'SOCIO',
+      'documento': '12345678',
+      'telefono': '987654321',
+    });
+    expect(calls[1].$2, <String, dynamic>{
+      'nombre': 'Cliente',
+      'documento': '87654321',
+      'telefono': '912345678',
+    });
+  });
+
   test('read state distinguishes empty, denied, content, and missing detail',
       () async {
     var calls = 0;
@@ -275,6 +359,78 @@ void main() {
       'EFECTIVO'
     ));
   });
+
+  test('saldo a favor payout sends the cash-only Caja V2 DTO', () async {
+    final accountWithCredit = {
+      ...account('c1', 'Ana', 10),
+      'saldoEfectivoCaja': 8.5,
+    };
+    final paidDetailWithCredit = {
+      ...detail('c1', 'Ana', 10),
+      'saldoEfectivoCaja': 3.5,
+    };
+    late String path;
+    late Map<String, dynamic> body;
+    final repo = CuentasRepository(ApiClient.instance,
+        request: (value, _) async => value == '/cuentas'
+            ? [accountWithCredit]
+            : {...detail('c1', 'Ana', 10), 'saldoEfectivoCaja': 8.5},
+        post: (value, payload) async {
+          path = value;
+          body = payload;
+          return paidDetailWithCredit;
+        });
+    final notifier = CuentasNotifier(repo,
+        authorized: true,
+        canCollect: true,
+        sedeId: 's1',
+        keyFactory: () => '11111111-1111-4111-8111-111111111111');
+    await notifier.load();
+    await notifier.select('c1');
+
+    final result = await notifier.paySaldoFavor(cuentaId: 'c1', monto: 5);
+
+    expect(path, '/cuentas/c1/saldo-a-favor/pagos');
+    expect(body, {
+      'monto': 5,
+      'medioPago': 'EFECTIVO',
+      'idempotencyKey': '11111111-1111-4111-8111-111111111111',
+      'sedeId': 's1',
+    });
+    expect(result.cuenta.saldoEfectivoCaja, 3.5);
+    expect(notifier.state.items.single.saldoEfectivoCaja, 3.5);
+    expect(
+        (notifier.state.detailState as OperationContent<CuentaDetalle>)
+            .data.cuenta.saldoEfectivoCaja,
+        3.5);
+  });
+
+  test('saldo a favor payout rejects unauthorized or non-positive accounts',
+      () async {
+    var posts = 0;
+    final repo = CuentasRepository(ApiClient.instance,
+        request: (_, _) async => [
+              {...account('c1', 'Ana'), 'saldoEfectivoCaja': -2.5},
+            ],
+        post: (_, _) async {
+          posts++;
+          return detail('c1', 'Ana');
+        });
+    final unauthorized = CuentasNotifier(repo,
+        authorized: true, canCollect: false, sedeId: 's1');
+    await unauthorized.load();
+    await expectLater(
+        unauthorized.paySaldoFavor(cuentaId: 'c1', monto: 1),
+        throwsA(isA<AppException>()));
+
+    final noCredit = CuentasNotifier(repo,
+        authorized: true, canCollect: true, sedeId: 's1');
+    await noCredit.load();
+    await expectLater(noCredit.paySaldoFavor(cuentaId: 'c1', monto: 1),
+        throwsA(isA<AppException>()));
+    expect(posts, 0);
+  });
+
   test(
       'collection state authorizes, preserves errors, deduplicates, and safely retries',
       () async {
@@ -437,6 +593,114 @@ void main() {
     expect(find.byKey(const Key('account-create-open')), findsNothing);
     expect(find.text('Ana'), findsOneWidget);
     expect(find.text('Beto'), findsOneWidget);
+  });
+
+  testWidgets(
+      'manual creation only offers supported types and keeps PERSONAL accounts viewable',
+      (tester) async {
+    final personal = {
+      ...account('personal-1', 'Gabriela'),
+      'tipo': 'PERSONAL',
+      'saldoEfectivoCaja': -3.25,
+    };
+    final repo = CuentasRepository(ApiClient.instance,
+        request: (_, _) async => [personal]);
+    final notifier = CuentasNotifier(repo,
+        authorized: true, canCreate: true, sedeId: 's1');
+    await notifier.load();
+    await _pumpCuentasScreen(tester,
+        notifier: notifier,
+        permissions: const ['cuentas:leer', 'cuentas:crear']);
+
+    expect(find.text('Gabriela'), findsOneWidget);
+    expect(find.textContaining('PERSONAL'), findsOneWidget);
+    expect(find.textContaining('En contra · S/ 3.25'), findsOneWidget);
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    final typeField = find.byType(DropdownButtonFormField<String>);
+    expect(typeField, findsOneWidget);
+    await tester.tap(typeField);
+    await tester.pumpAndSettle();
+    expect(find.text('Personal'), findsNothing);
+    expect(find.text('Socio'), findsOneWidget);
+  });
+
+  testWidgets('sales permission does not expose generic account creation',
+      (tester) async {
+    final notifier = CuentasNotifier(
+        CuentasRepository(ApiClient.instance, request: (_, _) async => []),
+        authorized: true,
+        canCreate: false,
+        sedeId: 's1');
+    await notifier.load();
+    await _pumpCuentasScreen(tester,
+        notifier: notifier,
+        role: 'VENDEDORA',
+        permissions: const ['ventas:crear']);
+    expect(find.byType(FloatingActionButton), findsNothing);
+  });
+
+  testWidgets(
+      'signed cash balances distinguish credit from debt and payout only credit',
+      (tester) async {
+    late String payoutPath;
+    late Map<String, dynamic> payoutBody;
+    final credit = {...account('credit-1', 'Ana'), 'saldoEfectivoCaja': 8};
+    final debt = {...account('debt-1', 'Beto'), 'saldoEfectivoCaja': -3.25};
+    final repo = CuentasRepository(ApiClient.instance,
+        request: (path, _) async => switch (path) {
+              '/cuentas' => [credit, debt],
+              '/cuentas/credit-1' => {
+                  ...detail('credit-1', 'Ana'),
+                  'saldoEfectivoCaja': 8,
+                },
+              '/cuentas/debt-1' => {
+                  ...detail('debt-1', 'Beto'),
+                  'saldoEfectivoCaja': -3.25,
+                },
+              _ => detail('credit-1', 'Ana'),
+            },
+        post: (path, body) async {
+          payoutPath = path;
+          payoutBody = body;
+          return {...detail('credit-1', 'Ana'), 'saldoEfectivoCaja': 3};
+        });
+    final notifier = CuentasNotifier(repo,
+        authorized: true,
+        canCollect: true,
+        sedeId: 's1',
+        keyFactory: () => '11111111-1111-4111-8111-111111111111');
+    await notifier.load();
+    await notifier.select('credit-1');
+    await _pumpCuentasScreen(tester,
+        notifier: notifier,
+        permissions: const ['cuentas:leer', 'cuentas:editar'],
+        size: const Size(1440, 900));
+
+    expect(find.text('A favor · S/ 8.00'), findsOneWidget);
+    expect(find.textContaining('En contra · S/ 3.25'), findsOneWidget);
+    expect(find.byKey(const Key('saldo-favor-payout-open')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('saldo-favor-payout-open')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('caja V2 abierta'), findsOneWidget);
+    await tester.enterText(
+        find.byKey(const Key('saldo-favor-payout-amount')), '5');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('saldo-favor-payout-submit')));
+    await tester.pumpAndSettle();
+    expect(payoutPath, '/cuentas/credit-1/saldo-a-favor/pagos');
+    expect(payoutBody, {
+      'monto': 5.0,
+      'medioPago': 'EFECTIVO',
+      'idempotencyKey': '11111111-1111-4111-8111-111111111111',
+      'sedeId': 's1',
+    });
+    expect(find.text('A favor · S/ 3.00'), findsOneWidget);
+    expect(find.text('Devolución registrada.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('cuenta-debt-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('En contra · S/ 3.25'), findsOneWidget);
+    expect(find.byKey(const Key('saldo-favor-payout-open')), findsNothing);
   });
 
   testWidgets(

@@ -5,6 +5,9 @@ import 'package:http_parser/http_parser.dart';
 import '../../../core/network/api_client.dart';
 
 typedef OperationJson = Map<String, dynamic>;
+typedef OperationMutationRequest =
+    Future<Object?> Function(String method, String path, OperationJson? data);
+
 OperationJson objectValue(dynamic value) =>
     value is Map ? Map<String, dynamic>.from(value) : {};
 List<OperationJson> objectList(dynamic value) =>
@@ -31,7 +34,8 @@ final operationsRepositoryProvider = Provider(
 
 class OperationsRepository {
   final ApiClient api;
-  OperationsRepository(this.api);
+  final OperationMutationRequest? payrollRecargoRequest;
+  OperationsRepository(this.api, {this.payrollRecargoRequest});
 
   Future<OperationsPage> list(
     String path, {
@@ -64,6 +68,29 @@ class OperationsRepository {
   }
 
   Future<void> remove(String path) async {
+    await api.delete(path);
+  }
+
+  Future<OperationJson> createManualRecargo({
+    required String usuarioId,
+    required double monto,
+    required String motivo,
+    required String fecha,
+  }) async {
+    final path = '/pagos/$usuarioId/recargos';
+    final data = {'monto': monto, 'motivo': motivo, 'fecha': fecha};
+    if (payrollRecargoRequest != null) {
+      return objectValue(await payrollRecargoRequest!('POST', path, data));
+    }
+    return objectValue((await api.post(path, data: data)).data);
+  }
+
+  Future<void> removeManualRecargo(String recargoId) async {
+    final path = '/pagos/recargos/$recargoId';
+    if (payrollRecargoRequest != null) {
+      await payrollRecargoRequest!('DELETE', path, null);
+      return;
+    }
     await api.delete(path);
   }
 

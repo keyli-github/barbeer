@@ -129,8 +129,11 @@ class ApiConstants {
 
   static const String accounts = '/cuentas';
   static const String accountSelector = '/cuentas/selector';
+  static const String accountCreateForSale = '/cuentas/clientes-venta';
   static String account(String id) => '/cuentas/$id';
   static String accountPayments(String id) => '/cuentas/$id/pagos';
+  static String accountSaldoFavorPayments(String id) =>
+      '/cuentas/$id/saldo-a-favor/pagos';
 
   // ── Etiquetas (billeteras digitales) ─────────────────────────────────────
   static const String etiquetas = '/etiquetas';

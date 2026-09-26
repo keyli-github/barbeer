@@ -35,12 +35,13 @@ class CuentasState {
   List<Cuenta> get pageItems =>
       items.skip((page - 1) * pageSize).take(pageSize).toList();
   CuentasState copy(
-          {OperationState<List<Cuenta>>? listState,
+          {List<Cuenta>? items,
+          OperationState<List<Cuenta>>? listState,
           OperationState<CuentaDetalle>? detailState,
           String? selectedId,
           int? page}) =>
       CuentasState(
-          items: items,
+          items: items ?? this.items,
           listState: listState ?? this.listState,
           detailState: detailState ?? this.detailState,
           selectedId: selectedId ?? this.selectedId,
@@ -84,6 +85,8 @@ class CuentasNotifier extends StateNotifier<CuentasState> {
   int _listGeneration = 0, _detailGeneration = 0;
   Future<void>? _collectionFuture;
   String? _collectionFingerprint, _collectionKey;
+  Future<CuentaDetalle>? _saldoFavorFuture;
+  String? _saldoFavorFingerprint, _saldoFavorKey;
   CuentasNotifier(this._repository,
       {required this.authorized,
       required this.sedeId,
@@ -94,6 +97,8 @@ class CuentasNotifier extends StateNotifier<CuentasState> {
       int pageSize = 10})
       : _keyFactory = keyFactory ?? const Uuid().v4,
         super(CuentasState(pageSize: pageSize));
+  bool get canPayOutSaldoFavor => canCollect;
+
   Future<void> load({String? search}) async {
     final generation = ++_listGeneration;
     final query = (search ?? state.search).trim();
@@ -179,6 +184,97 @@ class CuentasNotifier extends StateNotifier<CuentasState> {
       if (identical(_collectionFuture, future)) _collectionFuture = null;
     });
     return future;
+  }
+
+  Future<CuentaDetalle> paySaldoFavor(
+      {required String cuentaId, required double monto}) {
+    if (!canPayOutSaldoFavor) {
+      return Future.error(
+          const AppException(message: 'No autorizado.', statusCode: 403));
+    }
+    final selectedSedeId = sedeId;
+    if (selectedSedeId == null || selectedSedeId.isEmpty) {
+      return Future.error(const AppException(
+          message: 'Debe seleccionar una sede', statusCode: 400));
+    }
+    final accountIndex = state.items.indexWhere((item) => item.id == cuentaId);
+    final account = accountIndex < 0 ? null : state.items[accountIndex];
+    if (account == null || account.saldoEfectivoCaja <= 0) {
+      return Future.error(const AppException(
+          message: 'Esta cuenta no tiene saldo a favor', statusCode: 409));
+    }
+    final available = double.parse(account.saldoEfectivoCaja.toStringAsFixed(2));
+    final cents = monto * 100;
+    if (!monto.isFinite ||
+        monto < 0.01 ||
+        monto > 999999999.99 ||
+        monto > available ||
+        (cents - cents.round()).abs() > 0.000001) {
+      return Future.error(const AppException(
+          message: 'Ingresa un monto válido dentro del saldo a favor',
+          statusCode: 400));
+    }
+
+    final fingerprint = '$cuentaId|${monto.toStringAsFixed(2)}|$selectedSedeId';
+    if (_saldoFavorFuture != null) {
+      if (_saldoFavorFingerprint == fingerprint) return _saldoFavorFuture!;
+      return Future.error(const AppException(
+          message: 'Ya hay una devolución en curso', statusCode: 409));
+    }
+    if (_saldoFavorFingerprint != fingerprint) {
+      _saldoFavorFingerprint = fingerprint;
+      _saldoFavorKey = _keyFactory();
+    }
+    final future = _paySaldoFavor(
+        cuentaId: cuentaId,
+        monto: monto,
+        idempotencyKey: _saldoFavorKey!,
+        sedeId: selectedSedeId);
+    _saldoFavorFuture = future;
+    void clearFuture() {
+      if (identical(_saldoFavorFuture, future)) _saldoFavorFuture = null;
+    }
+    future.then<void>((_) => clearFuture(),
+        onError: (Object error, StackTrace stackTrace) => clearFuture());
+    return future;
+  }
+
+  Future<CuentaDetalle> _paySaldoFavor(
+      {required String cuentaId,
+      required double monto,
+      required String idempotencyKey,
+      required String sedeId}) async {
+    try {
+      final detail = await _repository.paySaldoFavor(cuentaId,
+          monto: monto,
+          medioPago: 'EFECTIVO',
+          idempotencyKey: idempotencyKey,
+          sedeId: sedeId);
+      final updatedItems = state.items
+          .map((item) => item.id == cuentaId
+              ? item.withDebt(
+                  saldo: detail.saldo,
+                  cantidadPendientes:
+                      detail.pendientes.length + detail.cargosPendientes.length,
+                  saldoEfectivoCaja: detail.cuenta.saldoEfectivoCaja)
+              : item)
+          .toList();
+      state = state.copy(
+          items: updatedItems,
+          listState: updatedItems.isEmpty
+              ? const OperationEmpty()
+              : OperationContent(updatedItems));
+      if (state.selectedId == cuentaId) {
+        state = state.copy(detailState: OperationContent(detail));
+      }
+      _saldoFavorFingerprint = null;
+      _saldoFavorKey = null;
+      return detail;
+    } catch (error) {
+      final exception = _exception(error);
+      if (exception.statusCode == 403) await onForbidden?.call();
+      throw exception;
+    }
   }
 
   Future<void> _collect(

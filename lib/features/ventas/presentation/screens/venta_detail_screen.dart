@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/anular_venta_dialog.dart';
+import '../widgets/venta_timestamps.dart';
 import 'conciliar_venta_screen.dart';
 
 /// Subpantalla completa de detalle de venta.
@@ -95,11 +96,6 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
         : isPendiente
         ? 'PENDIENTE'
         : 'ACTIVA';
-
-    DateTime? dt;
-    try {
-      dt = DateTime.parse(_venta.createdAt);
-    } catch (_) {}
 
     return Scaffold(
       backgroundColor: context.colors.backgroundAlt,
@@ -192,14 +188,13 @@ class _VentaDetailScreenState extends ConsumerState<VentaDetailScreen> {
                             letterSpacing: -0.5,
                           ),
                         ),
-                        if (dt != null)
-                          Text(
-                            FormatUtils.dateTime(dt),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
+                        VentaTimestamps(
+                          venta: _venta,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.7),
                           ),
+                        ),
                       ],
                     ),
                   ),

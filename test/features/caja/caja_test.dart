@@ -127,9 +127,18 @@ void main() {
     2: 7,
     1: 8,
     0.5: 9,
-    0.2: 10,
-    0.1: 11,
   };
+  final denominacionesEsperadas = [
+    {'denominacion': 200, 'cantidad': 1},
+    {'denominacion': 100, 'cantidad': 2},
+    {'denominacion': 50, 'cantidad': 3},
+    {'denominacion': 20, 'cantidad': 4},
+    {'denominacion': 10, 'cantidad': 5},
+    {'denominacion': 5, 'cantidad': 6},
+    {'denominacion': 2, 'cantidad': 7},
+    {'denominacion': 1, 'cantidad': 8},
+    {'denominacion': 0.5, 'cantidad': 9},
+  ];
 
   group('Permisos de Caja', () {
     test('1. VENDEDORA no accede a Caja', () {
@@ -248,28 +257,33 @@ void main() {
     });
 
     test('10. Denominaciones y payload de precuadre cumplen contrato', () {
-      expect(cajaDenominaciones, const [
-        200,
-        100,
-        50,
-        20,
-        10,
-        5,
-        2,
-        1,
-        0.5,
-        0.2,
-        0.1,
-      ]);
+      expect(cajaDenominaciones, const [200, 100, 50, 20, 10, 5, 2, 1, 0.5]);
       final payload = {'denominaciones': cajaDenominacionesPayload(cantidades)};
       expect(payload.containsKey('montoDeclarado'), isFalse);
-      expect(payload['denominaciones'], hasLength(11));
-      expect((payload['denominaciones'] as List).last, {
-        'denominacion': 0.1,
-        'cantidad': 11,
-      });
-      expect(cajaDenominacionesTotal(cantidades), 739.6);
+      expect(payload['denominaciones'], denominacionesEsperadas);
+      expect(cajaDenominacionesTotal(cantidades), 736.5);
     });
+
+    test(
+      'opening and precuadre payloads contain exactly nine denominations',
+      () {
+        expect(
+          cajaAperturaPayload(
+            cantidades,
+            sedeId: 'sede-1',
+            saldoInicialYape: 12.5,
+          ),
+          {
+            'denominaciones': denominacionesEsperadas,
+            'saldoInicialYape': 12.5,
+            'sedeId': 'sede-1',
+          },
+        );
+        expect(cajaPrecuadrePayload(cantidades), {
+          'denominaciones': denominacionesEsperadas,
+        });
+      },
+    );
 
     test('11. Cierre normal no envía monto declarado ni forzado', () {
       final payload = cajaCierrePayload(
@@ -279,7 +293,22 @@ void main() {
       expect(payload.containsKey('montoDeclarado'), isFalse);
       expect(payload.containsKey('forzarPendientes'), isFalse);
       expect(payload['motivoDiferencia'], 'Cierre sin novedades');
-      expect(payload['denominaciones'], hasLength(11));
+      expect(payload['denominaciones'], denominacionesEsperadas);
+    });
+
+    test('unsupported non-zero cash counts cannot be silently serialized', () {
+      for (final denomination in [0.2, 0.1]) {
+        final unsupportedCounts = {...cantidades, denomination: 3};
+
+        expect(
+          () => cajaDenominacionesPayload(unsupportedCounts),
+          throwsA(isA<UnsupportedCajaDenominationException>()),
+        );
+        expect(
+          () => cajaDenominacionesTotal(unsupportedCounts),
+          throwsA(isA<UnsupportedCajaDenominationException>()),
+        );
+      }
     });
 
     test('12. Cierre bloqueado: ventas pendientes', () {
@@ -351,10 +380,36 @@ void main() {
       final parsed = cajaCantidadesFromResponse([
         {'denominacion': 200, 'cantidad': 2, 'subtotal': 400},
         {'denominacion': 0.5, 'cantidad': 3, 'subtotal': 1.5},
-        {'denominacion': 0.2, 'cantidad': 99, 'subtotal': 19.8},
+        {'denominacion': 0.2, 'cantidad': 0, 'subtotal': 0},
+        {'denominacion': 0.1, 'cantidad': 0, 'subtotal': 0},
       ]);
-      expect(parsed, {200.0: 2, 0.5: 3, 0.2: 99});
+      expect(parsed, {200.0: 2, 0.5: 3});
       expect(cajaCantidadesFromResponse(null), isEmpty);
+    });
+
+    test('backend cash counts parse all nine supported denominations', () {
+      final response = [
+        for (var index = 0; index < cajaDenominaciones.length; index++)
+          {'denominacion': cajaDenominaciones[index], 'cantidad': index + 1},
+      ];
+      final parsed = cajaCantidadesFromResponse(response);
+
+      expect(parsed, {
+        for (var index = 0; index < cajaDenominaciones.length; index++)
+          cajaDenominaciones[index]: index + 1,
+      });
+      expect(parsed.keys.toList(), cajaDenominaciones);
+    });
+
+    test('backend non-zero unsupported cash counts fail explicitly', () {
+      for (final denomination in [0.2, 0.1]) {
+        expect(
+          () => cajaCantidadesFromResponse([
+            {'denominacion': denomination, 'cantidad': 10},
+          ]),
+          throwsA(isA<UnsupportedCajaDenominationException>()),
+        );
+      }
     });
 
     test(
@@ -549,12 +604,15 @@ void main() {
       expect(etiqueta.personalTipo, isNull);
     });
 
-    test('requiresStaff returns true only when personalTipo is set on the etiqueta', () {
-      // Staff required when etiqueta has personalTipo, regardless of direction
-      expect(cajaRequiresStaff(personalTipo: 'CARGO'), isTrue);
-      expect(cajaRequiresStaff(personalTipo: 'PAGO'), isTrue);
-      expect(cajaRequiresStaff(personalTipo: null), isFalse);
-      expect(cajaRequiresStaff(), isFalse);
-    });
+    test(
+      'requiresStaff returns true only when personalTipo is set on the etiqueta',
+      () {
+        // Staff required when etiqueta has personalTipo, regardless of direction
+        expect(cajaRequiresStaff(personalTipo: 'CARGO'), isTrue);
+        expect(cajaRequiresStaff(personalTipo: 'PAGO'), isTrue);
+        expect(cajaRequiresStaff(personalTipo: null), isFalse);
+        expect(cajaRequiresStaff(), isFalse);
+      },
+    );
   });
 }

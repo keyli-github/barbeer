@@ -35,6 +35,7 @@ class _FakeProductsRepository extends ProductosRepository {
     String? q,
     String? categoriaId,
     String? activo,
+    String? disponiblePos,
     String? sedeId,
   }) async => const ProductosPage(
     data: [_product],

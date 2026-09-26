@@ -19,6 +19,22 @@ class OfflineStore {
   Future<void> _cacheTail = Future.value();
 
   static bool canQueue(String method, String path) {
+    // Annulment payloads may contain a SUPERADMIN PIN; never stage them.
+    if (RegExp(r'^/caja/[^/]+/movimientos/[^/]+/anular$').hasMatch(path)) {
+      return false;
+    }
+    // Manual payroll recargos are unsafe to replay after an ambiguous outcome.
+    if ((method == 'POST' &&
+            RegExp(r'^/pagos/[^/]+/recargos$').hasMatch(path)) ||
+        (method == 'DELETE' &&
+            RegExp(r'^/pagos/recargos/[^/]+$').hasMatch(path))) {
+      return false;
+    }
+    // Cash balance payouts must be completed against the active Caja session.
+    if (method == 'POST' &&
+        RegExp(r'^/cuentas/[^/]+/saldo-a-favor/pagos$').hasMatch(path)) {
+      return false;
+    }
     if (path == '/asistencia/marcar' ||
         path.endsWith('/stock') ||
         path.contains('/sin-luz') ||

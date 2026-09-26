@@ -9,6 +9,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/venta_models.dart';
 import '../providers/ventas_provider.dart';
 import '../widgets/anular_venta_dialog.dart';
+import '../widgets/venta_timestamps.dart';
 
 class VentaDetailSheet extends ConsumerStatefulWidget {
   final Venta venta;
@@ -58,11 +59,6 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
     final auth = ref.watch(authProvider);
     final canAnular = canAnularVenta(auth) && !widget.venta.isAnulada;
     final v = widget.venta;
-
-    DateTime? dt;
-    try {
-      dt = DateTime.parse(v.createdAt);
-    } catch (_) {}
 
     final isAnulada = v.isAnulada;
     final isPendiente = v.isPendiente;
@@ -125,8 +121,8 @@ class _VentaDetailSheetState extends ConsumerState<VentaDetailSheet> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        dt != null ? FormatUtils.dateTime(dt) : '—',
+                      VentaTimestamps(
+                        venta: v,
                         style: TextStyle(
                           fontSize: 12,
                           color: context.colors.textSecondary,
