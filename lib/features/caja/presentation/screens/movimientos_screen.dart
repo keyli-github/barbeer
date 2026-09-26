@@ -10,6 +10,7 @@ import '../../../../core/widgets/app_feedback.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/caja_repository.dart';
 import '../providers/movimientos_provider.dart';
+import '../widgets/anular_movimiento_action.dart';
 
 class MovimientosScreen extends ConsumerWidget {
   const MovimientosScreen({super.key});
@@ -20,6 +21,9 @@ class MovimientosScreen extends ConsumerWidget {
     final isSuperAdmin = ref.watch(
       authProvider.select((auth) => auth.user?.isSuperAdmin ?? false),
     );
+    final hasCajaReadPermission = ref.watch(
+      authProvider.select((auth) => auth.hasPermission('caja:leer')),
+    );
     final notifier = ref.read(movimientosProvider.notifier);
     final desktop = MediaQuery.sizeOf(context).width >= 1024;
 
@@ -29,6 +33,8 @@ class MovimientosScreen extends ConsumerWidget {
         state: state,
         notifier: notifier,
         isSuperAdmin: isSuperAdmin,
+        hasCajaReadPermission: hasCajaReadPermission,
+        onRefresh: notifier.load,
       );
     }
 
@@ -92,11 +98,22 @@ class MovimientosScreen extends ConsumerWidget {
                     LayoutBuilder(
                       builder: (context, constraints) =>
                           constraints.maxWidth >= 800
-                          ? _DesktopTable(items: state.movimientos)
+                          ? _DesktopTable(
+                              items: state.movimientos,
+                              hasCajaReadPermission: hasCajaReadPermission,
+                              isSuperAdmin: isSuperAdmin,
+                              onRefresh: notifier.load,
+                            )
                           : Column(
                               children: [
                                 for (final movement in state.movimientos)
-                                  _MovementCard(movement: movement),
+                                  _MovementCard(
+                                    movement: movement,
+                                    hasCajaReadPermission:
+                                        hasCajaReadPermission,
+                                    isSuperAdmin: isSuperAdmin,
+                                    onRefresh: notifier.load,
+                                  ),
                               ],
                             ),
                     ),
@@ -115,6 +132,8 @@ class MovimientosScreen extends ConsumerWidget {
     required MovimientosState state,
     required MovimientosNotifier notifier,
     required bool isSuperAdmin,
+    required bool hasCajaReadPermission,
+    required Future<void> Function() onRefresh,
   }) => Scaffold(
     backgroundColor: context.colors.background,
     body: RefreshIndicator(
@@ -169,6 +188,9 @@ class MovimientosScreen extends ConsumerWidget {
               state: state,
               onRetry: notifier.load,
               onPage: notifier.cambiarPagina,
+              hasCajaReadPermission: hasCajaReadPermission,
+              isSuperAdmin: isSuperAdmin,
+              onRefresh: onRefresh,
             ),
           ],
         ],
@@ -181,11 +203,17 @@ class _DesktopMovementsPanel extends StatelessWidget {
   final MovimientosState state;
   final Future<void> Function() onRetry;
   final ValueChanged<int> onPage;
+  final bool hasCajaReadPermission;
+  final bool isSuperAdmin;
+  final Future<void> Function() onRefresh;
 
   const _DesktopMovementsPanel({
     required this.state,
     required this.onRetry,
     required this.onPage,
+    required this.hasCajaReadPermission,
+    required this.isSuperAdmin,
+    required this.onRefresh,
   });
 
   @override
@@ -214,6 +242,7 @@ class _DesktopMovementsPanel extends StatelessWidget {
               _DesktopMovementHeader('MONTO', 1),
               _DesktopMovementHeader('COMPROBANTE', 2),
               _DesktopMovementHeader('USUARIO', 1),
+              _DesktopMovementHeader('ACCIÓN', 1),
             ],
           ),
         ),
@@ -242,7 +271,12 @@ class _DesktopMovementsPanel extends StatelessWidget {
           )
         else
           for (final movement in state.movimientos)
-            _DesktopMovementRow(movement: movement),
+            _DesktopMovementRow(
+              movement: movement,
+              hasCajaReadPermission: hasCajaReadPermission,
+              isSuperAdmin: isSuperAdmin,
+              onRefresh: onRefresh,
+            ),
         Container(
           height: 64,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -302,7 +336,16 @@ class _DesktopMovementHeader extends StatelessWidget {
 
 class _DesktopMovementRow extends StatelessWidget {
   final CajaMovimiento movement;
-  const _DesktopMovementRow({required this.movement});
+  final bool hasCajaReadPermission;
+  final bool isSuperAdmin;
+  final Future<void> Function() onRefresh;
+
+  const _DesktopMovementRow({
+    required this.movement,
+    required this.hasCajaReadPermission,
+    required this.isSuperAdmin,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -338,6 +381,17 @@ class _DesktopMovementRow extends StatelessWidget {
         ),
         Expanded(flex: 2, child: _ComprobanteButton(url: movement.comprobante)),
         Expanded(child: Text(_user(movement), overflow: TextOverflow.ellipsis)),
+        Expanded(
+          child: CashMovementAnnulmentAction(
+            key: ObjectKey(movement),
+            movement: movement,
+            hasCajaReadPermission: hasCajaReadPermission,
+            isSuperAdmin: isSuperAdmin,
+            sessionVersion: null,
+            onRefresh: onRefresh,
+            compact: true,
+          ),
+        ),
       ],
     ),
   );
@@ -503,8 +557,16 @@ class _TipoDropdown extends StatelessWidget {
 
 class _DesktopTable extends StatelessWidget {
   final List<CajaMovimiento> items;
+  final bool hasCajaReadPermission;
+  final bool isSuperAdmin;
+  final Future<void> Function() onRefresh;
 
-  const _DesktopTable({required this.items});
+  const _DesktopTable({
+    required this.items,
+    required this.hasCajaReadPermission,
+    required this.isSuperAdmin,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) => AppCard(
@@ -520,6 +582,7 @@ class _DesktopTable extends StatelessWidget {
           DataColumn(label: Text('Monto'), numeric: true),
           DataColumn(label: Text('Comprobante')),
           DataColumn(label: Text('Usuario')),
+          DataColumn(label: Text('Acción')),
         ],
         rows: items
             .map(
@@ -540,6 +603,17 @@ class _DesktopTable extends StatelessWidget {
                   DataCell(Text(_money(item.monto))),
                   DataCell(_ComprobanteButton(url: item.comprobante)),
                   DataCell(Text(_user(item))),
+                  DataCell(
+                    CashMovementAnnulmentAction(
+                      key: ObjectKey(item),
+                      movement: item,
+                      hasCajaReadPermission: hasCajaReadPermission,
+                      isSuperAdmin: isSuperAdmin,
+                      sessionVersion: null,
+                      onRefresh: onRefresh,
+                      compact: true,
+                    ),
+                  ),
                 ],
               ),
             )
@@ -551,8 +625,16 @@ class _DesktopTable extends StatelessWidget {
 
 class _MovementCard extends StatelessWidget {
   final CajaMovimiento movement;
+  final bool hasCajaReadPermission;
+  final bool isSuperAdmin;
+  final Future<void> Function() onRefresh;
 
-  const _MovementCard({required this.movement});
+  const _MovementCard({
+    required this.movement,
+    required this.hasCajaReadPermission,
+    required this.isSuperAdmin,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -622,6 +704,16 @@ class _MovementCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   _TypeChip(type: movement.tipo),
+                  const SizedBox(height: 4),
+                  CashMovementAnnulmentAction(
+                    key: ObjectKey(movement),
+                    movement: movement,
+                    hasCajaReadPermission: hasCajaReadPermission,
+                    isSuperAdmin: isSuperAdmin,
+                    sessionVersion: null,
+                    onRefresh: onRefresh,
+                    compact: true,
+                  ),
                 ],
               ),
             ),

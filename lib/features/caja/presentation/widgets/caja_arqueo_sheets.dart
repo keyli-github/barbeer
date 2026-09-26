@@ -19,20 +19,30 @@ void showPrecuadreSheet(
   BuildContext context, {
   required VoidCallback onSuccess,
   Map<double, int> initialCounts = const {},
+  String? initialCountsWarning,
 }) {
   ResponsiveForm.showPage<void>(
     context: context,
     dialogWidth: 640,
     dialogHeight: 760,
-    page: _PrecuadreSheet(onSuccess: onSuccess, initialCounts: initialCounts),
+    page: _PrecuadreSheet(
+      onSuccess: onSuccess,
+      initialCounts: initialCounts,
+      initialCountsWarning: initialCountsWarning,
+    ),
   );
 }
 
 class _PrecuadreSheet extends ConsumerStatefulWidget {
   final VoidCallback onSuccess;
   final Map<double, int> initialCounts;
+  final String? initialCountsWarning;
 
-  const _PrecuadreSheet({required this.onSuccess, required this.initialCounts});
+  const _PrecuadreSheet({
+    required this.onSuccess,
+    required this.initialCounts,
+    this.initialCountsWarning,
+  });
 
   @override
   ConsumerState<_PrecuadreSheet> createState() => _PrecuadreSheetState();
@@ -79,6 +89,10 @@ class _PrecuadreSheetState extends ConsumerState<_PrecuadreSheet> {
           child: Column(
             children: [
               _TotalBand(label: 'Saldo esperado', value: _expected),
+              if (widget.initialCountsWarning != null) ...[
+                const SizedBox(height: 14),
+                CajaDenominationWarning(message: widget.initialCountsWarning!),
+              ],
               const SizedBox(height: 14),
               _DenominationFields(
                 controllers: _controllers,
@@ -128,6 +142,7 @@ void showCierreSheet(
   BuildContext context, {
   required bool canForzar,
   Map<double, int> initialCounts = const {},
+  String? initialCountsWarning,
   required VoidCallback onSuccess,
 }) {
   ResponsiveForm.showPage<void>(
@@ -137,6 +152,7 @@ void showCierreSheet(
     page: _CierreSheet(
       canForzar: canForzar,
       initialCounts: initialCounts,
+      initialCountsWarning: initialCountsWarning,
       onSuccess: onSuccess,
     ),
   );
@@ -145,11 +161,13 @@ void showCierreSheet(
 class _CierreSheet extends ConsumerStatefulWidget {
   final bool canForzar;
   final Map<double, int> initialCounts;
+  final String? initialCountsWarning;
   final VoidCallback onSuccess;
 
   const _CierreSheet({
     required this.canForzar,
     required this.initialCounts,
+    this.initialCountsWarning,
     required this.onSuccess,
   });
 
@@ -205,6 +223,10 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
           child: Column(
             children: [
               _TotalBand(label: 'Saldo esperado', value: _expected),
+              if (widget.initialCountsWarning != null) ...[
+                const SizedBox(height: 14),
+                CajaDenominationWarning(message: widget.initialCountsWarning!),
+              ],
               const SizedBox(height: 14),
               _DenominationFields(
                 controllers: _controllers,
@@ -275,6 +297,40 @@ class _CierreSheetState extends ConsumerState<_CierreSheet> {
 }
 
 // ── Widgets privados compartidos ─────────────────────────────────────────────
+
+class CajaDenominationWarning extends StatelessWidget {
+  final String message;
+
+  const CajaDenominationWarning({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: context.colors.warningLight,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.warning_amber_rounded,
+          color: AppColors.warning,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 class _DenominationFields extends StatelessWidget {
   final Map<double, TextEditingController> controllers;

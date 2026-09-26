@@ -135,6 +135,9 @@ class CajaNotifier extends StateNotifier<CajaState> {
     if (sedeId == null) return const {};
     try {
       return await _repository.ultimoCierre(sedeId: sedeId);
+    } on UnsupportedCajaDenominationException catch (error) {
+      state = state.copyWith(error: error.message);
+      return const {};
     } catch (_) {
       return const {};
     }

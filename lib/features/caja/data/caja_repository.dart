@@ -2,34 +2,73 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
 
 typedef CajaPostRequest = Future<Object?> Function(String path);
+typedef CajaAnnulMovementRequest =
+    Future<void> Function(String path, Map<String, dynamic> data);
 
-const cajaDenominaciones = <double>[
-  200,
-  100,
-  50,
-  20,
-  10,
-  5,
-  2,
-  1,
-  0.5,
-  0.2,
-  0.1,
-];
+const cajaDenominaciones = <double>[200, 100, 50, 20, 10, 5, 2, 1, 0.5];
+
+class UnsupportedCajaDenominationException implements Exception {
+  final double denomination;
+  final int quantity;
+
+  const UnsupportedCajaDenominationException({
+    required this.denomination,
+    required this.quantity,
+  });
+
+  String get message =>
+      'El conteo recibido incluye $quantity unidades de S/ ${denomination.toStringAsFixed(2)}, una denominación no habilitada. Realiza un recuento manual antes de continuar.';
+
+  @override
+  String toString() => message;
+}
+
+void _validateCajaDenominaciones(Map<double, int> cantidades) {
+  for (final entry in cantidades.entries) {
+    if (entry.value != 0 && !cajaDenominaciones.contains(entry.key)) {
+      throw UnsupportedCajaDenominationException(
+        denomination: entry.key,
+        quantity: entry.value,
+      );
+    }
+  }
+}
 
 List<Map<String, dynamic>> cajaDenominacionesPayload(
   Map<double, int> cantidades,
-) => cajaDenominaciones
-    .map(
-      (denominacion) => {
-        'denominacion': denominacion,
-        'cantidad': cantidades[denominacion] ?? 0,
-      },
-    )
-    .toList();
+) {
+  _validateCajaDenominaciones(cantidades);
+  return cajaDenominaciones
+      .map(
+        (denominacion) => {
+          'denominacion': denominacion,
+          'cantidad': cantidades[denominacion] ?? 0,
+        },
+      )
+      .toList();
+}
 
-double cajaDenominacionesTotal(Map<double, int> cantidades) =>
-    cantidades.entries.fold(0, (total, item) => total + item.key * item.value);
+Map<String, dynamic> cajaAperturaPayload(
+  Map<double, int> cantidades, {
+  String? sedeId,
+  double saldoInicialYape = 0,
+}) => {
+  'denominaciones': cajaDenominacionesPayload(cantidades),
+  'saldoInicialYape': saldoInicialYape,
+  'sedeId': ?sedeId,
+};
+
+Map<String, dynamic> cajaPrecuadrePayload(Map<double, int> cantidades) => {
+  'denominaciones': cajaDenominacionesPayload(cantidades),
+};
+
+double cajaDenominacionesTotal(Map<double, int> cantidades) {
+  _validateCajaDenominaciones(cantidades);
+  return cantidades.entries.fold(
+    0,
+    (total, item) => total + item.key * item.value,
+  );
+}
 
 Map<double, int> cajaCantidadesFromResponse(dynamic data) {
   if (data is! List) return const {};
@@ -37,11 +76,17 @@ Map<double, int> cajaCantidadesFromResponse(dynamic data) {
   for (final item in data.whereType<Map>()) {
     final denominacion = (item['denominacion'] as num?)?.toDouble();
     final cantidad = (item['cantidad'] as num?)?.toInt();
-    if (denominacion != null &&
-        cantidad != null &&
-        cajaDenominaciones.contains(denominacion)) {
-      cantidades[denominacion] = cantidad;
+    if (denominacion == null || cantidad == null) continue;
+    if (!cajaDenominaciones.contains(denominacion)) {
+      if (cantidad != 0) {
+        throw UnsupportedCajaDenominationException(
+          denomination: denominacion,
+          quantity: cantidad,
+        );
+      }
+      continue;
     }
+    cantidades[denominacion] = cantidad;
   }
   return cantidades;
 }
@@ -382,6 +427,9 @@ class CajaMovimiento {
   final String? comprobante;
   final String? etiquetaId;
   final String? etiqueta;
+  final String? revierteAId;
+  final String? revertidoPorId;
+  final bool anulable;
   final String usuario;
   final DateTime createdAt;
 
@@ -402,6 +450,9 @@ class CajaMovimiento {
     this.comprobante,
     this.etiquetaId,
     this.etiqueta,
+    this.revierteAId,
+    this.revertidoPorId,
+    this.anulable = false,
   });
 
   factory CajaMovimiento.fromJson(Map<String, dynamic> json) => CajaMovimiento(
@@ -418,6 +469,9 @@ class CajaMovimiento {
     referencia: json['referencia'] as String?,
     comprobante: json['comprobante'] as String?,
     etiquetaId: json['etiquetaId'] as String?,
+    revierteAId: json['revierteAId'] as String?,
+    revertidoPorId: json['revertidoPorId'] as String?,
+    anulable: json['anulable'] == true,
     etiqueta: switch (json['etiqueta']) {
       Map value => value['nombre']?.toString(),
       String value when value.isNotEmpty => value,
@@ -455,7 +509,12 @@ class CajaPage<T> {
 class CajaRepository {
   final ApiClient _api;
   final CajaPostRequest? postRequest;
-  const CajaRepository(this._api, {this.postRequest});
+  final CajaAnnulMovementRequest? annulMovementRequest;
+  const CajaRepository(
+    this._api, {
+    this.postRequest,
+    this.annulMovementRequest,
+  });
 
   /// Convierte response.data a Map de forma segura.
   /// Si el backend devuelve String (error HTML/texto), retorna mapa vacío.
@@ -581,11 +640,11 @@ class CajaRepository {
   }) async {
     final response = await _api.post(
       '/caja/apertura',
-      data: {
-        'denominaciones': cajaDenominacionesPayload(cantidades),
-        'saldoInicialYape': saldoInicialYape,
-        'sedeId': ?sedeId,
-      },
+      data: cajaAperturaPayload(
+        cantidades,
+        sedeId: sedeId,
+        saldoInicialYape: saldoInicialYape,
+      ),
     );
     return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }
@@ -612,10 +671,41 @@ class CajaRepository {
     );
   }
 
+  Future<void> anularMovimiento({
+    required String cajaSesionId,
+    required String movimientoId,
+    required String motivo,
+    String? superadminPin,
+  }) async {
+    final normalizedMotivo = motivo.trim();
+    if (normalizedMotivo.isEmpty || normalizedMotivo.length > 500) {
+      throw const FormatException(
+        'El motivo debe tener entre 1 y 500 caracteres.',
+      );
+    }
+    if (superadminPin != null && !RegExp(r'^\d{4}$').hasMatch(superadminPin)) {
+      throw const FormatException(
+        'La clave de SUPERADMIN debe tener 4 dígitos.',
+      );
+    }
+
+    final path = '/caja/$cajaSesionId/movimientos/$movimientoId/anular';
+    final data = <String, dynamic>{
+      'motivo': normalizedMotivo,
+      'superadminPin': ?superadminPin,
+    };
+    final request = annulMovementRequest;
+    if (request != null) {
+      await request(path, data);
+      return;
+    }
+    await _api.post(path, data: data);
+  }
+
   Future<CajaSesion> precuadre(String id, Map<double, int> cantidades) async {
     final response = await _api.post(
       '/caja/$id/precuadre',
-      data: {'denominaciones': cajaDenominacionesPayload(cantidades)},
+      data: cajaPrecuadrePayload(cantidades),
     );
     return CajaSesion.fromJson(CajaRepository._toMap(response.data));
   }

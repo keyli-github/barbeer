@@ -21,6 +21,7 @@ import '../../../reportes/presentation/providers/reportes_provider.dart';
 import '../../../ventas/data/models/venta_models.dart';
 import '../../data/caja_repository.dart';
 import '../providers/caja_provider.dart';
+import '../widgets/anular_movimiento_action.dart';
 import '../widgets/caja_arqueo_sheets.dart';
 import '../widgets/caja_resumen_v2.dart';
 
@@ -101,6 +102,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
                       canPrecuadre: auth.hasPermission('caja:precuadre'),
                       canClose: auth.hasPermission('caja:cerrar'),
                       canMove: auth.hasPermission('caja:movimientos'),
+                      canAnnulMovement: auth.hasPermission('caja:leer'),
                       hasSedeScope: state.sedeId != null,
                       userId: auth.user?.id ?? '',
                       username: auth.user?.username ?? '',
@@ -150,12 +152,14 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
   }
 
   Future<void> _showOpening(BuildContext context) async {
+    final state = ref.read(cajaProvider);
     final saved = await ResponsiveForm.showPage<bool>(
       context: context,
       dialogWidth: 640,
       dialogHeight: 760,
       page: _OpeningSheet(
-        initialCounts: ref.read(cajaProvider).aperturaSugerida,
+        initialCounts: state.aperturaSugerida,
+        initialCountsWarning: state.error,
       ),
     );
     if (saved == true && mounted) _success('Caja abierta correctamente');
@@ -163,12 +167,20 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
 
   Future<void> _showPrecuadre(BuildContext context) async {
     final state = ref.read(cajaProvider);
-    final precuadre = cajaCantidadesFromResponse(
-      state.actual?.denominacionesPrecuadre,
-    );
+    Map<double, int> precuadre;
+    var warning = state.error;
+    try {
+      precuadre = cajaCantidadesFromResponse(
+        state.actual?.denominacionesPrecuadre,
+      );
+    } on UnsupportedCajaDenominationException catch (error) {
+      precuadre = const {};
+      warning = error.message;
+    }
     showPrecuadreSheet(
       context,
       initialCounts: precuadre.isEmpty ? state.aperturaSugerida : precuadre,
+      initialCountsWarning: warning,
       onSuccess: () => _success('Precuadre registrado'),
     );
   }
@@ -177,12 +189,22 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
     BuildContext context, {
     required bool canForzar,
   }) async {
+    final state = ref.read(cajaProvider);
+    Map<double, int> initialCounts;
+    var warning = state.error;
+    try {
+      initialCounts = cajaCantidadesFromResponse(
+        state.actual?.denominacionesPrecuadre,
+      );
+    } on UnsupportedCajaDenominationException catch (error) {
+      initialCounts = const {};
+      warning = error.message;
+    }
     showCierreSheet(
       context,
       canForzar: canForzar,
-      initialCounts: cajaCantidadesFromResponse(
-        ref.read(cajaProvider).actual?.denominacionesPrecuadre,
-      ),
+      initialCounts: initialCounts,
+      initialCountsWarning: warning,
       onSuccess: () => _success('Caja cerrada correctamente'),
     );
   }
@@ -408,6 +430,7 @@ class _Actual extends StatelessWidget {
   final bool canPrecuadre;
   final bool canClose;
   final bool canMove;
+  final bool canAnnulMovement;
   final bool hasSedeScope;
   final String userId;
   final String username;
@@ -427,6 +450,7 @@ class _Actual extends StatelessWidget {
     required this.canPrecuadre,
     required this.canClose,
     this.canMove = false,
+    this.canAnnulMovement = false,
     required this.hasSedeScope,
     required this.userId,
     required this.username,
@@ -463,11 +487,13 @@ class _Actual extends StatelessWidget {
         child: AppEmptyState(
           icon: Icons.lock_clock_outlined,
           title: 'No hay una caja abierta',
-          description: !hasSedeScope
-              ? 'Selecciona una sede en el encabezado para consultar o abrir su caja.'
-              : canOpen
-              ? 'Registra el conteo de efectivo para iniciar el turno.'
-              : 'Un usuario autorizado debe abrir la caja de esta sede.',
+          description:
+              state.error ??
+              (!hasSedeScope
+                  ? 'Selecciona una sede en el encabezado para consultar o abrir su caja.'
+                  : canOpen
+                  ? 'Registra el conteo de efectivo para iniciar el turno.'
+                  : 'Un usuario autorizado debe abrir la caja de esta sede.'),
           actionLabel: canOpen ? 'Abrir caja' : null,
           onAction: canOpen ? onOpen : null,
         ),
@@ -501,6 +527,8 @@ class _Actual extends StatelessWidget {
         canPrecuadre: canPrecuadre,
         canClose: canClose,
         canMove: canMove,
+        canAnnulMovement: canAnnulMovement,
+        isSuperAdmin: isSuperAdmin,
         onEntry: () => onMove('ENTRADA'),
         onExit: () => onMove('SALIDA'),
         onPrecuadre: onPrecuadre,
@@ -693,10 +721,22 @@ class _Actual extends StatelessWidget {
               ),
             )
           else if (MediaQuery.sizeOf(context).width >= 1024)
-            _MovementsDesktopTable(movements: state.movimientos)
+            _MovementsDesktopTable(
+              movements: state.movimientos,
+              hasCajaReadPermission: canAnnulMovement,
+              isSuperAdmin: isSuperAdmin,
+              sessionVersion: session.version,
+              onRefresh: onRefresh,
+            )
           else
             for (final movement in state.movimientos)
-              _MovementTile(movement: movement),
+              _MovementTile(
+                movement: movement,
+                hasCajaReadPermission: canAnnulMovement,
+                isSuperAdmin: isSuperAdmin,
+                sessionVersion: session.version,
+                onRefresh: onRefresh,
+              ),
           _Pager(
             page: state.movimientosPagina,
             pages: state.movimientosPaginas,
@@ -1002,8 +1042,9 @@ class _RefreshableCajaState extends StatelessWidget {
 
 class _OpeningSheet extends ConsumerStatefulWidget {
   final Map<double, int> initialCounts;
+  final String? initialCountsWarning;
 
-  const _OpeningSheet({required this.initialCounts});
+  const _OpeningSheet({required this.initialCounts, this.initialCountsWarning});
 
   @override
   ConsumerState<_OpeningSheet> createState() => _OpeningSheetState();
@@ -1047,13 +1088,17 @@ class _OpeningSheetState extends ConsumerState<_OpeningSheet> {
     appBar: SubPageAppBar(
       title: 'Apertura de caja',
       subtitle: widget.initialCounts.isEmpty
-          ? 'Conteo obligatorio de las 11 denominaciones PEN'
+          ? 'Conteo obligatorio de las 9 denominaciones PEN'
           : 'Prefill del último cierre; verifica el efectivo físico',
     ),
     body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
+          if (widget.initialCountsWarning != null) ...[
+            CajaDenominationWarning(message: widget.initialCountsWarning!),
+            const SizedBox(height: 14),
+          ],
           GridView.count(
             crossAxisCount: MediaQuery.sizeOf(context).width > 520 ? 3 : 2,
             shrinkWrap: true,
@@ -1455,6 +1500,7 @@ class _DetailSheet extends ConsumerStatefulWidget {
 }
 
 class _DetailSheetState extends ConsumerState<_DetailSheet> {
+  late Future<CajaSesion> _sessionFuture;
   bool _reopening = false;
   bool _resendingReport = false;
   // Movimientos de la sesión
@@ -1465,6 +1511,12 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
   int _movTotal = 0;
   String? _movTipo;
   String? _loadedId;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionFuture = widget.future;
+  }
 
   Future<void> _loadMovimientos(String id, {int? pagina, String? tipo}) async {
     setState(() => _movLoading = true);
@@ -1488,6 +1540,31 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
     }
   }
 
+  Future<void> _refreshAfterAnnulment(String id) async {
+    final repo = ref.read(cajaRepositoryProvider);
+    final sessionFuture = ref.read(cajaProvider.notifier).detalle(id);
+    final movementPageFuture = repo.movimientos(
+      id,
+      pagina: _movPage,
+      tipo: _movTipo,
+    );
+    final results = await Future.wait<Object>([
+      sessionFuture,
+      movementPageFuture,
+    ]);
+    final session = results[0] as CajaSesion;
+    final page = results[1] as CajaPage<CajaMovimiento>;
+    if (!mounted) return;
+    setState(() {
+      _sessionFuture = Future.value(session);
+      _movimientos = page.data;
+      _movPages = page.totalPaginas;
+      _movTotal = page.total;
+      _movPage = page.pagina;
+      _movLoading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: context.colors.surface,
@@ -1496,7 +1573,7 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
       subtitle: 'Resumen y arqueos del turno',
     ),
     body: FutureBuilder<CajaSesion>(
-      future: widget.future,
+      future: _sessionFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const _InlineSkeleton();
@@ -1809,7 +1886,16 @@ class _DetailSheetState extends ConsumerState<_DetailSheet> {
                       child: Column(
                         children: [
                           for (final m in _movimientos)
-                            _MovementTile(movement: m),
+                            _MovementTile(
+                              movement: m,
+                              hasCajaReadPermission: auth.hasPermission(
+                                'caja:leer',
+                              ),
+                              isSuperAdmin: auth.user?.isSuperAdmin ?? false,
+                              sessionVersion: session.version,
+                              onRefresh: () =>
+                                  _refreshAfterAnnulment(session.id),
+                            ),
                         ],
                       ),
                     ),
@@ -1987,8 +2073,18 @@ class _Metric extends StatelessWidget {
 
 class _MovementTile extends StatelessWidget {
   final CajaMovimiento movement;
+  final bool hasCajaReadPermission;
+  final bool isSuperAdmin;
+  final String? sessionVersion;
+  final Future<void> Function() onRefresh;
 
-  const _MovementTile({required this.movement});
+  const _MovementTile({
+    required this.movement,
+    required this.hasCajaReadPermission,
+    required this.isSuperAdmin,
+    required this.sessionVersion,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2079,6 +2175,20 @@ class _MovementTile extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 46),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: CashMovementAnnulmentAction(
+                  key: ObjectKey(movement),
+                  movement: movement,
+                  hasCajaReadPermission: hasCajaReadPermission,
+                  isSuperAdmin: isSuperAdmin,
+                  sessionVersion: sessionVersion,
+                  onRefresh: onRefresh,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -2094,6 +2204,8 @@ class CajaDesktopCurrentView extends StatelessWidget {
   final bool canPrecuadre;
   final bool canClose;
   final bool canMove;
+  final bool canAnnulMovement;
+  final bool isSuperAdmin;
   final VoidCallback onEntry;
   final VoidCallback onExit;
   final VoidCallback onPrecuadre;
@@ -2110,6 +2222,8 @@ class CajaDesktopCurrentView extends StatelessWidget {
     required this.canPrecuadre,
     required this.canClose,
     required this.canMove,
+    required this.canAnnulMovement,
+    required this.isSuperAdmin,
     required this.onEntry,
     required this.onExit,
     required this.onPrecuadre,
@@ -2295,7 +2409,13 @@ class CajaDesktopCurrentView extends StatelessWidget {
                     child: Center(child: Text('Sin movimientos del turno.')),
                   )
                 else
-                  _MovementsDesktopTable(movements: state.movimientos),
+                  _MovementsDesktopTable(
+                    movements: state.movimientos,
+                    hasCajaReadPermission: canAnnulMovement,
+                    isSuperAdmin: isSuperAdmin,
+                    sessionVersion: session.version,
+                    onRefresh: onRefresh,
+                  ),
               ],
             ),
           ),
@@ -2393,7 +2513,18 @@ class _DesktopCajaAction extends StatelessWidget {
 /// Desktop DataTable for caja movements — matches web's table layout.
 class _MovementsDesktopTable extends StatelessWidget {
   final List<CajaMovimiento> movements;
-  const _MovementsDesktopTable({required this.movements});
+  final bool hasCajaReadPermission;
+  final bool isSuperAdmin;
+  final String? sessionVersion;
+  final Future<void> Function() onRefresh;
+
+  const _MovementsDesktopTable({
+    required this.movements,
+    required this.hasCajaReadPermission,
+    required this.isSuperAdmin,
+    required this.sessionVersion,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -2415,6 +2546,7 @@ class _MovementsDesktopTable extends StatelessWidget {
             DataColumn(label: Text('Monto'), numeric: true),
             DataColumn(label: Text('Comprobante')),
             DataColumn(label: Text('Usuario')),
+            DataColumn(label: Text('Acción')),
           ],
           rows: movements.map((m) {
             final incoming = m.tipo == 'ENTRADA';
@@ -2494,6 +2626,17 @@ class _MovementsDesktopTable extends StatelessWidget {
                       fontSize: 12,
                       color: context.colors.textSecondary,
                     ),
+                  ),
+                ),
+                DataCell(
+                  CashMovementAnnulmentAction(
+                    key: ObjectKey(m),
+                    movement: m,
+                    hasCajaReadPermission: hasCajaReadPermission,
+                    isSuperAdmin: isSuperAdmin,
+                    sessionVersion: sessionVersion,
+                    onRefresh: onRefresh,
+                    compact: true,
                   ),
                 ),
               ],
