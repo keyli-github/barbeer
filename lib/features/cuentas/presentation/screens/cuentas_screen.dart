@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/async/operation_state.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/format_utils.dart';
 import '../../../../core/widgets/app_empty_state.dart';
@@ -14,6 +15,13 @@ import '../../../ventas/presentation/widgets/comprobante_analysis_panel.dart';
 import '../providers/cuentas_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/widgets/operation_form.dart';
+
+String _saldoEfectivoCajaLabel(double balance) {
+  final rounded = double.parse(balance.toStringAsFixed(2));
+  if (rounded > 0) return 'A favor · ${FormatUtils.currency(rounded)}';
+  if (rounded < 0) return 'En contra · ${FormatUtils.currency(-rounded)}';
+  return 'Sin saldo';
+}
 
 class CuentasScreen extends ConsumerStatefulWidget {
   const CuentasScreen({super.key});
@@ -39,7 +47,6 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
             decoration: const InputDecoration(labelText: 'Tipo de cuenta'),
             items: const [
               DropdownMenuItem(value: 'CLIENTE', child: Text('Cliente')),
-              DropdownMenuItem(value: 'PERSONAL', child: Text('Personal')),
               DropdownMenuItem(value: 'SOCIO', child: Text('Socio')),
             ],
             onChanged: (value) {
@@ -191,7 +198,7 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
                   ),
                   title: Text(account.nombre),
                   subtitle: Text(
-                    '${account.tipo} · ${account.cantidadPendientes ?? 0} venta(s) pendiente(s)\nEfectivo en caja: ${FormatUtils.currency(account.saldoEfectivoCaja)}',
+                    '${account.tipo} · ${account.cantidadPendientes ?? 0} venta(s) pendiente(s)\nEfectivo en caja: ${_saldoEfectivoCajaLabel(account.saldoEfectivoCaja)}',
                   ),
                   trailing: Text(
                     FormatUtils.currency(account.saldo),
@@ -441,8 +448,8 @@ class _CuentasScreenState extends ConsumerState<CuentasScreen> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${account.cantidadPendientes ?? 0} venta(s) pendiente(s)',
-                          maxLines: 1,
+                          '${account.cantidadPendientes ?? 0} venta(s) pendiente(s) · ${_saldoEfectivoCajaLabel(account.saldoEfectivoCaja)}',
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: context.colors.textTertiary,
@@ -755,6 +762,8 @@ class _AccountDetail extends StatelessWidget {
             ],
           ),
           const Divider(height: 28),
+          _CashBalancePanel(detail: detail, notifier: notifier),
+          const Divider(height: 28),
           for (final charge in detail.cargosPendientes)
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -894,6 +903,232 @@ class _AccountDetail extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _CashBalancePanel extends StatelessWidget {
+  final CuentaDetalle detail;
+  final CuentasNotifier notifier;
+
+  const _CashBalancePanel({required this.detail, required this.notifier});
+
+  @override
+  Widget build(BuildContext context) {
+    final balance = double.parse(
+      detail.cuenta.saldoEfectivoCaja.toStringAsFixed(2),
+    );
+    final canPayOut = notifier.canPayOutSaldoFavor && balance > 0;
+    final color = balance > 0
+        ? context.colors.success
+        : balance < 0
+        ? context.colors.error
+        : context.colors.textTertiary;
+
+    return Container(
+      key: const Key('saldo-efectivo-panel'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceAlt,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Saldo efectivo en caja',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: context.colors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _saldoEfectivoCajaLabel(balance),
+                  key: const Key('saldo-efectivo-value'),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          if (canPayOut) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                key: const Key('saldo-favor-payout-open'),
+                icon: const Icon(Icons.payments_outlined, size: 18),
+                label: const Text('Devolver saldo a favor'),
+                onPressed: () async {
+                  final paid = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => _SaldoFavorPayoutDialog(
+                      detail: detail,
+                      notifier: notifier,
+                    ),
+                  );
+                  if (paid == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Devolución registrada.')),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SaldoFavorPayoutDialog extends StatefulWidget {
+  final CuentaDetalle detail;
+  final CuentasNotifier notifier;
+
+  const _SaldoFavorPayoutDialog({required this.detail, required this.notifier});
+
+  @override
+  State<_SaldoFavorPayoutDialog> createState() =>
+      _SaldoFavorPayoutDialogState();
+}
+
+class _SaldoFavorPayoutDialogState extends State<_SaldoFavorPayoutDialog> {
+  late final TextEditingController amount;
+  String? error;
+  bool busy = false;
+
+  double get _available =>
+      double.parse(widget.detail.cuenta.saldoEfectivoCaja.toStringAsFixed(2));
+  double get _maxPayout =>
+      _available > 999999999.99 ? 999999999.99 : _available;
+
+  double? get _amount =>
+      double.tryParse(amount.text.trim().replaceAll(',', '.'));
+
+  bool get _validAmount {
+    final value = _amount;
+    if (value == null ||
+        !value.isFinite ||
+        value < 0.01 ||
+        value > _maxPayout) {
+      return false;
+    }
+    final cents = value * 100;
+    return (cents - cents.round()).abs() <= 0.000001;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    amount = TextEditingController(text: _maxPayout.toStringAsFixed(2));
+  }
+
+  @override
+  void dispose() {
+    amount.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final amountValue = _amount;
+    if (!_validAmount || amountValue == null || busy) {
+      setState(
+        () => error =
+            'Ingresa un monto entre S/ 0.01 y ${FormatUtils.currency(_maxPayout)}.',
+      );
+      return;
+    }
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await widget.notifier.paySaldoFavor(
+        cuentaId: widget.detail.id,
+        monto: amountValue,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (exception) {
+      if (mounted) {
+        setState(() {
+          busy = false;
+          error = exception is AppException
+              ? exception.message
+              : 'No se pudo registrar la devolución.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Devolver saldo a favor'),
+    content: SizedBox(
+      width: 420,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Saldo disponible: ${FormatUtils.currency(_available)}'),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('saldo-favor-payout-amount'),
+              controller: amount,
+              autofocus: true,
+              enabled: !busy,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.done,
+              onChanged: (_) => setState(() => error = null),
+              onSubmitted: (_) => _submit(),
+              decoration: const InputDecoration(
+                labelText: 'Monto a devolver (S/) *',
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Se registrará una salida en efectivo. Requiere una caja V2 abierta para esta sede, iniciada por tu usuario.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 10),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  error!,
+                  key: const Key('saldo-favor-payout-error'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: busy ? null : () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(
+        key: const Key('saldo-favor-payout-submit'),
+        onPressed: busy ? null : _submit,
+        child: Text(busy ? 'Registrando...' : 'Registrar devolución'),
+      ),
+    ],
   );
 }
 

@@ -992,6 +992,9 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
 
   Widget _buildSaleDetails({required VoidCallback refresh}) {
     final auth = ref.read(authProvider);
+    final canCreateSaleAccount =
+        auth.hasPermission('cuentas:crear') ||
+        auth.hasPermission('ventas:crear');
     final recargoOculto = ref.read(recargoControlProvider).oculto;
     final selectedEtiqueta = _etiquetas
         .where((item) => item.id == _etiquetaId)
@@ -1341,8 +1344,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
           if ((_payment == EstadoConciliacion.efectivo ||
                   (_payment == EstadoConciliacion.billetera &&
                       (_comprobanteAnalisis?.monto ?? _total) < _total)) &&
-              (auth.user?.hasPermission('cuentas:crear') == true ||
-                  auth.user?.hasPermission('ventas:crear') == true)) ...[
+              canCreateSaleAccount) ...[
             const SizedBox(height: AppSpacing.xs),
             if (_cuenta != null && _cuentaMonto != null)
               Row(
@@ -1385,9 +1387,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                           repository: ref.read(cuentasRepositoryProvider),
                           sedeId: sedeId,
                           total: _total,
-                          canCreate:
-                              auth.user?.hasPermission('cuentas:crear') ??
-                              false,
+                          canCreate: canCreateSaleAccount,
                           paidAmount: _payment == EstadoConciliacion.billetera
                               ? _comprobanteAnalisis?.monto
                               : null,
@@ -1469,7 +1469,7 @@ class _NuevaVentaViewState extends ConsumerState<NuevaVentaView> {
                         repository: ref.read(cuentasRepositoryProvider),
                         sedeId: sede,
                         total: remaining,
-                        canCreate: auth.hasPermission('cuentas:crear'),
+                        canCreate: canCreateSaleAccount,
                       );
                       if (charge != null && mounted) {
                         if (_accountCharges.any(

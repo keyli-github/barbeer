@@ -894,7 +894,7 @@ void main() {
       },
     );
 
-    testWidgets('account charge stays hidden without selector permissions', (
+    testWidgets('account charge stays hidden with no grants', (
       tester,
     ) async {
       var selectorCalls = 0;
@@ -909,6 +909,7 @@ void main() {
         tester,
         size: const Size(1440, 900),
         loader: () async => _products,
+        permissions: const [],
         accountsRepository: accounts,
       );
       await tester.pump();
@@ -967,7 +968,7 @@ void main() {
         );
         await tester.tap(find.byKey(const Key('account-charge-open')));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Crear Nueva Cuenta'));
+        await tester.tap(find.text('Crear cuenta de cliente'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byKey(const Key('account-name')), ' Luis ');
         await tester.pump();
@@ -987,8 +988,95 @@ void main() {
         await tester.ensureVisible(find.text('CONFIRMAR VENTA'));
         await tester.tap(find.text('CONFIRMAR VENTA'));
         await tester.pumpAndSettle();
-        expect(createPath, '/cuentas');
+        expect(createPath, '/cuentas/clientes-venta');
         expect(createBody, {'nombre': 'Luis'});
+        expect(sales.creates.single.json['cuentaId'], 'created-account');
+        expect(sales.creates.single.json['cuentaMonto'], 12);
+        expect(find.byKey(const Key('mobile-cart-bar')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'seller with only sales:create creates a client account through the sale endpoint',
+      (tester) async {
+        late String createPath;
+        late Map<String, dynamic> createBody;
+        final accounts = CuentasRepository(
+          ApiClient.instance,
+          request: (_, _) async => [],
+          post: (path, body) async {
+            createPath = path;
+            createBody = body;
+            return {
+              'id': 'created-account',
+              'nombre': 'Luis',
+              'documento': null,
+              'telefono': null,
+              'saldo': '0',
+              'activo': true,
+              'cantidadPendientes': null,
+              'createdAt': '2026-08-01T10:00:00Z',
+              'updatedAt': '2026-08-01T10:00:00Z',
+            };
+          },
+        );
+        final sales = _ConfirmReceiptRepository(
+          analysis: _validAnalysis('unused', 'Yape'),
+        );
+        await _pumpNuevaVenta(
+          tester,
+          size: const Size(390, 844),
+          loader: () async => _products,
+          permissions: const ['ventas:crear'],
+          repository: sales,
+          accountsRepository: accounts,
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('mobile-product-p1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Confirmar'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('mobile-cart-bar')));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-open')),
+        );
+        await tester.tap(find.byKey(const Key('account-charge-open')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Crear cuenta de cliente'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('account-name')), ' Luis ');
+        await tester.enterText(
+          find.byKey(const Key('account-document')),
+          '12345678',
+        );
+        await tester.enterText(
+          find.byKey(const Key('account-phone')),
+          '987654321',
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('account-create-submit')));
+        await tester.pumpAndSettle();
+        expect(find.text('Cliente Seleccionado: Luis'), findsOneWidget);
+        await tester.enterText(
+          find.byKey(const Key('account-cash-amount')),
+          '0',
+        );
+        await tester.pump();
+        await tester.ensureVisible(
+          find.byKey(const Key('account-charge-apply')),
+        );
+        await tester.tap(find.byKey(const Key('account-charge-apply')));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('CONFIRMAR VENTA'));
+        await tester.tap(find.text('CONFIRMAR VENTA'));
+        await tester.pumpAndSettle();
+        expect(createPath, '/cuentas/clientes-venta');
+        expect(createBody, {
+          'nombre': 'Luis',
+          'documento': '12345678',
+          'telefono': '987654321',
+        });
         expect(sales.creates.single.json['cuentaId'], 'created-account');
         expect(sales.creates.single.json['cuentaMonto'], 12);
         expect(find.byKey(const Key('mobile-cart-bar')), findsNothing);

@@ -66,7 +66,7 @@ class _CreateCuentaDialogState extends State<_CreateCuentaDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Crear Nueva Cuenta'),
+    title: const Text('Crear Cuenta de Cliente'),
     content: SizedBox(
       width: 420,
       child: Column(
@@ -79,7 +79,7 @@ class _CreateCuentaDialogState extends State<_CreateCuentaDialog> {
             inputFormatters: [LengthLimitingTextInputFormatter(100)],
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
-              labelText: 'Nombre de Usuario *',
+              labelText: 'Nombre del cliente *',
               hintText: 'Ej. Juan Pérez',
             ),
           ),
@@ -284,11 +284,11 @@ class _CuentaChargeDialogState extends State<_CuentaChargeDialog> {
               if (widget.canCreate)
                 TextButton.icon(
                   icon: const Icon(Icons.person_add_alt_1),
-                  label: const Text('Crear Nueva Cuenta'),
+                  label: const Text('Crear cuenta de cliente'),
                   onPressed: () async {
                     final created = await showCreateCuentaDialog(
                       context,
-                      widget.repository.create,
+                      widget.repository.createClienteVenta,
                     );
                     if (created != null && mounted)
                       setState(() => selected = created);

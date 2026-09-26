@@ -38,6 +38,31 @@ class CuentasRepository {
     String? documento,
     String? telefono,
     String? tipo,
+  }) => _createAt(
+    ApiConstants.accounts,
+    nombre: nombre,
+    documento: documento,
+    telefono: telefono,
+    tipo: tipo,
+  );
+
+  Future<Cuenta> createClienteVenta({
+    required String nombre,
+    String? documento,
+    String? telefono,
+  }) => _createAt(
+    ApiConstants.accountCreateForSale,
+    nombre: nombre,
+    documento: documento,
+    telefono: telefono,
+  );
+
+  Future<Cuenta> _createAt(
+    String path, {
+    required String nombre,
+    String? documento,
+    String? telefono,
+    String? tipo,
   }) async {
     final body = <String, dynamic>{
       'nombre': nombre.trim(),
@@ -46,8 +71,8 @@ class CuentasRepository {
       if (telefono?.trim().isNotEmpty ?? false) 'telefono': telefono!.trim(),
     };
     final data = post != null
-        ? await post!(ApiConstants.accounts, body)
-        : (await _api.post(ApiConstants.accounts, data: body)).data;
+        ? await post!(path, body)
+        : (await _api.post(path, data: body)).data;
     return Cuenta.fromJson(Json.from(data as Map));
   }
 
@@ -76,6 +101,28 @@ class CuentasRepository {
     final data = post != null
         ? await post!(ApiConstants.accountPayments(id), body)
         : (await _api.post(ApiConstants.accountPayments(id), data: body)).data;
+    return CuentaDetalle.fromJson(Json.from(data as Map));
+  }
+
+  Future<CuentaDetalle> paySaldoFavor(
+    String id, {
+    required double monto,
+    required String medioPago,
+    required String idempotencyKey,
+    required String sedeId,
+  }) async {
+    final body = <String, dynamic>{
+      'monto': monto,
+      'medioPago': medioPago,
+      'idempotencyKey': idempotencyKey,
+      'sedeId': sedeId,
+    };
+    final data = post != null
+        ? await post!(ApiConstants.accountSaldoFavorPayments(id), body)
+        : (await _api.post(
+            ApiConstants.accountSaldoFavorPayments(id),
+            data: body,
+          )).data;
     return CuentaDetalle.fromJson(Json.from(data as Map));
   }
 

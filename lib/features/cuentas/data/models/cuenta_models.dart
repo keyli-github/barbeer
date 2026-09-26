@@ -42,21 +42,24 @@ class Cuenta {
     createdAt: j['createdAt'] as String,
     updatedAt: j['updatedAt'] as String,
   );
-  Cuenta withDebt({required double saldo, required int cantidadPendientes}) =>
-      Cuenta(
-        id: id,
-        nombre: nombre,
-        documento: documento,
-        telefono: telefono,
-        tipo: tipo,
-        saldoEfectivoCaja: saldoEfectivoCaja,
-        saldo: saldo,
-        activo: activo,
-        cantidadPendientes: cantidadPendientes,
-        esPersonal: esPersonal,
-        createdAt: createdAt,
-        updatedAt: updatedAt,
-      );
+  Cuenta withDebt({
+    required double saldo,
+    required int cantidadPendientes,
+    double? saldoEfectivoCaja,
+  }) => Cuenta(
+    id: id,
+    nombre: nombre,
+    documento: documento,
+    telefono: telefono,
+    tipo: tipo,
+    saldoEfectivoCaja: saldoEfectivoCaja ?? this.saldoEfectivoCaja,
+    saldo: saldo,
+    activo: activo,
+    cantidadPendientes: cantidadPendientes,
+    esPersonal: esPersonal,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
 
 class CuentaMovimiento {
